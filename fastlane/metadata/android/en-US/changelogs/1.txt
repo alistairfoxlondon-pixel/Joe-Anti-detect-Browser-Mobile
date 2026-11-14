@@ -1,0 +1,1 @@
+First public build. Isolated profiles, per-profile fingerprints, HTTP/HTTPS/SOCKS5 proxy auth with watchlist alerts, paste-as-human, tracker counter, history, JSON backups.

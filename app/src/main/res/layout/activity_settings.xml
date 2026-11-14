@@ -146,6 +146,20 @@
                 android:text="Anti-detect browser for Android. Every profile is an isolated identity — its own cookies, storage, proxy and fingerprint. All data stays on this device; there is no account, no sync, no telemetry."
                 android:textSize="11sp"
                 android:textColor="@color/text_dim" />
+
+            <LinearLayout
+                android:id="@+id/rowLicenses"
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:layout_marginTop="6dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal"
+                android:clickable="true"
+                android:focusable="true"
+                android:background="?attr/selectableItemBackground">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Open source licenses" android:textSize="13sp" android:textColor="@color/text" />
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:tint="@color/text_faint" />
+            </LinearLayout>
         </LinearLayout>
     </ScrollView>
 </LinearLayout>

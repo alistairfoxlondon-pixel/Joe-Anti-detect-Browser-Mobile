@@ -79,6 +79,9 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         // --- Export ---
+        binding.rowLicenses.setOnClickListener {
+            startActivity(Intent(this, LicensesActivity::class.java))
+        }
         binding.btnExportWithSecrets.setOnClickListener { shareExport(includeSecrets = true) }
         binding.btnExportNoSecrets.setOnClickListener { shareExport(includeSecrets = false) }
 
