@@ -458,10 +458,6 @@ class BrowserActivity : AppCompatActivity() {
             binding.pageProgress.visibility = View.VISIBLE
         }
 
-        override fun onProgressChanged(view: WebView?, newProgress: Int) {
-            binding.pageProgress.progress = newProgress
-            binding.pageProgress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
-        }
 
         override fun onPageFinished(view: WebView?, url: String?) {
             binding.pageProgress.visibility = View.GONE
@@ -507,7 +503,12 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     private inner class JBWebChromeClient : WebChromeClient() {
-        override fun onConsoleMessage(message: ConsoleMessage?): Boolean = false
+        override fun onProgressChanged(view: WebView?, newProgress: Int) {
+            binding.pageProgress.progress = newProgress
+            binding.pageProgress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
+        }
+
+        override fun onConsoleMessage(message: WebChromeClient.ConsoleMessage?): Boolean = false
 
         override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
             val allow = profile.fp.geoMode != "block"
@@ -520,7 +521,7 @@ class BrowserActivity : AppCompatActivity() {
         }
 
         override fun onShowFileChooser(webView: WebView?, filePathCallback: ValueCallback<Array<Uri>>?,
-                                       fileChooserParams: FileChooserParams?): Boolean {
+                                       fileChooserParams: WebChromeClient.FileChooserParams?): Boolean {
             this@BrowserActivity.filePathCallback?.onReceiveValue(null)
             this@BrowserActivity.filePathCallback = filePathCallback
             try {
@@ -533,7 +534,7 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        override fun onShowCustomView(view: android.view.View?, callback: CustomViewCallback?) {
+        override fun onShowCustomView(view: android.view.View?, callback: WebChromeClient.CustomViewCallback?) {
             if (view == null) return
             customView = view
             customViewCallback = callback

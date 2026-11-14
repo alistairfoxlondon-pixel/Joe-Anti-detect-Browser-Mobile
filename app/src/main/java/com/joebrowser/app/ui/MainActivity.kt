@@ -61,9 +61,9 @@ class MainActivity : AppCompatActivity() {
         ProxyMonitorService.maybeStart(this)
     }
 
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        val openTab = intent?.getStringExtra(EXTRA_OPEN_TAB) ?: return
+        val openTab = intent.getStringExtra(EXTRA_OPEN_TAB) ?: return
         val tab = when (openTab) {
             "proxies" -> R.id.nav_proxies
             "profiles" -> R.id.nav_profiles

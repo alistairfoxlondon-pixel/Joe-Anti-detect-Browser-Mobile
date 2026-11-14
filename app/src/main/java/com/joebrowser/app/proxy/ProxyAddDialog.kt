@@ -50,7 +50,7 @@ class ProxyAddDialog(
             }
         }
 
-        binding.btnCancelAdd.setOnClickListener { dialogRef.get()?.dismiss() }
+        binding.btnCancelAdd.setOnClickListener { dialog?.dismiss() }
 
         binding.btnCheckSave.setOnClickListener {
             val pasted = binding.pasteInput.text?.toString().orEmpty().trim()
@@ -58,14 +58,14 @@ class ProxyAddDialog(
         }
 
         val dialog = MaterialAlertDialogBuilder(context).setView(binding.root).create()
-        dialogRef.set(dialog)
+        this.dialog = dialog
         dialog.show()
     }
 
-    private val dialogRef = java.lang.ref.WeakReference<AlertDialog>(null)
+    private var dialog: AlertDialog? = null
 
     private fun saveParsedList(pasted: String, binding: DialogProxyAddBinding) {
-        val watch = binding.proxyWatchSwitch.isChecked
+        val shouldWatch = binding.proxyWatchSwitch.isChecked
         val parsed = ProxyParser.parseAll(pasted)
         if (parsed.proxies.isEmpty()) {
             binding.parsePreview.text = "Nothing recognized in the pasted text."
@@ -74,13 +74,13 @@ class ProxyAddDialog(
         val db = Database.get(context)
         val ids = mutableListOf<String>()
         parsed.proxies.forEach { cfg ->
-            val config = ProxyConfig.fromJson(cfg.toJson()).apply { watch = watch }
+            val config = ProxyConfig.fromJson(cfg.toJson()).apply { watch = shouldWatch }
             val item = SavedProxy(name = cfg.label().ifBlank { "${cfg.host}:${cfg.port}" }, config = config)
             db.saveProxy(item)
             ids.add(item.id)
         }
         android.widget.Toast.makeText(context, "Saved ${ids.size} prox${if (ids.size == 1) "y" else "ies"}", android.widget.Toast.LENGTH_SHORT).show()
-        dialogRef.get()?.dismiss()
+        dialog?.dismiss()
         onSaved()
         CoroutineScope(Dispatchers.IO).launch { ids.forEach { ProxyTester.testAndPersist(context, it) } }
     }
@@ -111,7 +111,7 @@ class ProxyAddDialog(
                 !result.ok -> "Unreachable — ${result.error.ifBlank { "proxy refused the connection" }}"
                 else -> "OK — ${result.ip} · ${result.latencyMs} ms · ${result.country.ifEmpty { "unknown country" }}"
             }
-            dialogRef.get()?.dismiss()
+            dialog?.dismiss()
             onSaved()
         }
     }
