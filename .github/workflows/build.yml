@@ -39,12 +39,37 @@ jobs:
         run: echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/joe-release.p12"
 
       - name: Build debug and release APKs
+        id: build
         env:
           JOE_KEYSTORE_PATH: ${{ env.KEYSTORE_BASE64 != '' && format('{0}/joe-release.p12', runner.temp) || '' }}
           JOE_KEYSTORE_PASSWORD: ${{ env.KEYSTORE_PASSWORD }}
           JOE_KEY_ALIAS: ${{ env.KEY_ALIAS }}
           JOE_KEY_PASSWORD: ${{ env.KEY_PASSWORD }}
-        run: ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace
+        shell: bash
+        run: |
+          mkdir -p ci-logs
+          set +e
+          ./gradlew :app:assembleDebug :app:assembleRelease --no-daemon --stacktrace --console=plain 2>&1 | tee ci-logs/build.log
+          code=${PIPESTATUS[0]}
+          echo "gradle_exit=$code" >> "$GITHUB_OUTPUT"
+          exit $code
+
+      # The sandbox running the agent cannot stream the raw Actions log, so
+      # surface the important lines as annotations (visible via the check-runs API).
+      - name: Annotate build errors
+        if: failure()
+        shell: bash
+        run: |
+          [ -f ci-logs/build.log ] || { echo "::error::No build log captured"; exit 0; }
+          grep -nE "^e: |error:|FAILURE:|What went wrong|Caused by|> Task .* FAILED" ci-logs/build.log | head -70 | while IFS= read -r line; do
+            msg=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
+            echo "::error::$msg"
+          done
+          echo "::notice::---- tail of build log ----"
+          tail -n 30 ci-logs/build.log | while IFS= read -r line; do
+            msg=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
+            echo "::notice::$msg"
+          done
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
