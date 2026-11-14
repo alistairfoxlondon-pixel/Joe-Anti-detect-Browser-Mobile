@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Joe Browser</string>
+    <string name="settings">Settings</string>
+    <string name="history">History</string>
+    <string name="open_source_licenses">Open source licenses</string>
+    <string name="nav_home">Home</string>
+    <string name="nav_profiles">Profiles</string>
+    <string name="nav_proxies">Proxies</string>
+    <string name="nav_browsers">Browsers</string>
+    <string name="nav_extensions">Extensions</string>
+    <string name="paste_as_human">Paste as Human</string>
+    <string name="fingerprint_test_browserscan">BrowserScan</string>
+    <string name="action_save">Save</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_delete">Delete</string>
+    <string name="action_edit">Edit</string>
+    <string name="action_close">Close</string>
+    <string name="action_retry">Retry</string>
+</resources>

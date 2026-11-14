@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    android:background="@color/card">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <ImageView
+            android:layout_width="22dp"
+            android:layout_height="22dp"
+            android:src="@drawable/ic_shield_check" />
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="10dp"
+            android:text="HTTP Tracker"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/text" />
+        <ImageButton
+            android:id="@+id/trackerClose"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:src="@drawable/ic_close"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Close"
+            android:tint="@color/text_dim" />
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/trackerSummary"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="0 requests · 0 trackers"
+        android:textSize="13sp"
+        android:textColor="@color/text_dim" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/trackerList"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="10dp" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:layout_marginTop="8dp">
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnCopyTrackerReport"
+            style="@style/Jb.Button.Secondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginEnd="6dp"
+            android:layout_height="38dp"
+            android:text="Copy report"
+            android:textAllCaps="false" />
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnClearTracker"
+            style="@style/Jb.Button.Secondary"
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_marginStart="6dp"
+            android:layout_height="38dp"
+            android:text="Clear"
+            android:textAllCaps="false" />
+    </LinearLayout>
+</LinearLayout>

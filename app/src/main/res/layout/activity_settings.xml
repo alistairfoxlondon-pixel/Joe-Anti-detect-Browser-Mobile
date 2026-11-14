@@ -1,0 +1,151 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="@color/bg">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="56dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:paddingStart="4dp"
+        android:paddingEnd="12dp"
+        android:background="@color/card"
+        android:elevation="2dp">
+        <ImageButton
+            android:id="@+id/btnSettingsBack"
+            android:layout_width="44dp"
+            android:layout_height="44dp"
+            android:src="@drawable/ic_back"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Back" />
+        <TextView
+            android:layout_width="0dp"
+            android:layout_weight="1"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:text="Settings"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            android:textColor="@color/text" />
+    </LinearLayout>
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="match_parent">
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:padding="16dp"
+            android:paddingBottom="40dp">
+
+            <!-- Appearance -->
+            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="APPEARANCE" />
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/themeChips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                app:singleSelection="true"
+                app:selectionRequired="true">
+            </com.google.android.material.chip.ChipGroup>
+
+            <!-- Browsing -->
+            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="BROWSING" />
+            <com.google.android.material.textfield.TextInputLayout
+                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:hint="Default start page">
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/settingsStartUrl"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:singleLine="true"
+                    android:inputType="textUri|textNoSuggestions" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal" android:layout_marginTop="2dp">
+                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Save browsing history" android:textSize="13sp" android:textColor="@color/text" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Pages visited in any profile are stored locally" android:textSize="10sp" android:textColor="@color/text_faint" />
+                </LinearLayout>
+                <Switch android:id="@+id/settingsHistoryEnabled" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <!-- Data -->
+            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="DATA &amp; TRASH" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal" android:layout_marginTop="2dp">
+                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Keep deleted profiles in trash" android:textSize="13sp" android:textColor="@color/text" />
+                    <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Deletion moves the profile to trash instead of erasing it" android:textSize="10sp" android:textColor="@color/text_faint" />
+                </LinearLayout>
+                <Switch android:id="@+id/settingsTrashEnabled" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
+            </LinearLayout>
+            <LinearLayout android:id="@+id/rowEmptyTrash" android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal"
+                android:clickable="true" android:focusable="true" android:background="?attr/selectableItemBackground">
+                <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Empty trash" android:textSize="13sp" android:textColor="@color/text" />
+                <TextView android:id="@+id/trashCount" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="0 items" android:textSize="12sp" android:textColor="@color/text_faint" android:layout_marginEnd="10dp" />
+                <ImageView android:layout_width="20dp" android:layout_height="20dp" android:src="@drawable/ic_chevron_right" android:tint="@color/text_faint" />
+            </LinearLayout>
+
+            <!-- Export -->
+            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="EXPORT" />
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:orientation="horizontal">
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnExportWithSecrets"
+                    style="@style/Jb.Button.Secondary"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp"
+                    android:layout_height="42dp"
+                    android:text="Full backup"
+                    android:textAllCaps="false"
+                    android:textSize="13sp" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/btnExportNoSecrets"
+                    style="@style/Jb.Button.Secondary"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp"
+                    android:layout_height="42dp"
+                    android:text="Share (no passwords)"
+                    android:textAllCaps="false"
+                    android:textSize="13sp" />
+            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="4dp"
+                android:text="Backups are JSON. “Full backup” includes proxy passwords encrypted with the device key — it stays readable only on this device."
+                android:textSize="10sp"
+                android:textColor="@color/text_faint" />
+
+            <!-- About -->
+            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="18dp" android:text="ABOUT" />
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="6dp" android:orientation="horizontal" android:gravity="center_vertical">
+                <ImageView android:layout_width="34dp" android:layout_height="34dp" android:src="@drawable/ic_logo" />
+                <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="12dp" android:orientation="vertical">
+                    <TextView android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Joe Browser" android:textSize="14sp" android:textStyle="bold" android:textColor="@color/text" />
+                    <TextView android:id="@+id/settingsVersion" android:layout_width="wrap_content" android:layout_height="wrap_content" android:text="Version" android:textSize="11sp" android:textColor="@color/text_faint" />
+                </LinearLayout>
+            </LinearLayout>
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Anti-detect browser for Android. Every profile is an isolated identity — its own cookies, storage, proxy and fingerprint. All data stays on this device; there is no account, no sync, no telemetry."
+                android:textSize="11sp"
+                android:textColor="@color/text_dim" />
+        </LinearLayout>
+    </ScrollView>
+</LinearLayout>

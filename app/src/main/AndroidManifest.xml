@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- Core connectivity. Joe Browser is local-first: no account, no cloud, no telemetry. -->
+    <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- Proxy offline / rotation alerts -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
+
+    <application
+        android:name=".JoeBrowserApp"
+        android:allowBackup="false"
+        android:fullBackupContent="false"
+        android:dataExtractionRules="@xml/data_extraction_rules"
+        android:hardwareAccelerated="true"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
+        android:label="@string/app_name"
+        android:supportsRtl="true"
+        android:theme="@style/Theme.JoeBrowser"
+        android:usesCleartextTraffic="false"
+        tools:targetApi="34">
+
+        <activity
+            android:name=".ui.MainActivity"
+            android:exported="true"
+            android:theme="@style/Theme.JoeBrowser.Splash"
+            android:launchMode="singleTask"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|uiMode">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
+        <activity
+            android:name=".browser.BrowserActivity"
+            android:exported="false"
+            android:configChanges="orientation|screenSize|smallestScreenSize|keyboardHidden|keyboard|uiMode"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.ProfileEditorActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+
+        <activity
+            android:name=".ui.SettingsActivity"
+            android:exported="false"
+            android:label="@string/settings" />
+
+        <activity
+            android:name=".ui.HistoryActivity"
+            android:exported="false"
+            android:label="@string/history" />
+
+        <activity
+            android:name=".ui.LicensesActivity"
+            android:exported="false"
+            android:label="@string/open_source_licenses" />
+
+        <!-- Proxy offline / rotation alerts run as a special-use foreground service.
+             Type justification: continuous health monitoring of the user's own proxies
+             on the user's own device; no data leaves the device. -->
+        <service
+            android:name=".proxy.ProxyMonitorService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Monitor proxy connectivity and IP rotation for user-configured proxies and raise local notifications" />
+        </service>
+
+        <receiver
+            android:name=".proxy.BootReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.BOOT_COMPLETED" />
+            </intent-filter>
+        </receiver>
+
+        <provider
+            android:name="androidx.core.content.FileProvider"
+            android:authorities="${applicationId}.fileprovider"
+            android:exported="false"
+            android:grantUriPermissions="true">
+            <meta-data
+                android:name="android.support.FILE_PROVIDER_PATHS"
+                android:resource="@xml/file_paths" />
+        </provider>
+    </application>
+</manifest>

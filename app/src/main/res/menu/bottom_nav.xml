@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/nav_home"
+        android:icon="@drawable/ic_nav_home"
+        android:title="@string/nav_home"
+        android:contentDescription="@string/nav_home" />
+    <item android:id="@+id/nav_profiles"
+        android:icon="@drawable/ic_nav_profiles"
+        android:title="@string/nav_profiles"
+        android:contentDescription="@string/nav_profiles" />
+    <item android:id="@+id/nav_proxies"
+        android:icon="@drawable/ic_nav_proxies"
+        android:title="@string/nav_proxies"
+        android:contentDescription="@string/nav_proxies" />
+    <item android:id="@+id/nav_browsers"
+        android:icon="@drawable/ic_nav_browsers"
+        android:title="@string/nav_browsers"
+        android:contentDescription="@string/nav_browsers" />
+    <item android:id="@+id/nav_extensions"
+        android:icon="@drawable/ic_nav_extensions"
+        android:title="@string/nav_extensions"
+        android:contentDescription="@string/nav_extensions" />
+</menu>
