@@ -65,8 +65,13 @@ jobs:
             msg=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::error::$msg"
           done
-          echo "::notice::---- tail of build log ----"
-          tail -n 30 ci-logs/build.log | while IFS= read -r line; do
+          echo "::notice::---- context around 'What went wrong' ----"
+          grep -m1 -n -A8 "What went wrong" ci-logs/build.log | while IFS= read -r line; do
+            msg=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
+            echo "::error::$msg"
+          done
+          echo "::notice::---- head of build log ----"
+          head -n 40 ci-logs/build.log | while IFS= read -r line; do
             msg=$(printf '%s' "$line" | tr -d '\r' | sed 's/%/%25/g')
             echo "::notice::$msg"
           done
