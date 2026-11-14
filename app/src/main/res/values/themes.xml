@@ -26,7 +26,6 @@
         <item name="shapeAppearanceSmallComponent">@style/ShapeSmall</item>
         <item name="shapeAppearanceMediumComponent">@style/ShapeMedium</item>
         <item name="shapeAppearanceLargeComponent">@style/ShapeMedium</item>
-        <item name="shapeAppearanceExtraLargeComponent">@style/ShapeMedium</item>
         <item name="textAppearanceBodyLarge">@style/JbText.Body</item>
         <item name="textAppearanceBodyMedium">@style/JbText.BodyMedium</item>
         <item name="textAppearanceTitleLarge">@style/JbText.Title</item>
