@@ -508,8 +508,6 @@ class BrowserActivity : AppCompatActivity() {
             binding.pageProgress.visibility = if (newProgress >= 100) View.GONE else View.VISIBLE
         }
 
-        override fun onConsoleMessage(message: WebChromeClient.ConsoleMessage?): Boolean = false
-
         override fun onGeolocationPermissionsShowPrompt(origin: String?, callback: GeolocationPermissions.Callback?) {
             val allow = profile.fp.geoMode != "block"
             callback?.invoke(origin, allow, false)
