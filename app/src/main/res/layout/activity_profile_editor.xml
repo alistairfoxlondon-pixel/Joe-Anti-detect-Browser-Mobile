@@ -172,7 +172,7 @@
                     android:layout_height="36dp"
                     android:text="Regenerate"
                     android:icon="@drawable/ic_refresh"
-                    android:iconSize="16dp"
+                    app:iconSize="16dp"
                     android:textAllCaps="false" />
             </LinearLayout>
 
