@@ -23,8 +23,10 @@ No account. No cloud. No telemetry. Everything lives on the device.
 | **Proxy support** | HTTP, HTTPS and SOCKS5 with username/password auth. WebView can't carry proxy credentials, so the app runs a loopback CONNECT/SOCKS5 relay (`LocalProxyRelay`) that injects them upstream — the same path the proxy tester uses, so what you test is what you get. |
 | **Proxy library** | Paste-import (`host:port`, `scheme://user:pass@host:port`, `host:port:user:pass`, etc.), live checks (exit IP, latency, geo), watchlists with **offline / recovered / exit-IP-rotated** notifications (special-use foreground service, stops itself when nothing is watched). |
 | **Paste as Human** | Types clipboard content with human timing (Relaxed/Natural/Fast/Instant) into any focused field — no extension needed. |
-| **HTTP Tracker** | Native request counter + known-tracker-host heuristic; badge + per-session report, copyable as text. |
-| **History & trash** | Per-profile history (capped), soft-delete "trash" for profiles with empty-trash in settings. |
+| **HTTP Tracker** | Native request counter + known-tracker-host heuristic; badge + per-session report sheet (a real `RecyclerView`, so a 3000-request page scrolls), copyable as text. |
+| **Engines tab** | Catalogue of the five identity families (Chrome, Chromium, Brave, Edge, Firefox) with the pinned build list each profile can take, how many profiles already use it, and a one-tap "create profile with this engine" action. |
+| **Tools tab** | Every real setting in one place: background monitor on/off + cadence, human-typing defaults and rhythm, default start page, history/tracker/selection switches, theme, trash, storage use, JSON backup (with or without passwords) and a full reset. |
+| **History & trash** | Per-profile history (capped), soft-delete "trash" for profiles with empty-trash in the Tools tab. |
 | **Backups** | JSON export (full, or shared without credentials) via the system share sheet, e.g. into a password manager. Proxy passwords are AES-256-GCM encrypted at rest and decrypt only on this device. |
 
 ## Honest limitations (please read)
@@ -37,15 +39,19 @@ No account. No cloud. No telemetry. Everything lives on the device.
   surface; it does not and cannot make you anonymous.
 - **Firefox identities are UA-level only.** Rendering is always the WebView (Blink); Gecko
   internals are not emulated.
-- **Extensions**: WebView cannot execute Chrome extensions. The Extensions tab is a library of
-  store links you open in a profile, not an installer.
+- **Extensions**: WebView cannot execute Chrome extensions, so the app does not ship an
+  extensions installer or an extensions tab at all. Anything a page needs has to be injected by
+  the fingerprint layer or the page itself.
 - **In-app purchases, sync, account restore**: none. This is a single-device, offline-first tool.
 - **Fingerprint spoofing is a cat-and-mouse game.** The consistency engine avoids the obvious
   contradictions (desktop OS + mobile touch points, Direct3D renderer on Android, …) and the
   editor surfaces warnings, but detector services change constantly.
-- **Proxy override is process-wide** in AndroidX WebKit. If two Joe Browser windows use different
-  proxies at the same time, the most recent one wins for new requests; the app warns in-toast
-  when that happens. One shared relay per profile is the safe way to use multiple proxies.
+- **Proxy override is process-wide** in AndroidX WebKit. Each browser window starts its own
+  loopback relay (`LocalProxyRelay`) around its profile's proxy and installs a process-wide
+  override that points at it; if two windows with *different* proxies are open at once, the most
+  recently opened one wins for new requests in both. The badge in each window reflects the proxy
+  it actually verified, so a mismatch is visible rather than silent. Keep one proxied profile
+  open at a time for strict separation.
 - **Root certificates / MITM**: `PROCEED ANYWAY` on the SSL dialog is for captive portals and
   broken corporate CAs, not for defeating TLS validation as a feature.
 
@@ -80,14 +86,19 @@ used for sideloading. Locally, place a `keystore.properties` (git-ignored) with
 
 Being straight about what was and wasn't tested:
 
-- ✅ **Compiles** — `assembleDebug` and `assembleRelease` (R8 + resource shrinking) pass in CI.
-- ✅ **Resource linking** — all layouts, drawables, themes, and view-binding references verified.
-- ✅ **Static audit** — binding ids, menu ids, `R.*` references, and manifest declarations cross-checked.
-- ❌ **Not run on a device/emulator yet** — no instrumented UI test has been executed; first-run
-  flows (WebView isolation path, proxy CONNECT path, tracker badge, downloads, file chooser) are
-  implemented but untested at runtime. Please file issues with logs if something misbehaves.
+- ✅ **Compiles** — `assembleDebug` and `assembleRelease` (R8 + resource shrinking) pass in CI on
+  every push; the workflow is the gate, not a local run.
+- ✅ **Resource linking** — every layout, drawable, string, dimen and theme referenced from XML or
+  `R.*` resolves (the build fails otherwise).
+- ✅ **Static audit** — view-binding ids cross-checked against their layouts, internal imports and
+  cross-class member calls verified, no `TODO`/stub paths left in `app/src/main`.
+- ❌ **Not run on a device/emulator yet** — no instrumented UI test has been executed. First-run
+  flows (WebView `MULTI_PROFILE` bucket binding, document-start injection, proxy relay CONNECT,
+  tracker sheet, downloads, file chooser, fullscreen video) are implemented but untested at
+  runtime. Please file issues with logs if something misbehaves.
 - ❌ **Fingerprint coherence vs. live detector services** (BrowserScan, IPHey, PixelScan, …) —
-  not validated end-to-end; the editor shows the consistency warnings it computes locally.
+  not validated end-to-end; the editor shows the consistency warnings it computes locally and
+  the in-browser *Fingerprint check* menu opens those services inside the profile.
 
 ## Privacy
 
@@ -101,4 +112,4 @@ The only network calls the app itself makes are: the page you open, the proxy he
 ## License
 
 Source-available for your own profiles and devices. Third-party licenses: see the in-app
-*Open source licenses* screen (Settings → … → Licenses) and `NOTICE` files where present.
+*Open source licenses* screen (Tools tab → About → Open source licenses) and `NOTICE` files where present.

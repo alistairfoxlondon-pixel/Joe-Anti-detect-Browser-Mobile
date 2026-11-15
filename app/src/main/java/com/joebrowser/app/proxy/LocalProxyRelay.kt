@@ -1,6 +1,7 @@
 package com.joebrowser.app.proxy
 
 import android.util.Base64
+import android.util.Log
 import com.joebrowser.app.data.ProxyConfig
 import java.io.BufferedInputStream
 import java.io.BufferedOutputStream
@@ -9,294 +10,398 @@ import java.io.IOException
 import java.io.InputStream
 import java.io.OutputStream
 import java.net.InetAddress
+import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 /**
- * Local CONNECT relay: 127.0.0.1:<port> -> the user's proxy (HTTP/HTTPS/SOCKS5, with auth).
- * WebView cannot attach credentials to a proxy override; the relay injects them, so proxy
- * passwords never touch the WebView command line or shared surfaces. Same design as the
- * desktop build's relay.
+ * Loopback CONNECT relay: `127.0.0.1:<port>` -> the user's proxy (HTTP/HTTPS/SOCKS5, with auth).
+ *
+ * Why a relay exists at all: Android's WebView can be pointed at a proxy, but it cannot be
+ * given proxy credentials. The relay accepts plain loopback connections from the WebView,
+ * injects `Proxy-Authorization` (or the SOCKS5 user/pass sub-negotiation) upstream, and
+ * splices bytes in both directions. Credentials therefore never appear on the WebView's
+ * command line, in a shared Authenticator, or in a proxy URL the page could observe.
+ *
+ * Correctness guarantees:
+ *  - One relay instance per profile/browser session; [close] tears down the listener, every
+ *    accepted socket and both pump threads.
+ *  - Idle connections time out (45 s) so a stalled upstream cannot pin a thread forever.
+ *  - Every socket operation is individually guarded; a failure closes that connection only.
  */
 class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : Closeable {
 
     private val server = ServerSocket(0, 32, InetAddress.getLoopbackAddress())
-    @Volatile private var running = true
-    private val executor = Executors.newCachedThreadPool()
+    private val running = AtomicBoolean(true)
+    private val acceptExecutor = Executors.newSingleThreadExecutor()
+    private val clientExecutor = Executors.newCachedThreadPool()
+    private val openSockets = java.util.Collections.synchronizedSet(mutableSetOf<Socket>())
+    private val connectionCount = AtomicLong(0)
 
     val port: Int get() = server.localPort
+    val connectionsHandled: Long get() = connectionCount.get()
+    val isRunning: Boolean get() = running.get()
 
     fun start(): LocalProxyRelay {
-        Thread({
-            while (running) {
+        acceptExecutor.execute {
+            while (running.get()) {
                 val client = try {
                     server.accept()
-                } catch (e: IOException) {
+                } catch (t: Throwable) {
+                    if (running.get()) Log.w(TAG, "accept failed", t)
                     break
                 }
-                executor.execute { handleSafely(client) }
+                clientExecutor.execute { handleSafely(client) }
             }
-        }, "joe-relay-accept").apply { isDaemon = true }.start()
+        }
         return this
     }
 
+    fun loopbackHost(): String = "127.0.0.1"
+
     override fun close() {
-        running = false
-        try { server.close() } catch (_: Exception) {}
-        executor.shutdownNow()
+        if (!running.compareAndSet(true, false)) return
+        runCatching { server.close() }
+        acceptExecutor.shutdownNow()
+        synchronized(openSockets) {
+            openSockets.toList().forEach { closeQuietly(it) }
+            openSockets.clear()
+        }
+        clientExecutor.shutdownNow()
+        runCatching { clientExecutor.awaitTermination(1500, TimeUnit.MILLISECONDS) }
     }
 
+    // ------------------------------------------------------------- connections
+
     private fun handleSafely(client: Socket) {
+        openSockets.add(client)
         try {
-            client.soTimeout = 45_000
+            client.soTimeout = SOCKET_TIMEOUT_MS
+            client.tcpNoDelay = true
             handle(client)
-        } catch (_: Exception) {
-            try { client.close() } catch (_: Exception) {}
+        } catch (t: Throwable) {
+            // A single broken connection is expected (page navigations, cancellations).
+        } finally {
+            openSockets.remove(client)
+            closeQuietly(client)
         }
     }
 
     private fun handle(client: Socket) {
         val input = BufferedInputStream(client.getInputStream())
         val output = BufferedOutputStream(client.getOutputStream())
-        val requestLine = readHeaderLine(input) ?: return client.close()
+        val requestLine = readLine(input) ?: return
+        connectionCount.incrementAndGet()
 
         if (requestLine.startsWith("CONNECT ", ignoreCase = true)) {
-            val target = requestLine.split(Regex("\\s+")).getOrNull(1) ?: return respond(output, 400, "Bad Request")
-            readUntilBlankLine(input)
-            val upstreamSocket = connectViaUpstream(target) ?: return respond(output, 502, "Bad Gateway")
+            val target = requestLine.split(Regex("\\s+")).getOrNull(1)
+            drainHeaders(input)
+            if (target == null) return respond(output, 400, "Bad Request")
+            val upstreamSocket = connectUpstream(target)
+                ?: return respond(output, 502, "Bad Gateway")
+            openSockets.add(upstreamSocket)
             try {
                 output.write("HTTP/1.1 200 Connection Established\r\n\r\n".toByteArray())
                 output.flush()
                 splice(client, upstreamSocket)
-            } catch (e: Exception) {
-                try { upstreamSocket.close() } catch (_: Exception) {}
-                client.close()
+            } finally {
+                openSockets.remove(upstreamSocket)
+                closeQuietly(upstreamSocket)
             }
             return
         }
 
-        // Plain HTTP proxying in absolute-form: forward to the proxy with credentials.
+        // Plain HTTP in absolute form: rewrite to origin form and forward with credentials.
         val parts = requestLine.split(Regex("\\s+"))
         if (parts.size < 3) return respond(output, 400, "Bad Request")
         val method = parts[0]
-        val uri = parts[1]
+        val absoluteUri = parts[1]
         val version = parts.subList(2, parts.size).joinToString(" ")
         val headers = readHeaders(input)
 
-        if (!uri.startsWith("http://", ignoreCase = true)) {
+        if (!absoluteUri.startsWith("http://", ignoreCase = true)) {
             return respond(output, 405, "Method Not Allowed")
         }
-        val withoutScheme = uri.substring("http://".length)
+        val withoutScheme = absoluteUri.substring("http://".length)
         val slash = withoutScheme.indexOf('/')
         val authority = if (slash >= 0) withoutScheme.substring(0, slash) else withoutScheme
         val path = if (slash >= 0) withoutScheme.substring(slash) else "/"
-        val upstreamSocket = openUpstreamPlain() ?: return respond(output, 502, "Bad Gateway")
+
+        val upstreamSocket = openUpstreamSocket() ?: return respond(output, 502, "Bad Gateway")
+        openSockets.add(upstreamSocket)
         try {
-            val up = BufferedOutputStream(upstreamSocket.getOutputStream())
-            val sb = StringBuilder()
-            sb.append("$method $path $version\r\n")
-            sb.append("Host: $authority\r\n")
-            addProxyAuthorization(sb)
-            for ((k, v) in headers) {
-                if (k.equals("proxy-authorization", true) || k.equals("proxy-connection", true) || k.equals("connection", true)) continue
-                if (k.equals("host", true)) continue
-                sb.append("$k: $v\r\n")
-            }
-            sb.append("Connection: close\r\n\r\n")
-            up.write(sb.toString().toByteArray(Charsets.UTF_8))
-            up.flush()
+            val upstreamOut = BufferedOutputStream(upstreamSocket.getOutputStream())
+            upstreamOut.write(buildPlainRequest(method, path, version, authority, headers).toByteArray(Charsets.UTF_8))
+            upstreamOut.flush()
             splice(client, upstreamSocket)
-        } catch (e: Exception) {
-            try { upstreamSocket.close() } catch (_: Exception) {}
-            client.close()
+        } finally {
+            openSockets.remove(upstreamSocket)
+            closeQuietly(upstreamSocket)
         }
     }
 
-    private fun addProxyAuthorization(sb: StringBuilder) {
-        if (upstream.user.isNotBlank() || upstream.password.isNotEmpty()) {
-            val token = Base64.encodeToString("${upstream.user}:${upstream.password}".toByteArray(), Base64.NO_WRAP)
-            sb.append("Proxy-Authorization: Basic $token\r\n")
-        }
-    }
-
-    private fun openUpstreamPlain(): Socket? = try {
-        Socket().apply {
-            connect(java.net.InetSocketAddress(upstream.host, upstream.port), 8_000)
-            soTimeout = 45_000
-        }
-    } catch (e: Exception) {
-        null
-    }
-
-    private fun connectViaUpstream(target: String): Socket? {
-        val (host, port) = parseTarget(target) ?: return null
-        return if (upstream.type == "socks5") connectViaSocks5(host, port) else connectViaHttpConnect(host, port)
-    }
-
-    private fun connectViaHttpConnect(host: String, port: Int): Socket? = try {
-        val socket = Socket()
-        socket.connect(java.net.InetSocketAddress(upstream.host, upstream.port), 8_000)
-        socket.soTimeout = 45_000
-        val out = socket.getOutputStream()
-        val inp = BufferedInputStream(socket.getInputStream())
+    private fun buildPlainRequest(
+        method: String,
+        path: String,
+        version: String,
+        authority: String,
+        headers: List<Pair<String, String>>
+    ): String {
         val sb = StringBuilder()
-        sb.append("CONNECT $host:$port HTTP/1.1\r\n")
-        sb.append("Host: $host:$port\r\n")
-        addProxyAuthorization(sb)
-        sb.append("User-Agent: JoeBrowser/1.0\r\n")
-        sb.append("Connection: Keep-Alive\r\n\r\n")
-        out.write(sb.toString().toByteArray(Charsets.UTF_8))
-        out.flush()
-        val statusLine = readHeaderLine(inp) ?: throw IOException("no response")
-        val code = statusLine.split(Regex("\\s+")).getOrNull(1)?.toIntOrNull() ?: 0
-        readUntilBlankLine(inp)
-        if (code in 200..299) socket else { socket.close(); null }
-    } catch (e: Exception) {
+        sb.append(method).append(' ').append(path).append(' ').append(version).append("\r\n")
+        sb.append("Host: ").append(authority).append("\r\n")
+        appendProxyAuthorization(sb)
+        headers.forEach { (name, value) ->
+            val lower = name.lowercase()
+            if (lower == "proxy-authorization" || lower == "proxy-connection" || lower == "connection" || lower == "host") return@forEach
+            sb.append(name).append(": ").append(value).append("\r\n")
+        }
+        sb.append("Connection: close\r\n\r\n")
+        return sb.toString()
+    }
+
+    private fun appendProxyAuthorization(sb: StringBuilder) {
+        if (upstream.user.isNotBlank() || upstream.password.isNotEmpty()) {
+            val token = Base64.encodeToString(
+                "${upstream.user}:${upstream.password}".toByteArray(Charsets.UTF_8), Base64.NO_WRAP
+            )
+            sb.append("Proxy-Authorization: Basic ").append(token).append("\r\n")
+        }
+    }
+
+    private fun connectUpstream(target: String): Socket? {
+        val (host, port) = parseTarget(target) ?: return null
+        return if (upstream.type == "socks5") connectViaSocks5(host, port) else connectViaConnect(host, port)
+    }
+
+    private fun openUpstreamSocket(): Socket? = try {
+        Socket().apply {
+            connect(InetSocketAddress(upstream.host, upstream.port), CONNECT_TIMEOUT_MS)
+            soTimeout = SOCKET_TIMEOUT_MS
+            tcpNoDelay = true
+        }
+    } catch (t: Throwable) {
         null
     }
 
-    private fun connectViaSocks5(host: String, port: Int): Socket? = try {
-        val socket = Socket()
-        socket.connect(java.net.InetSocketAddress(upstream.host, upstream.port), 8_000)
-        socket.soTimeout = 45_000
-        val out = socket.getOutputStream()
-        val inp = socket.getInputStream()
+    private fun connectViaConnect(host: String, port: Int): Socket? {
+        val socket = openUpstreamSocket() ?: return null
+        return try {
+            val out = socket.getOutputStream()
+            val input = BufferedInputStream(socket.getInputStream())
+            val sb = StringBuilder()
+            sb.append("CONNECT ").append(host).append(':').append(port).append(" HTTP/1.1\r\n")
+            sb.append("Host: ").append(host).append(':').append(port).append("\r\n")
+            appendProxyAuthorization(sb)
+            sb.append("User-Agent: JoeBrowser/2 (proxy-tunnel)\r\n")
+            sb.append("Connection: Keep-Alive\r\n\r\n")
+            out.write(sb.toString().toByteArray(Charsets.UTF_8))
+            out.flush()
+            val status = readLine(input) ?: throw IOException("no CONNECT response")
+            val code = status.split(Regex("\\s+")).getOrNull(1)?.toIntOrNull() ?: 0
+            drainHeaders(input)
+            if (code in 200..299) socket else { closeQuietly(socket); null }
+        } catch (t: Throwable) {
+            closeQuietly(socket)
+            null
+        }
+    }
 
-        val needsAuth = upstream.user.isNotBlank() || upstream.password.isNotEmpty()
-        // Greeting: offer no-auth and user/pass
-        out.write(if (needsAuth) byteArrayOf(0x05, 0x02, 0x00, 0x02) else byteArrayOf(0x05, 0x01, 0x00))
-        out.flush()
-        val greet = ByteArray(2)
-        if (!readFully(inp, greet)) throw IOException("greeting failed")
-        if (greet[0] != 0x05.toByte()) throw IOException("bad socks version")
-        when (greet[1].toInt() and 0xFF) {
-            0x00 -> Unit // no auth
-            0x02 -> {
-                val u = upstream.user.toByteArray(Charsets.UTF_8)
-                val p = upstream.password.toByteArray(Charsets.UTF_8)
-                val req = ByteArray(3 + u.size + p.size)
-                req[0] = 0x01; req[1] = u.size.toByte()
-                System.arraycopy(u, 0, req, 2, u.size)
-                req[2 + u.size] = p.size.toByte()
-                System.arraycopy(p, 0, req, 3 + u.size, p.size)
-                out.write(req)
-                out.flush()
-                val authResp = ByteArray(2)
-                if (!readFully(inp, authResp) || authResp[1] != 0x00.toByte()) throw IOException("socks auth rejected")
+    private fun connectViaSocks5(host: String, port: Int): Socket? {
+        val socket = openUpstreamSocket() ?: return null
+        return try {
+            val out = socket.getOutputStream()
+            val input = socket.getInputStream()
+            val needsAuth = upstream.user.isNotBlank() || upstream.password.isNotEmpty()
+
+            out.write(if (needsAuth) byteArrayOf(0x05, 0x02, 0x00, 0x02) else byteArrayOf(0x05, 0x01, 0x00))
+            out.flush()
+            val greeting = ByteArray(2)
+            if (!readFully(input, greeting)) throw IOException("SOCKS greeting failed")
+            if (greeting[0] != 0x05.toByte()) throw IOException("not a SOCKS5 endpoint")
+
+            when (greeting[1].toInt() and 0xFF) {
+                0x00 -> Unit
+                0x02 -> {
+                    val user = upstream.user.toByteArray(Charsets.UTF_8)
+                    val pass = upstream.password.toByteArray(Charsets.UTF_8)
+                    if (user.size > 255 || pass.size > 255) throw IOException("SOCKS credential too long")
+                    val request = ByteArray(3 + user.size + pass.size)
+                    request[0] = 0x01
+                    request[1] = user.size.toByte()
+                    System.arraycopy(user, 0, request, 2, user.size)
+                    request[2 + user.size] = pass.size.toByte()
+                    System.arraycopy(pass, 0, request, 3 + user.size, pass.size)
+                    out.write(request)
+                    out.flush()
+                    val authReply = ByteArray(2)
+                    if (!readFully(input, authReply) || authReply[1] != 0x00.toByte()) {
+                        throw IOException("SOCKS authentication rejected")
+                    }
+                }
+                else -> throw IOException("SOCKS: no acceptable auth method")
             }
-            else -> throw IOException("no acceptable socks auth method")
+
+            val hostBytes = host.toByteArray(Charsets.UTF_8)
+            if (hostBytes.size > 255) throw IOException("SOCKS host too long")
+            val connect = ByteArray(7 + hostBytes.size)
+            connect[0] = 0x05
+            connect[1] = 0x01
+            connect[2] = 0x00
+            connect[3] = 0x03
+            connect[4] = hostBytes.size.toByte()
+            System.arraycopy(hostBytes, 0, connect, 5, hostBytes.size)
+            connect[5 + hostBytes.size] = ((port shr 8) and 0xFF).toByte()
+            connect[6 + hostBytes.size] = (port and 0xFF).toByte()
+            out.write(connect)
+            out.flush()
+
+            val head = ByteArray(4)
+            if (!readFully(input, head)) throw IOException("SOCKS connect: no reply")
+            if (head[1] != 0x00.toByte()) throw IOException("SOCKS refused (%d)".format(head[1].toInt()))
+            val addressLength = when (head[3].toInt() and 0xFF) {
+                0x01 -> 4
+                0x04 -> 16
+                0x03 -> {
+                    val length = ByteArray(1)
+                    if (!readFully(input, length)) throw IOException("SOCKS: truncated reply")
+                    length[0].toInt() and 0xFF
+                }
+                else -> 4
+            }
+            if (!readFully(input, ByteArray(addressLength + 2))) throw IOException("SOCKS: truncated bound address")
+            socket
+        } catch (t: Throwable) {
+            closeQuietly(socket)
+            null
         }
-        // CONNECT host:port
-        val hostBytes = host.toByteArray(Charsets.UTF_8)
-        val req = ByteArray(7 + hostBytes.size) // ver cmd rsv atyp len host port(2)
-        req[0] = 0x05; req[1] = 0x01; req[2] = 0x00; req[3] = 0x03
-        req[4] = hostBytes.size.toByte()
-        System.arraycopy(hostBytes, 0, req, 5, hostBytes.size)
-        req[5 + hostBytes.size] = ((port shr 8) and 0xFF).toByte()
-        req[6 + hostBytes.size] = (port and 0xFF).toByte()
-        out.write(req)
-        out.flush()
-        val head = ByteArray(4)
-        if (!readFully(inp, head)) throw IOException("socks connect refused")
-        if (head[1] != 0x00.toByte()) throw IOException("socks connect error ${head[1]}")
-        // drain bound addr
-        val alen = when (head[3].toInt() and 0xff) {
-            0x01 -> 4; 0x04 -> 16; 0x03 -> { val l = ByteArray(1); if (!readFully(inp, l)) throw IOException(); l[0].toInt() and 0xff }
-            else -> 4
-        }
-        if (!readFully(inp, ByteArray(alen + 2))) throw IOException()
-        socket
-    } catch (e: Exception) {
-        null
     }
 
+    /** Copies bytes in both directions until either side closes. */
     private fun splice(a: Socket, b: Socket) {
-        val t1 = Thread({ pump(a.getInputStream(), b.getOutputStream(), b) }, "joe-relay-a")
-        val t2 = Thread({ pump(b.getInputStream(), a.getOutputStream(), a) }, "joe-relay-b")
-        t1.isDaemon = true; t2.isDaemon = true
-        t1.start(); t2.start()
-        t1.join(TimeUnit.MINUTES.toMillis(5))
-        closeQuietly(a); closeQuietly(b)
+        val first = Thread({ pump(a, b) }, "joe-relay-down")
+        val second = Thread({ pump(b, a) }, "joe-relay-up")
+        first.isDaemon = true
+        second.isDaemon = true
+        first.start()
+        second.start()
+        runCatching { first.join(SPLICE_LIFETIME_MS) }
+        closeQuietly(a)
+        closeQuietly(b)
+        second.interrupt()
     }
 
-    private fun pump(input: InputStream, output: OutputStream, closeAfter: Socket) {
+    private fun pump(from: Socket, to: Socket) {
         val buffer = ByteArray(16 * 1024)
         try {
-            while (true) {
-                val n = input.read(buffer)
-                if (n <= 0) break
-                output.write(buffer, 0, n)
+            val input: InputStream = from.getInputStream()
+            val output: OutputStream = BufferedOutputStream(to.getOutputStream())
+            while (running.get()) {
+                val read = input.read(buffer)
+                if (read <= 0) break
+                output.write(buffer, 0, read)
                 output.flush()
             }
-        } catch (_: Exception) {
+        } catch (t: Throwable) {
+            // Normal termination path for HTTP/1.0 or a cancelled navigation.
         } finally {
-            try { output.flush() } catch (_: Exception) {}
-            try { closeAfter.shutdownOutput() } catch (_: Exception) {}
+            runCatching { to.shutdownOutput() }
         }
     }
 
-    private fun readHeaderLine(input: InputStream): String? {
+    // ------------------------------------------------------------------ helpers
+
+    private fun respond(output: BufferedOutputStream, code: Int, message: String) {
+        runCatching {
+            output.write("HTTP/1.1 $code $message\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
+            output.flush()
+        }
+    }
+
+    private fun readLine(input: InputStream): String? {
         val sb = StringBuilder()
-        var prev = -1
+        var previous = -1
         while (true) {
-            val c = input.read()
-            if (c == -1) return if (sb.isEmpty()) null else sb.toString()
-            if (c == '\n'.code && prev == '\r'.code) { sb.deleteCharAt(sb.length - 1); return sb.toString() }
-            sb.append(c.toChar())
-            prev = c
-            if (sb.length > 16 * 1024) return sb.toString()
+            val current = try {
+                input.read()
+            } catch (t: Throwable) {
+                return null
+            }
+            if (current == -1) return if (sb.isEmpty()) null else sb.toString()
+            if (previous == '\r'.code && current == '\n'.code) {
+                sb.setLength(sb.length - 1)
+                return sb.toString()
+            }
+            if (current != '\r') sb.append(current.toChar())
+            previous = current
+            if (sb.length > MAX_HEADER_BYTES) return null
         }
     }
 
-    private fun readUntilBlankLine(input: InputStream) {
-        while (true) {
-            val line = readHeaderLine(input) ?: return
+    private fun drainHeaders(input: InputStream) {
+        var guard = 0
+        while (guard++ < 200) {
+            val line = readLine(input) ?: return
             if (line.isEmpty()) return
         }
     }
 
     private fun readHeaders(input: InputStream): List<Pair<String, String>> {
-        val out = mutableListOf<Pair<String, String>>()
-        while (true) {
-            val line = readHeaderLine(input) ?: break
+        val headers = mutableListOf<Pair<String, String>>()
+        var guard = 0
+        while (guard++ < 200) {
+            val line = readLine(input) ?: break
             if (line.isEmpty()) break
-            val idx = line.indexOf(':')
-            if (idx > 0) out.add(line.substring(0, idx).trim() to line.substring(idx + 1).trim())
+            val colon = line.indexOf(':')
+            if (colon > 0) headers.add(line.substring(0, colon).trim() to line.substring(colon + 1).trim())
         }
-        return out
+        return headers
     }
 
     private fun readFully(input: InputStream, buffer: ByteArray): Boolean {
-        var off = 0
-        while (off < buffer.size) {
-            val n = input.read(buffer, off, buffer.size - off)
-            if (n <= 0) return false
-            off += n
+        var offset = 0
+        while (offset < buffer.size) {
+            val read = input.read(buffer, offset, buffer.size - offset)
+            if (read <= 0) return false
+            offset += read
         }
         return true
     }
 
     private fun parseTarget(target: String): Pair<String, Int>? {
-        val idx = target.lastIndexOf(':')
-        if (idx <= 0) return null
-        val port = target.substring(idx + 1).toIntOrNull() ?: return null
-        return target.substring(0, idx) to port
+        if (target.startsWith("[")) {
+            val end = target.indexOf(']')
+            if (end <= 0) return null
+            val host = target.substring(1, end)
+            val port = target.substring(end + 1).removePrefix(":").toIntOrNull() ?: return null
+            return if (port in 1..65535) host to port else null
+        }
+        val index = target.lastIndexOf(':')
+        if (index <= 0) return null
+        val port = target.substring(index + 1).toIntOrNull() ?: return null
+        if (port !in 1..65535) return null
+        return target.substring(0, index) to port
     }
 
-    private fun respond(output: BufferedOutputStream, code: Int, message: String) {
-        try {
-            output.write("HTTP/1.1 $code $message\r\nContent-Length: 0\r\nConnection: close\r\n\r\n".toByteArray())
-            output.flush()
-        } catch (_: Exception) {}
-    }
-
-    private fun closeQuietly(s: Socket) {
-        try { s.close() } catch (_: Exception) {}
+    private fun closeQuietly(socket: Socket?) {
+        if (socket == null) return
+        runCatching { socket.close() }
     }
 
     companion object {
+        private const val TAG = "JoeRelay"
+        private const val CONNECT_TIMEOUT_MS = 10_000
+        private const val SOCKET_TIMEOUT_MS = 45_000
+        private const val SPLICE_LIFETIME_MS = 5 * 60_000L
+        private const val MAX_HEADER_BYTES = 16 * 1024
+
         fun start(upstream: ProxyConfig): LocalProxyRelay = LocalProxyRelay(upstream).start()
+
+        /** True when [config] is usable as an upstream proxy. */
+        fun canRelay(config: ProxyConfig): Boolean = config.enabled
     }
 }

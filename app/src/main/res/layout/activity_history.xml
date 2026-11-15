@@ -1,81 +1,148 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Browsing history.
+
+  Fixed search + filter bar at the top (so the filter never scrolls away), then a single
+  RecyclerView that owns its own empty state. Group headers are real items with a stable id per
+  day, which keeps the list from re-grouping as the user scrolls.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg">
+    android:background="@color/bg"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
+        android:layout_height="@dimen/toolbar_height"
+        android:background="@color/surface"
         android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:paddingStart="4dp"
-        android:paddingEnd="12dp"
-        android:background="@color/card"
-        android:elevation="2dp">
+        android:paddingEnd="12dp">
+
         <ImageButton
             android:id="@+id/btnHistoryBack"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:src="@drawable/ic_back"
+            android:layout_width="@dimen/touch_target"
+            android:layout_height="@dimen/touch_target"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Back" />
+            android:contentDescription="@string/action_back"
+            android:padding="13dp"
+            android:src="@drawable/ic_back"
+            android:tint="@color/text_dim" />
+
         <TextView
+            style="@style/Text.Jb.ScreenTitle"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:text="History"
-            android:textSize="17sp"
-            android:textStyle="bold"
-            android:textColor="@color/text" />
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/history_title" />
+
         <TextView
-            android:id="@+id/btnClearHistory"
+            android:id="@+id/historyCount"
+            style="@style/Text.Jb.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:padding="10dp"
-            android:text="Clear all"
-            android:textSize="13sp"
-            android:textStyle="bold"
-            android:textColor="@color/danger"
-            android:clickable="true" />
+            android:layout_marginEnd="8dp"
+            android:ellipsize="end"
+            android:maxLines="1" />
+
+        <ImageButton
+            android:id="@+id/btnHistoryClear"
+            android:layout_width="@dimen/touch_target"
+            android:layout_height="@dimen/touch_target"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/history_clear"
+            android:padding="13dp"
+            android:src="@drawable/ic_trash"
+            android:tint="@color/danger" />
     </LinearLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/historyList"
+    <View
         android:layout_width="match_parent"
-        android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
 
-    <LinearLayout
-        android:id="@+id/historyEmpty"
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Jb.TextInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/screen_h_pad"
+        android:layout_marginTop="10dp"
+        android:layout_marginEnd="@dimen/screen_h_pad"
+        android:hint="@string/history_search"
+        app:endIconMode="clear_text"
+        xmlns:app="http://schemas.android.com/apk/res-auto">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/historySearch"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:imeOptions="actionSearch"
+            android:importantForAutofill="no"
+            android:inputType="textUri|textNoSuggestions"
+            android:maxLines="1"
+            android:singleLine="true" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.chip.ChipGroup
+        android:id="@+id/historyFilters"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/screen_h_pad"
+        android:layout_marginTop="8dp"
+        android:layout_marginEnd="@dimen/screen_h_pad"
+        app:chipSpacingHorizontal="6dp"
+        app:selectionRequired="true"
+        app:singleLine="true"
+        app:singleSelection="true"
+        xmlns:app="http://schemas.android.com/apk/res-auto" />
+
+    <FrameLayout
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:visibility="gone">
-        <ImageView
-            android:layout_width="64dp"
-            android:layout_height="64dp"
-            android:src="@drawable/ic_history"
-            android:tint="@color/text_faint"
-            android:alpha="0.7" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
-            android:text="No history yet"
-            android:textSize="16sp"
-            android:textStyle="bold"
-            android:textColor="@color/text" />
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:text="Pages you visit in any profile will show up here."
-            android:textSize="12sp"
-            android:textColor="@color/text_dim" />
-    </LinearLayout>
+        android:layout_marginTop="6dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/historyList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingStart="@dimen/screen_h_pad"
+            android:paddingEnd="@dimen/screen_h_pad"
+            android:paddingBottom="@dimen/gap_xl"
+            android:scrollbars="vertical" />
+
+        <LinearLayout
+            android:id="@+id/historyEmpty"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:layout_width="42dp"
+                android:layout_height="42dp"
+                android:alpha="0.5"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_history"
+                android:tint="@color/text_muted" />
+
+            <TextView
+                android:id="@+id/historyEmptyText"
+                style="@style/Text.Jb.BodyMedium"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="@string/history_empty" />
+        </LinearLayout>
+    </FrameLayout>
 </LinearLayout>

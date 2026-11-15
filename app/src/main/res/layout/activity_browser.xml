@@ -1,201 +1,374 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Browser shell.
+
+  Vertical stack, no overlay collisions:
+    1. identity bar   — profile avatar + name + engine chip + kernel chip
+    2. proxy strip     — only visible while a proxy check is in flight, then it settles
+    3. progress bar    — 2dp, collapses to nothing at 100%
+    4. WebView          (weight=1, the only flexible element)
+    5. error card      — replaces the WebView content when a navigation fails
+    6. address bar     — back / forward / url pill / menu
+    7. find bar        — hidden unless the user asks for it
+  The custom-view FrameLayout is the last child so fullscreen video covers everything.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/browserRoot"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg">
+    android:background="@color/bg"
+    android:orientation="vertical">
 
-    <!-- Toolbar -->
+    <!-- ========================================================== identity bar -->
     <LinearLayout
-        android:id="@+id/browserToolbar"
         android:layout_width="match_parent"
-        android:layout_height="52dp"
-        android:orientation="horizontal"
+        android:layout_height="@dimen/browser_toolbar_height"
+        android:background="@color/surface"
         android:gravity="center_vertical"
-        android:paddingStart="4dp"
-        android:paddingEnd="4dp"
-        android:background="@color/card">
+        android:orientation="horizontal"
+        android:paddingStart="8dp"
+        android:paddingEnd="6dp">
 
         <ImageButton
-            android:id="@+id/btnBack"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_back"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Back"
-            android:tint="@color/text_dim" />
-
-        <ImageButton
-            android:id="@+id/btnForward"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_chevron_right"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Forward"
-            android:tint="@color/text_dim" />
-
-        <ImageButton
-            android:id="@+id/btnReload"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_refresh"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Reload"
-            android:tint="@color/text_dim" />
-
-        <FrameLayout
-            android:id="@+id/urlPill"
-            android:layout_width="0dp"
+            android:id="@+id/btnBrowserBack"
+            android:layout_width="36dp"
             android:layout_height="36dp"
-            android:layout_weight="1"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_back"
+            android:padding="9dp"
+            android:src="@drawable/ic_back"
+            android:tint="@color/text_dim" />
+
+        <TextView
+            android:id="@+id/browserAvatar"
+            android:layout_width="30dp"
+            android:layout_height="30dp"
             android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:background="@drawable/bg_url_pill">
+            android:background="@drawable/bg_avatar"
+            android:gravity="center"
+            android:maxLines="1"
+            android:textColor="@color/white"
+            android:textSize="11sp"
+            android:textStyle="bold" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/browserProfileName"
+                style="@style/Text.Jb.Body"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textStyle="bold" />
 
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="horizontal"
-                android:gravity="center_vertical"
-                android:paddingStart="12dp"
-                android:paddingEnd="12dp">
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
 
-                <ImageView
-                    android:id="@+id/urlLock"
-                    android:layout_width="13dp"
-                    android:layout_height="13dp"
-                    android:src="@drawable/ic_lock"
-                    android:tint="@color/success"
-                    android:contentDescription="Secure connection" />
+                <TextView
+                    android:id="@+id/browserEngineChip"
+                    style="@style/Text.Jb.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_chip_neutral"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingStart="6dp"
+                    android:paddingTop="1dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="1dp"
+                    android:textColor="@color/text_muted" />
 
-                <EditText
-                    android:id="@+id/urlField"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="match_parent"
-                    android:layout_marginStart="6dp"
-                    android:background="@null"
-                    android:singleLine="true"
-                    android:textSize="13sp"
-                    android:textColor="@color/text"
-                    android:textColorHint="@color/text_faint"
-                    android:imeOptions="actionGo"
-                    android:inputType="textUri"
-                    android:hint="Search or type URL" />
+                <TextView
+                    android:id="@+id/browserKernelChip"
+                    style="@style/Text.Jb.Label"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="4dp"
+                    android:background="@drawable/bg_chip_neutral"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:paddingStart="6dp"
+                    android:paddingTop="1dp"
+                    android:paddingEnd="6dp"
+                    android:paddingBottom="1dp" />
             </LinearLayout>
-        </FrameLayout>
+        </LinearLayout>
 
-        <FrameLayout
-            android:layout_width="40dp"
-            android:layout_height="40dp">
-            <ImageButton
-                android:id="@+id/btnTracker"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@drawable/ic_shield_check"
-                android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="HTTP tracker" />
-            <TextView
-                android:id="@+id/trackerBadge"
-                android:layout_width="16dp"
-                android:layout_height="16dp"
-                android:layout_gravity="top|end"
-                android:layout_marginTop="3dp"
-                android:layout_marginEnd="3dp"
-                android:background="@drawable/bg_badge"
-                android:gravity="center"
-                android:text="0"
-                android:textSize="9sp"
-                android:textColor="#FFFFFF"
-                android:textStyle="bold"
-                android:visibility="gone" />
-        </FrameLayout>
-
-        <ImageButton
-            android:id="@+id/btnMore"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:src="@drawable/ic_more"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Menu"
-            android:tint="@color/text_dim" />
+        <TextView
+            android:id="@+id/browserProxyBadge"
+            style="@style/Text.Jb.Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="4dp"
+            android:background="@drawable/bg_chip_neutral"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingStart="7dp"
+            android:paddingTop="3dp"
+            android:paddingEnd="7dp"
+            android:paddingBottom="3dp"
+            android:visibility="gone" />
     </LinearLayout>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
+
+    <!-- ============================================================== progress -->
     <ProgressBar
-        android:id="@+id/pageProgress"
+        android:id="@+id/browserProgress"
         style="?android:attr/progressBarStyleHorizontal"
         android:layout_width="match_parent"
         android:layout_height="2dp"
-        android:progressTint="@color/accent"
-        android:visibility="gone"
-        android:max="100" />
+        android:max="100"
+        android:progress="0"
+        android:progressDrawable="@drawable/progress_browser" />
 
+    <!-- ================================================================ content -->
     <FrameLayout
-        android:id="@+id/browserContent"
+        android:id="@+id/browserWebViewFrame"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <WebView
-            android:id="@+id/webView"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
+        <!-- The live WebView is added here in code, after BrowserKernel.prepare(). -->
 
-        <!-- Error state -->
         <LinearLayout
-            android:id="@+id/errorView"
+            android:id="@+id/browserStateCard"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="vertical"
-            android:gravity="center"
-            android:padding="32dp"
             android:background="@color/bg"
+            android:gravity="center"
+            android:orientation="vertical"
+            android:padding="30dp"
             android:visibility="gone">
 
             <ImageView
-                android:layout_width="56dp"
-                android:layout_height="56dp"
-                android:src="@drawable/ic_warning"
-                android:tint="@color/warning" />
+                android:id="@+id/browserStateIcon"
+                android:layout_width="46dp"
+                android:layout_height="46dp"
+                android:alpha="0.55"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_wifi_off"
+                android:tint="@color/text_muted" />
 
             <TextView
-                android:id="@+id/errorTitle"
-                android:layout_width="wrap_content"
+                android:id="@+id/browserStateTitle"
+                style="@style/Text.Jb.CardTitle"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="16dp"
-                android:text="Page couldn't be loaded"
-                android:textSize="17sp"
-                android:textStyle="bold"
-                android:textColor="@color/text" />
+                android:layout_marginTop="14dp"
+                android:gravity="center"
+                android:maxLines="2"
+                android:text="@string/browser_error_title" />
 
             <TextView
-                android:id="@+id/errorDetail"
-                android:layout_width="wrap_content"
+                android:id="@+id/browserStateBody"
+                style="@style/Text.Jb.BodyMedium"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:gravity="center"
-                android:text="Check the connection or the proxy settings for this profile."
-                android:textSize="13sp"
-                android:textColor="@color/text_dim" />
+                android:maxLines="3"
+                android:text="@string/browser_error_body" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnRetry"
+                android:id="@+id/browserStateAction"
+                style="@style/Widget.Jb.Button.Outlined"
                 android:layout_width="wrap_content"
-                android:layout_height="40dp"
-                android:layout_marginTop="18dp"
-                android:text="Try again"
-                android:textAllCaps="false"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                style="@style/Jb.Button.Primary" />
+                android:layout_height="@dimen/button_height"
+                android:layout_marginTop="16dp"
+                android:text="@string/action_retry" />
         </LinearLayout>
 
-        <!-- Fullscreen video container -->
-        <FrameLayout
-            android:id="@+id/customViewContainer"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            android:visibility="gone"
-            android:background="#000000" />
+        <ProgressBar
+            android:id="@+id/browserLoading"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="@color/accent"
+            android:visibility="gone" />
     </FrameLayout>
+
+    <!-- ============================================================== find bar -->
+    <LinearLayout
+        android:id="@+id/browserFindBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface_muted"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="6dp"
+        android:paddingBottom="6dp"
+        android:visibility="gone">
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Jb.TextInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="@string/browser_find_hint">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/browserFindInput"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:imeOptions="actionSearch"
+                android:importantForAutofill="no"
+                android:inputType="text"
+                android:maxLines="1"
+                android:singleLine="true" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <ImageButton
+            android:id="@+id/browserFindPrev"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/browser_find_prev"
+            android:padding="10dp"
+            android:rotation="180"
+            android:src="@drawable/ic_chevron_down"
+            android:tint="@color/text_dim" />
+
+        <ImageButton
+            android:id="@+id/browserFindNext"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/browser_find_next"
+            android:padding="10dp"
+            android:src="@drawable/ic_chevron_down"
+            android:tint="@color/text_dim" />
+
+        <ImageButton
+            android:id="@+id/browserFindClose"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_close"
+            android:padding="11dp"
+            android:src="@drawable/ic_close"
+            android:tint="@color/text_dim" />
+    </LinearLayout>
+
+    <!-- =========================================================== address bar -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="4dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="4dp"
+        android:paddingBottom="4dp">
+
+        <ImageButton
+            android:id="@+id/btnNavBack"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_back"
+            android:padding="10dp"
+            android:src="@drawable/ic_back"
+            android:tint="@color/text_dim" />
+
+        <ImageButton
+            android:id="@+id/btnNavForward"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/browser_forward"
+            android:padding="10dp"
+            android:rotation="180"
+            android:src="@drawable/ic_back"
+            android:tint="@color/text_dim" />
+
+        <LinearLayout
+            android:layout_width="0dp"
+            android:layout_height="40dp"
+            android:layout_marginStart="2dp"
+            android:layout_marginEnd="2dp"
+            android:layout_weight="1"
+            android:background="@drawable/bg_url_pill"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:paddingStart="10dp"
+            android:paddingEnd="4dp">
+
+            <ImageView
+                android:id="@+id/browserUrlIcon"
+                android:layout_width="@dimen/icon_sm"
+                android:layout_height="@dimen/icon_sm"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_search"
+                android:tint="@color/text_muted" />
+
+            <EditText
+                android:id="@+id/browserUrlField"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:background="@null"
+                android:ellipsize="end"
+                android:hint="@string/browser_url_hint"
+                android:imeOptions="actionGo"
+                android:importantForAutofill="no"
+                android:inputType="textUri|textNoSuggestions"
+                android:maxLines="1"
+                android:paddingEnd="2dp"
+                android:selectAllOnFocus="true"
+                android:singleLine="true"
+                android:textColor="@color/text"
+                android:textColorHint="@color:text_muted"
+                android:textSize="13sp" />
+
+            <ImageButton
+                android:id="@+id/btnNavReload"
+                android:layout_width="34dp"
+                android:layout_height="34dp"
+                android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/browser_reload"
+                android:padding="8dp"
+                android:src="@drawable/ic_refresh"
+                android:tint="@color/text_muted" />
+        </LinearLayout>
+
+        <ImageButton
+            android:id="@+id/btnBrowserMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/browser_menu"
+            android:padding="10dp"
+            android:src="@drawable/ic_more"
+            android:tint="@color/text_dim" />
+    </LinearLayout>
+
+    <!-- ========================================================= fullscreen video -->
+    <FrameLayout
+        android:id="@+id/browserCustomView"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="@android:color/black"
+        android:visibility="gone" />
 </LinearLayout>

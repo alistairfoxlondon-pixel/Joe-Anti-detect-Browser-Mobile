@@ -4,22 +4,56 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.UUID
 
-/** Joe Browser data model. JSON is the storage format; org.json is built into Android. */
+/**
+ * Joe Browser data model.
+ *
+ * Every persisted type is JSON-backed (org.json ships with Android and needs no dependency),
+ * and every reader is written defensively: a field written by an older build, a truncated
+ * blob, or an unknown enum value falls back to a sane default instead of throwing. That is
+ * what keeps a corrupt row from crashing the app on launch.
+ */
 
 const val BROWSERSCAN_URL = "https://www.browserscan.net/"
 const val DEFAULT_START_URL = BROWSERSCAN_URL
+
+/** Browser engines a profile can present itself as. Rendering is always the system WebView. */
+enum class BrowserEngine(val id: String, val title: String, val engineFamily: String) {
+    CHROME("chrome", "Google Chrome", "Chromium"),
+    CHROMIUM("chromium", "Chromium", "Chromium"),
+    BRAVE("brave", "Brave", "Chromium"),
+    EDGE("edge", "Microsoft Edge", "Chromium"),
+    FIREFOX("firefox", "Mozilla Firefox", "Gecko");
+
+    companion object {
+        fun of(id: String?): BrowserEngine = entries.firstOrNull { it.id.equals(id, true) } ?: CHROME
+    }
+}
+
+/** Operating systems a profile can present. */
+object OsCatalog {
+    val all = listOf("Android", "iPhone", "iPad", "Windows 11", "Windows 10", "macOS", "Linux")
+    fun isMobile(os: String): Boolean = os == "Android" || os == "iPhone" || os == "iPad"
+    fun deviceType(os: String): String = when (os) {
+        "Android", "iPhone" -> "mobile"
+        "iPad" -> "tablet"
+        else -> "desktop"
+    }
+}
+
+// ---------------------------------------------------------------- fingerprint
 
 data class FingerprintConfig(
     var seed: Int = 1,
     var os: String = "Android",
     var deviceType: String = "mobile",
+    var deviceModel: String = "",
     var timezone: String = "Asia/Dhaka",
     var language: String = "en-US",
     var acceptLanguage: String = "en-US,en;q=0.9",
     var screenW: Int = 393,
     var screenH: Int = 851,
     var availW: Int = 393,
-    var availH: Int = 851 - 48,
+    var availH: Int = 851,
     var colorDepth: Int = 24,
     var pixelRatio: Double = 2.75,
     var webglVendor: String = "Google Inc. (Qualcomm)",
@@ -30,80 +64,124 @@ data class FingerprintConfig(
     var canvasNoise: Boolean = true,
     var audioNoise: Boolean = true,
     var hardwareNoise: Boolean = true,
+    var fontNoise: Boolean = true,
+    var mediaNoise: Boolean = true,
     var doNotTrack: Boolean = false,
     var spoofBattery: Boolean = true,
-    var webrtcMode: String = "proxy",   // off | proxy | public
-    var geoMode: String = "proxy",      // proxy | system | custom | block
-    var geoLat: String = "",
-    var geoLng: String = "",
+    /** off | proxy | public */
+    var webrtcMode: String = "proxy",
+    /** proxy | system | custom | block */
+    var geoMode: String = "proxy",
+    var geoLat: String = "0",
+    var geoLng: String = "0",
+    /** Keep timezone/language glued to the proxy's exit country. */
     var autoMatchProxy: Boolean = true,
+    /** Manual screen override flag — when false the factory keeps screen/GPU coherent. */
+    var manualScreen: Boolean = false,
     var userAgentOverride: String = "",
-    var browserVersion: String = "131.0.6778.85",
+    var browserVersion: String = "134.0.6998.89",
     var androidVersion: String = "auto",
     var iosVersion: String = "auto"
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
-        put("seed", seed); put("os", os); put("deviceType", deviceType)
-        put("timezone", timezone); put("language", language); put("acceptLanguage", acceptLanguage)
-        put("screenW", screenW); put("screenH", screenH); put("availW", availW); put("availH", availH)
-        put("colorDepth", colorDepth); put("pixelRatio", pixelRatio)
-        put("webglVendor", webglVendor); put("webglRenderer", webglRenderer)
-        put("cores", cores); put("memory", memory); put("touchPoints", touchPoints)
-        put("canvasNoise", canvasNoise); put("audioNoise", audioNoise); put("hardwareNoise", hardwareNoise)
-        put("doNotTrack", doNotTrack); put("spoofBattery", spoofBattery)
-        put("webrtcMode", webrtcMode); put("geoMode", geoMode)
-        put("geoLat", geoLat); put("geoLng", geoLng)
-        put("autoMatchProxy", autoMatchProxy); put("userAgentOverride", userAgentOverride)
+        put("seed", seed)
+        put("os", os)
+        put("deviceType", deviceType)
+        put("deviceModel", deviceModel)
+        put("timezone", timezone)
+        put("language", language)
+        put("acceptLanguage", acceptLanguage)
+        put("screenW", screenW)
+        put("screenH", screenH)
+        put("availW", availW)
+        put("availH", availH)
+        put("colorDepth", colorDepth)
+        put("pixelRatio", pixelRatio)
+        put("webglVendor", webglVendor)
+        put("webglRenderer", webglRenderer)
+        put("cores", cores)
+        put("memory", memory)
+        put("touchPoints", touchPoints)
+        put("canvasNoise", canvasNoise)
+        put("audioNoise", audioNoise)
+        put("hardwareNoise", hardwareNoise)
+        put("fontNoise", fontNoise)
+        put("mediaNoise", mediaNoise)
+        put("doNotTrack", doNotTrack)
+        put("spoofBattery", spoofBattery)
+        put("webrtcMode", webrtcMode)
+        put("geoMode", geoMode)
+        put("geoLat", geoLat)
+        put("geoLng", geoLng)
+        put("autoMatchProxy", autoMatchProxy)
+        put("manualScreen", manualScreen)
+        put("userAgentOverride", userAgentOverride)
         put("browserVersion", browserVersion)
-        put("androidVersion", androidVersion); put("iosVersion", iosVersion)
+        put("androidVersion", androidVersion)
+        put("iosVersion", iosVersion)
     }
+
+    /** Deep copy that survives serialization round-trips. */
+    fun duplicate(): FingerprintConfig = fromJson(toJson())
 
     companion object {
         fun fromJson(o: JSONObject?): FingerprintConfig {
             val d = FingerprintConfig()
             if (o == null) return d
-            d.seed = o.optInt("seed", d.seed)
-            d.os = o.optString("os", d.os)
-            d.deviceType = o.optString("deviceType", d.deviceType)
-            d.timezone = o.optString("timezone", d.timezone)
-            d.language = o.optString("language", d.language)
-            d.acceptLanguage = o.optString("acceptLanguage", d.acceptLanguage)
-            d.screenW = o.optInt("screenW", d.screenW)
-            d.screenH = o.optInt("screenH", d.screenH)
-            d.availW = o.optInt("availW", d.availW)
-            d.availH = o.optInt("availH", d.availH)
-            d.colorDepth = o.optInt("colorDepth", d.colorDepth)
-            d.pixelRatio = o.optDouble("pixelRatio", d.pixelRatio)
-            d.webglVendor = o.optString("webglVendor", d.webglVendor)
-            d.webglRenderer = o.optString("webglRenderer", d.webglRenderer)
-            d.cores = o.optInt("cores", d.cores)
-            d.memory = o.optInt("memory", d.memory)
-            d.touchPoints = o.optInt("touchPoints", d.touchPoints)
-            d.canvasNoise = o.optBoolean("canvasNoise", d.canvasNoise)
-            d.audioNoise = o.optBoolean("audioNoise", d.audioNoise)
-            d.hardwareNoise = o.optBoolean("hardwareNoise", d.hardwareNoise)
-            d.doNotTrack = o.optBoolean("doNotTrack", d.doNotTrack)
-            d.spoofBattery = o.optBoolean("spoofBattery", d.spoofBattery)
-            d.webrtcMode = o.optString("webrtcMode", d.webrtcMode)
-            d.geoMode = o.optString("geoMode", d.geoMode)
-            d.geoLat = o.optString("geoLat", d.geoLat)
-            d.geoLng = o.optString("geoLng", d.geoLng)
-            d.autoMatchProxy = o.optBoolean("autoMatchProxy", d.autoMatchProxy)
-            d.userAgentOverride = o.optString("userAgentOverride", d.userAgentOverride)
-            d.browserVersion = o.optString("browserVersion", d.browserVersion)
-            d.androidVersion = o.optString("androidVersion", d.androidVersion)
-            d.iosVersion = o.optString("iosVersion", d.iosVersion)
-            return d
+            return d.apply {
+                seed = o.optInt("seed", seed)
+                os = o.optString("os", os).takeIf { it in OsCatalog.all } ?: os
+                deviceType = o.optString("deviceType", OsCatalog.deviceType(os))
+                deviceModel = o.optString("deviceModel", deviceModel)
+                timezone = o.optString("timezone", timezone)
+                language = o.optString("language", language)
+                acceptLanguage = o.optString("acceptLanguage", acceptLanguage)
+                screenW = o.optInt("screenW", screenW).coerceIn(200, 7680)
+                screenH = o.optInt("screenH", screenH).coerceIn(200, 4320)
+                availW = o.optInt("availW", screenW).coerceIn(200, 7680)
+                availH = o.optInt("availH", screenH).coerceIn(200, 4320)
+                colorDepth = o.optInt("colorDepth", colorDepth).coerceIn(8, 64)
+                pixelRatio = o.optDouble("pixelRatio", pixelRatio).takeIf { it in 0.5..8.0 } ?: 1.0
+                webglVendor = o.optString("webglVendor", webglVendor)
+                webglRenderer = o.optString("webglRenderer", webglRenderer)
+                cores = o.optInt("cores", cores).coerceIn(1, 64)
+                memory = o.optInt("memory", memory).coerceIn(1, 64)
+                touchPoints = o.optInt("touchPoints", touchPoints).coerceIn(0, 10)
+                canvasNoise = o.optBoolean("canvasNoise", canvasNoise)
+                audioNoise = o.optBoolean("audioNoise", audioNoise)
+                hardwareNoise = o.optBoolean("hardwareNoise", hardwareNoise)
+                fontNoise = o.optBoolean("fontNoise", fontNoise)
+                mediaNoise = o.optBoolean("mediaNoise", mediaNoise)
+                doNotTrack = o.optBoolean("doNotTrack", doNotTrack)
+                spoofBattery = o.optBoolean("spoofBattery", spoofBattery)
+                webrtcMode = o.optString("webrtcMode", webrtcMode).takeIf { it in WEBRTC_MODES } ?: "proxy"
+                geoMode = o.optString("geoMode", geoMode).takeIf { it in GEO_MODES } ?: "proxy"
+                geoLat = o.optString("geoLat", geoLat)
+                geoLng = o.optString("geoLng", geoLng)
+                autoMatchProxy = o.optBoolean("autoMatchProxy", autoMatchProxy)
+                manualScreen = o.optBoolean("manualScreen", manualScreen)
+                userAgentOverride = o.optString("userAgentOverride", userAgentOverride)
+                browserVersion = o.optString("browserVersion", browserVersion)
+                androidVersion = o.optString("androidVersion", androidVersion)
+                iosVersion = o.optString("iosVersion", iosVersion)
+            }
         }
+
+        val WEBRTC_MODES = listOf("off", "proxy", "public")
+        val GEO_MODES = listOf("proxy", "system", "custom", "block")
     }
 }
 
+// ---------------------------------------------------------------------- proxy
+
 data class ProxyConfig(
-    var type: String = "none",   // none | http | https | socks5
+    /** none | http | https | socks5 */
+    var type: String = "none",
     var host: String = "",
     var port: Int = 0,
     var user: String = "",
-    var password: String = "",   // plaintext in memory, encrypted at rest
+    /** Plain in memory, AES-GCM encrypted at rest by [SecureStore]. */
+    var password: String = "",
     var lastIp: String = "",
     var lastCountry: String = "",
     var lastCountryCode: String = "",
@@ -111,40 +189,64 @@ data class ProxyConfig(
     var lastTimezone: String = "",
     var lastCheckedAt: Long = 0L,
     var latencyMs: Int = -1,
+    var lastError: String = "",
+    var failStreak: Int = 0,
+    var rotations: Int = 0,
     var watch: Boolean = false,
     var watchIntervalSec: Int = 120
 ) {
-    val enabled: Boolean get() = !isNone(type) && host.isNotBlank() && port in 1..65535
+    val enabled: Boolean get() = isNone(type).not() && host.isNotBlank() && port in 1..65535
+    val online: Boolean get() = enabled && lastIp.isNotBlank() && latencyMs >= 0
+    val checked: Boolean get() = lastCheckedAt > 0L
 
-    fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
-        put("type", type); put("host", host); put("port", port); put("user", user)
-        if (includeSecret && password.isNotEmpty()) put("passwordEnc", SecureStore.encrypt(password))
-        put("lastIp", lastIp); put("lastCountry", lastCountry); put("lastCountryCode", lastCountryCode)
-        put("lastCity", lastCity); put("lastTimezone", lastTimezone)
-        put("lastCheckedAt", lastCheckedAt); put("latencyMs", latencyMs)
-        put("watch", watch); put("watchIntervalSec", watchIntervalSec)
-    }
-
-    fun copy() = ProxyConfig(type, host, port, user, password, lastIp, lastCountry, lastCountryCode,
-        lastCity, lastTimezone, lastCheckedAt, latencyMs, watch, watchIntervalSec)
+    fun isOnline(): Boolean = online
 
     fun label(): String = when {
         !enabled -> "Direct"
-        lastCountryCode.isNotBlank() -> "${type.uppercase()} · $lastCountryCode"
+        lastCountryCode.isNotBlank() -> type.uppercase() + " · " + lastCountryCode
         else -> type.uppercase()
     }
 
-    fun detail(): String = if (enabled) "${type.uppercase()} $host:$port" else "No proxy"
+    fun detail(): String = if (enabled) type.uppercase() + " " + host + ":" + port else "No proxy"
+
+    fun authority(): String = if (enabled) host + ":" + port else ""
+
+    fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
+        put("type", type)
+        put("host", host)
+        put("port", port)
+        put("user", user)
+        if (includeSecret && password.isNotEmpty()) put("passwordEnc", SecureStore.encrypt(password))
+        put("lastIp", lastIp)
+        put("lastCountry", lastCountry)
+        put("lastCountryCode", lastCountryCode)
+        put("lastCity", lastCity)
+        put("lastTimezone", lastTimezone)
+        put("lastCheckedAt", lastCheckedAt)
+        put("latencyMs", latencyMs)
+        put("lastError", lastError)
+        put("failStreak", failStreak)
+        put("rotations", rotations)
+        put("watch", watch)
+        put("watchIntervalSec", watchIntervalSec)
+    }
+
+    fun duplicate(includeSecret: Boolean = true): ProxyConfig = fromJson(toJson(includeSecret))
 
     companion object {
         fun isNone(t: String?): Boolean = t.isNullOrBlank() || t.equals("none", ignoreCase = true)
+
+        fun direct(): ProxyConfig = ProxyConfig(type = "none")
+
         fun fromJson(o: JSONObject?): ProxyConfig {
             val d = ProxyConfig()
             if (o == null) return d
-            d.type = o.optString("type", d.type)
-            d.host = o.optString("host", d.host)
-            d.port = o.optInt("port", d.port)
-            d.user = o.optString("user", d.user)
+            d.type = normalizeType(o.optString("type", d.type))
+            d.host = o.optString("host", "")
+            d.port = o.optInt("port", 0).coerceIn(0, 65535)
+            d.user = o.optString("user", "")
+            // SecureStore.decrypt never throws: a missing/invalid key degrades to an empty
+            // password, which the relay treats as "no credentials" instead of crashing.
             d.password = SecureStore.decrypt(o.optString("passwordEnc", ""))
             d.lastIp = o.optString("lastIp", "")
             d.lastCountry = o.optString("lastCountry", "")
@@ -153,59 +255,85 @@ data class ProxyConfig(
             d.lastTimezone = o.optString("lastTimezone", "")
             d.lastCheckedAt = o.optLong("lastCheckedAt", 0L)
             d.latencyMs = o.optInt("latencyMs", -1)
+            d.lastError = o.optString("lastError", "")
+            d.failStreak = o.optInt("failStreak", 0)
+            d.rotations = o.optInt("rotations", 0)
             d.watch = o.optBoolean("watch", false)
-            d.watchIntervalSec = o.optInt("watchIntervalSec", d.watchIntervalSec)
+            d.watchIntervalSec = o.optInt("watchIntervalSec", 120).coerceIn(30, 3600)
             return d
+        }
+
+        fun normalizeType(raw: String): String = when (raw.lowercase()) {
+            "http", "https", "socks5" -> raw.lowercase()
+            "socks", "socks5h", "socks4", "socks4a" -> "socks5"
+            else -> "none"
         }
     }
 }
+
+// ---------------------------------------------------------------------- tools
 
 data class ToolConfig(
     var humanPaste: Boolean = true,
     /** relaxed | natural | fast | instant */
     var humanPasteSpeed: String = "natural",
+    /** Inject realistic key pauses and punctuation rhythm. */
+    var humanPasteJitter: Boolean = true,
     var proxyWatch: Boolean = true,
     var proxyWatchIntervalSec: Int = 120,
-    /** Restore native context menu / selection on pages that block them. */
+    /** Restore text selection / context menu on hostile pages. */
     var unlockSelection: Boolean = true,
     /** Count requests and flag known tracker hosts. */
-    var httpTracker: Boolean = true
+    var httpTracker: Boolean = true,
+    /** Re-align timezone/language when the proxy exit country rotates. */
+    var autoSyncLocale: Boolean = true
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
-        put("humanPaste", humanPaste); put("humanPasteSpeed", humanPasteSpeed)
-        put("proxyWatch", proxyWatch); put("proxyWatchIntervalSec", proxyWatchIntervalSec)
-        put("unlockSelection", unlockSelection); put("httpTracker", httpTracker)
+        put("humanPaste", humanPaste)
+        put("humanPasteSpeed", humanPasteSpeed)
+        put("humanPasteJitter", humanPasteJitter)
+        put("proxyWatch", proxyWatch)
+        put("proxyWatchIntervalSec", proxyWatchIntervalSec)
+        put("unlockSelection", unlockSelection)
+        put("httpTracker", httpTracker)
+        put("autoSyncLocale", autoSyncLocale)
     }
 
     companion object {
+        val SPEEDS = listOf("relaxed", "natural", "fast", "instant")
+
         fun fromJson(o: JSONObject?): ToolConfig {
             val d = ToolConfig()
             if (o == null) return d
             d.humanPaste = o.optBoolean("humanPaste", d.humanPaste)
             d.humanPasteSpeed = o.optString("humanPasteSpeed", d.humanPasteSpeed)
+                .takeIf { it in SPEEDS } ?: "natural"
+            d.humanPasteJitter = o.optBoolean("humanPasteJitter", d.humanPasteJitter)
             d.proxyWatch = o.optBoolean("proxyWatch", d.proxyWatch)
             d.proxyWatchIntervalSec = o.optInt("proxyWatchIntervalSec", d.proxyWatchIntervalSec)
+                .coerceIn(30, 3600)
             d.unlockSelection = o.optBoolean("unlockSelection", d.unlockSelection)
             d.httpTracker = o.optBoolean("httpTracker", d.httpTracker)
+            d.autoSyncLocale = o.optBoolean("autoSyncLocale", d.autoSyncLocale)
             return d
         }
     }
 }
 
+// -------------------------------------------------------------------- profile
+
 data class Profile(
-    var id: String = UUID.randomUUID().toString().replace("-", ""),
+    var id: String = newId(),
     var name: String = "",
     var notes: String = "",
     var group: String = "",
     var tags: String = "",
     var status: String = "",
     var startUrl: String = DEFAULT_START_URL,
-    /** chrome | chromium | brave | firefox | edge — the identity the profile reports. */
-    var browserKind: String = "chrome",
-    var browserVersion: String = "131.0.6778.85",
+    var browserKind: String = BrowserEngine.CHROME.id,
+    var browserVersion: String = "134.0.6998.89",
     /** Clear cookies/storage/history when the profile closes. */
     var freshSession: Boolean = false,
-    /** Whether the profile has ever been launched (drives the first-run BrowserScan open). */
     var everLaunched: Boolean = false,
     var openCount: Int = 0,
     var created: Long = System.currentTimeMillis(),
@@ -214,7 +342,11 @@ data class Profile(
     var proxy: ProxyConfig = ProxyConfig(),
     var tools: ToolConfig = ToolConfig()
 ) {
+    val engine: BrowserEngine get() = BrowserEngine.of(browserKind)
+
     fun groupOrUngrouped(): String = group.ifBlank { "Ungrouped" }
+
+    fun displayName(): String = name.ifBlank { "Untitled profile" }
 
     fun initials(): String {
         val n = name.trim()
@@ -232,81 +364,113 @@ data class Profile(
         val d = System.currentTimeMillis() - lastOpened
         return when {
             d < 90_000 -> "Opened just now"
-            d < 3_600_000 -> "Opened ${d / 60_000}m ago"
-            d < 86_400_000 -> "Opened ${d / 3_600_000}h ago"
-            d < 30L * 86_400_000 -> "Opened ${d / 86_400_000}d ago"
-            else -> "Opened " + java.text.SimpleDateFormat("MMM d", java.util.Locale.US).format(java.util.Date(lastOpened))
+            d < 3_600_000 -> "Opened " + (d / 60_000) + "m ago"
+            d < 86_400_000 -> "Opened " + (d / 3_600_000) + "h ago"
+            d < 30L * 86_400_000 -> "Opened " + (d / 86_400_000) + "d ago"
+            else -> "Opened " + java.text.SimpleDateFormat("MMM d", java.util.Locale.US)
+                .format(java.util.Date(lastOpened))
         }
     }
 
     fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
-        put("id", id); put("name", name); put("notes", notes)
-        put("group", group); put("tags", tags); put("status", status)
+        put("id", id)
+        put("name", name)
+        put("notes", notes)
+        put("group", group)
+        put("tags", tags)
+        put("status", status)
         put("startUrl", startUrl)
-        put("browserKind", browserKind); put("browserVersion", browserVersion)
-        put("freshSession", freshSession); put("everLaunched", everLaunched)
-        put("openCount", openCount); put("created", created); put("lastOpened", lastOpened)
-        put("fp", fp.toJson()); put("proxy", proxy.toJson(includeSecret)); put("tools", tools.toJson())
+        put("browserKind", browserKind)
+        put("browserVersion", browserVersion)
+        put("freshSession", freshSession)
+        put("everLaunched", everLaunched)
+        put("openCount", openCount)
+        put("created", created)
+        put("lastOpened", lastOpened)
+        put("fp", fp.toJson())
+        put("proxy", proxy.toJson(includeSecret))
+        put("tools", tools.toJson())
     }
 
-    fun copy(freshId: Boolean = true): Profile = Profile(
-        id = if (freshId) UUID.randomUUID().toString().replace("-", "") else id,
-        name = name, notes = notes, group = group, tags = tags, status = status, startUrl = startUrl,
-        browserKind = browserKind, browserVersion = browserVersion, freshSession = freshSession,
-        everLaunched = false, openCount = if (freshId) 0 else openCount,
-        created = if (freshId) System.currentTimeMillis() else created,
-        lastOpened = if (freshId) 0L else lastOpened,
-        fp = FingerprintConfig.fromJson(fp.toJson()),
-        proxy = proxy.copy(),
+    /** A new profile that inherits the identity but not the history of this one. */
+    fun duplicate(newName: String = name + " copy"): Profile = Profile(
+        name = newName,
+        notes = notes,
+        group = group,
+        tags = tags,
+        status = status,
+        startUrl = startUrl,
+        browserKind = browserKind,
+        browserVersion = browserVersion,
+        freshSession = freshSession,
+        fp = fp.duplicate(),
+        proxy = proxy.duplicate(),
         tools = ToolConfig.fromJson(tools.toJson())
     )
 
     companion object {
-        fun fromJson(o: JSONObject): Profile {
+        fun newId(): String = UUID.randomUUID().toString().replace("-", "")
+
+        fun fromJson(o: JSONObject?): Profile {
             val d = Profile()
-            d.id = o.optString("id", d.id)
-            d.name = o.optString("name", d.name)
-            d.notes = o.optString("notes", "")
-            d.group = o.optString("group", "")
-            d.tags = o.optString("tags", "")
-            d.status = o.optString("status", "")
-            d.startUrl = o.optString("startUrl", DEFAULT_START_URL)
-            d.browserKind = o.optString("browserKind", d.browserKind)
-            d.browserVersion = o.optString("browserVersion", d.browserVersion)
-            d.freshSession = o.optBoolean("freshSession", false)
-            d.everLaunched = o.optBoolean("everLaunched", false)
-            d.openCount = o.optInt("openCount", 0)
-            d.created = o.optLong("created", System.currentTimeMillis())
-            d.lastOpened = o.optLong("lastOpened", 0L)
-            d.fp = FingerprintConfig.fromJson(o.optJSONObject("fp"))
-            d.proxy = ProxyConfig.fromJson(o.optJSONObject("proxy"))
-            d.tools = ToolConfig.fromJson(o.optJSONObject("tools"))
-            return d
+            if (o == null) return d
+            val parsedId = o.optString("id", d.id).ifBlank { d.id }
+            return d.apply {
+                id = parsedId
+                name = o.optString("name", name)
+                notes = o.optString("notes", notes)
+                group = o.optString("group", group)
+                tags = o.optString("tags", tags)
+                status = o.optString("status", status)
+                startUrl = o.optString("startUrl", DEFAULT_START_URL).ifBlank { DEFAULT_START_URL }
+                browserKind = BrowserEngine.of(o.optString("browserKind", browserKind)).id
+                browserVersion = o.optString("browserVersion", browserVersion)
+                freshSession = o.optBoolean("freshSession", freshSession)
+                everLaunched = o.optBoolean("everLaunched", everLaunched)
+                openCount = o.optInt("openCount", openCount)
+                created = o.optLong("created", System.currentTimeMillis())
+                lastOpened = o.optLong("lastOpened", 0L)
+                fp = FingerprintConfig.fromJson(o.optJSONObject("fp"))
+                proxy = ProxyConfig.fromJson(o.optJSONObject("proxy"))
+                tools = ToolConfig.fromJson(o.optJSONObject("tools"))
+            }
         }
     }
 }
 
-/** A saved proxy in the proxy library (independent of any single profile). */
+/** A saved proxy in the library (independent of any single profile). */
 data class SavedProxy(
-    var id: String = UUID.randomUUID().toString().replace("-", ""),
+    var id: String = newId(),
     var name: String = "",
     var config: ProxyConfig = ProxyConfig(),
     var note: String = ""
 ) {
+    fun displayName(): String = name.ifBlank { config.authority().ifBlank { "Proxy" } }
+
     fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
-        put("id", id); put("name", name); put("note", note)
+        put("id", id)
+        put("name", name)
+        put("note", note)
         put("config", config.toJson(includeSecret))
     }
 
     companion object {
-        fun fromJson(o: JSONObject): SavedProxy = SavedProxy(
-            id = o.optString("id", UUID.randomUUID().toString().replace("-", "")),
-            name = o.optString("name", ""),
-            note = o.optString("note", ""),
-            config = ProxyConfig.fromJson(o.optJSONObject("config"))
-        )
+        fun newId(): String = UUID.randomUUID().toString().replace("-", "")
+
+        fun fromJson(o: JSONObject?): SavedProxy {
+            val d = SavedProxy()
+            if (o == null) return d
+            return d.apply {
+                id = o.optString("id", id).ifBlank { id }
+                name = o.optString("name", name)
+                note = o.optString("note", note)
+                config = ProxyConfig.fromJson(o.optJSONObject("config"))
+            }
+        }
     }
 }
+
+// -------------------------------------------------------------------- history
 
 data class HistoryEntry(
     var id: Long = 0,
@@ -317,6 +481,8 @@ data class HistoryEntry(
     var ts: Long
 )
 
+// ----------------------------------------------------------------- extensions
+
 data class ExtensionItem(
     var id: String = UUID.randomUUID().toString().replace("-", ""),
     var name: String,
@@ -324,28 +490,73 @@ data class ExtensionItem(
     var addedAt: Long = System.currentTimeMillis()
 ) {
     fun toJson(): JSONObject = JSONObject().apply {
-        put("id", id); put("name", name); put("storeUrl", storeUrl); put("addedAt", addedAt)
+        put("id", id)
+        put("name", name)
+        put("storeUrl", storeUrl)
+        put("addedAt", addedAt)
     }
 
     companion object {
-        fun fromJson(o: JSONObject): ExtensionItem = ExtensionItem(
-            id = o.optString("id", UUID.randomUUID().toString().replace("-", "")),
-            name = o.optString("name", "Extension"),
-            storeUrl = o.optString("storeUrl", ""),
-            addedAt = o.optLong("addedAt", System.currentTimeMillis())
-        )
+        fun fromJson(o: JSONObject?): ExtensionItem? {
+            if (o == null) return null
+            val url = o.optString("storeUrl", "")
+            if (url.isBlank()) return null
+            return ExtensionItem(
+                id = o.optString("id", UUID.randomUUID().toString().replace("-", "")),
+                name = o.optString("name", "Extension"),
+                storeUrl = url,
+                addedAt = o.optLong("addedAt", System.currentTimeMillis())
+            )
+        }
     }
 }
+
+// --------------------------------------------------------------------- alerts
+
+/** A monitor event surfaced to the UI (offline / recovered / exit-IP rotation). */
+data class MonitorAlert(
+    var id: Long = 0,
+    /** offline | recovered | rotated */
+    var kind: String,
+    var target: String,
+    var detail: String,
+    var ts: Long = System.currentTimeMillis()
+) {
+    companion object {
+        const val KIND_OFFLINE = "offline"
+        const val KIND_RECOVERED = "recovered"
+        const val KIND_ROTATED = "rotated"
+
+        fun fromJson(o: JSONObject?): MonitorAlert? {
+            if (o == null) return null
+            return MonitorAlert(
+                id = o.optLong("id", 0),
+                kind = o.optString("kind", KIND_OFFLINE),
+                target = o.optString("target", ""),
+                detail = o.optString("detail", ""),
+                ts = o.optLong("ts", System.currentTimeMillis())
+            )
+        }
+    }
+}
+
+// ----------------------------------------------------------------- consistency
 
 /** Consistency findings for the fingerprint editor summary. */
 data class FingerprintWarning(val message: String, val severity: String)
 
+// --------------------------------------------------------------------- export
+
 object ExportFormat {
-    fun build(profiles: List<Profile>, proxies: List<SavedProxy>, extensions: List<ExtensionItem>,
-              includeSecrets: Boolean): JSONObject = JSONObject().apply {
+    fun build(
+        profiles: List<Profile>,
+        proxies: List<SavedProxy>,
+        extensions: List<ExtensionItem>,
+        includeSecrets: Boolean
+    ): JSONObject = JSONObject().apply {
         put("app", "JoeBrowser")
         put("platform", "android")
-        put("formatVersion", 1)
+        put("formatVersion", 2)
         put("exportedAt", System.currentTimeMillis())
         put("includeCredentials", includeSecrets)
         put("profiles", JSONArray().apply { profiles.forEach { put(it.toJson(includeSecrets)) } })

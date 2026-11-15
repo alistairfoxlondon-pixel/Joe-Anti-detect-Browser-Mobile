@@ -51,19 +51,14 @@
             android:windowSoftInputMode="adjustResize" />
 
         <activity
-            android:name=".ui.SettingsActivity"
-            android:exported="false"
-            android:label="@string/settings" />
-
-        <activity
             android:name=".ui.HistoryActivity"
             android:exported="false"
-            android:label="@string/history" />
+            android:label="@string/history_title" />
 
         <activity
             android:name=".ui.LicensesActivity"
             android:exported="false"
-            android:label="@string/open_source_licenses" />
+            android:label="@string/licenses_title" />
 
         <!-- Proxy offline / rotation alerts run as a special-use foreground service.
              Type justification: continuous health monitoring of the user's own proxies

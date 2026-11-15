@@ -1,47 +1,79 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Licenses / credits.
+
+  Static list built from code (one card per dependency) so the text stays selectable and
+  copyable while the layout stays trivially scrollable.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg">
+    android:background="@color/bg"
+    android:orientation="vertical">
 
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
+        android:layout_height="@dimen/toolbar_height"
+        android:background="@color/surface"
         android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:paddingStart="4dp"
-        android:paddingEnd="12dp"
-        android:background="@color/card"
-        android:elevation="2dp">
+        android:paddingEnd="12dp">
+
         <ImageButton
             android:id="@+id/btnLicensesBack"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:src="@drawable/ic_back"
+            android:layout_width="@dimen/touch_target"
+            android:layout_height="@dimen/touch_target"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Back" />
+            android:contentDescription="@string/action_back"
+            android:padding="13dp"
+            android:src="@drawable/ic_back"
+            android:tint="@color/text_dim" />
+
         <TextView
+            style="@style/Text.Jb.ScreenTitle"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:text="Open source licenses"
-            android:textSize="17sp"
-            android:textStyle="bold"
-            android:textColor="@color/text" />
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/licenses_title" />
     </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
 
     <ScrollView
         android:layout_width="match_parent"
-        android:layout_height="match_parent">
-        <TextView
-            android:id="@+id/licensesText"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false">
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:padding="16dp"
-            android:textSize="11sp"
-            android:fontFamily="monospace"
-            android:textColor="@color/text_dim" />
+            android:orientation="vertical"
+            android:paddingStart="@dimen/screen_h_pad"
+            android:paddingTop="@dimen/screen_v_pad"
+            android:paddingEnd="@dimen/screen_h_pad"
+            android:paddingBottom="@dimen/gap_xl">
+
+            <TextView
+                android:id="@+id/licensesVersion"
+                style="@style/Text.Jb.Caption"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/gap_m"
+                android:maxLines="2" />
+
+            <LinearLayout
+                android:id="@+id/licensesContainer"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical" />
+        </LinearLayout>
     </ScrollView>
 </LinearLayout>

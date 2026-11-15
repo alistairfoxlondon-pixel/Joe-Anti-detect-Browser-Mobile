@@ -1,269 +1,341 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<!--
+  Dashboard.
+
+  Structure:
+   1. Hero card — identity summary + kernel state chips (one line each, no paragraphs).
+   2. Metric row — three equal-weight cards, fixed height so a long number cannot reflow
+      the row.
+   3. Primary actions — two buttons, equal weight, 48dp.
+   4. Monitor strip — latest alerts, collapsed to a single line each.
+   5. Recent profiles — up to four rows in a vertical container (not a nested scroll list).
+   6. Verify chips — launch a detector site inside a chosen profile.
+
+  Every text view has an explicit maxLines + ellipsize, so nothing can clip or push a sibling.
+-->
+<androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:fillViewport="true"
-    android:background="@color/bg">
+    android:background="@color/bg"
+    android:clipToPadding="false"
+    android:fillViewport="true">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="@dimen/screen_h_pad"
+        android:paddingTop="@dimen/screen_v_pad"
+        android:paddingEnd="@dimen/screen_h_pad"
+        android:paddingBottom="@dimen/gap_xl">
 
-        <!-- Hero -->
+        <!-- ================================================================ hero -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
-            android:gravity="center_vertical"
-            android:padding="18dp"
-            android:background="@drawable/bg_hero">
+            android:background="@drawable/bg_hero"
+            android:orientation="vertical"
+            android:padding="18dp">
 
             <LinearLayout
-                android:layout_width="0dp"
-                android:layout_weight="1"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
                     android:layout_height="wrap_content"
-                    android:text="Joe Browser"
-                    android:textSize="23sp"
-                    android:textStyle="bold"
-                    android:textColor="#FFFFFF" />
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/home_greeting"
+                        android:textColor="@color/hero_text"
+                        android:textSize="21sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/home_subtitle"
+                        android:textColor="@color/hero_text_dim"
+                        android:textSize="12sp" />
+                </LinearLayout>
+
+                <ImageView
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_marginStart="12dp"
+                    android:contentDescription="@string/app_name"
+                    android:src="@drawable/ic_shield_home" />
+            </LinearLayout>
+
+            <!-- Kernel state: two chips, always on one row, wrap only on very narrow screens -->
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/kernelChips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                app:chipSpacingHorizontal="8dp"
+                app:singleLine="false" />
+        </LinearLayout>
+
+        <!-- ============================================================= metrics -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/gap_m"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <LinearLayout
+                android:id="@+id/metricProfiles"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:id="@+id/metricProfilesValue"
+                    style="@style/Text.Jb.Metric"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="0" />
+
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="4dp"
-                    android:text="The anti-detect browser workspace that stays on your device."
-                    android:textSize="12.5sp"
-                    android:textColor="#D6E6FF" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/home_metric_profiles"
+                    android:textAppearance="@style/Text.Jb.Caption" />
             </LinearLayout>
 
-            <ImageView
-                android:layout_width="64dp"
-                android:layout_height="64dp"
-                android:layout_marginStart="12dp"
-                android:src="@drawable/ic_shield_home"
-                android:contentDescription="Joe Browser shield" />
-        </LinearLayout>
-
-        <!-- Stats -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:orientation="horizontal">
-
             <LinearLayout
-                android:id="@+id/statProfiles"
+                android:id="@+id/metricProxies"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="14dp"
-                android:background="@drawable/bg_card_surface"
+                android:layout_marginStart="@dimen/gap_s"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card"
                 android:clickable="true"
-                android:focusable="true">
+                android:focusable="true"
+                android:orientation="vertical"
+                android:padding="14dp">
+
                 <TextView
-                    android:id="@+id/statProfilesNumber"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/metricProxiesValue"
+                    style="@style/Text.Jb.Metric"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="0/0" />
+
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Profiles"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_faint" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/home_metric_proxies"
+                    android:textAppearance="@style/Text.Jb.Caption" />
             </LinearLayout>
 
-            <View android:layout_width="8dp" android:layout_height="1dp" />
-
             <LinearLayout
-                android:id="@+id/statProxies"
+                android:id="@+id/metricAlerts"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="14dp"
-                android:background="@drawable/bg_card_surface"
-                android:clickable="true"
-                android:focusable="true">
-                <TextView
-                    android:id="@+id/statProxiesNumber"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0/0"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Proxies online"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_faint" />
-            </LinearLayout>
-
-            <View android:layout_width="8dp" android:layout_height="1dp" />
-
-            <LinearLayout
-                android:id="@+id/statExtensions"
-                android:layout_width="0dp"
+                android:layout_marginStart="@dimen/gap_s"
                 android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:orientation="vertical"
-                android:padding="14dp"
-                android:background="@drawable/bg_card_surface"
+                android:background="@drawable/bg_card"
                 android:clickable="true"
-                android:focusable="true">
+                android:focusable="true"
+                android:orientation="vertical"
+                android:padding="14dp">
+
                 <TextView
-                    android:id="@+id/statExtensionsNumber"
-                    android:layout_width="wrap_content"
+                    android:id="@+id/metricAlertsValue"
+                    style="@style/Text.Jb.Metric"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textSize="24sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="0" />
+
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Saved extensions"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_faint" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/home_metric_running"
+                    android:textAppearance="@style/Text.Jb.Caption" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- CTAs -->
+        <!-- ============================================================= actions -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
+            android:layout_marginTop="@dimen/gap_m"
             android:orientation="horizontal">
+
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/btnNewProfile"
-                style="@style/Jb.Button.Primary"
+                style="@style/Widget.Jb.Button"
                 android:layout_width="0dp"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginEnd="5dp"
                 android:layout_weight="1"
-                android:layout_marginEnd="6dp"
-                android:layout_height="46dp"
-                android:text="New profile"
-                android:textAllCaps="false"
-                android:icon="@drawable/ic_plus" />
+                android:text="@string/home_new_profile"
+                app:icon="@drawable/ic_plus"
+                app:iconGravity="textStart" />
+
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/btnPasteProxy"
-                style="@style/Jb.Button.Secondary"
+                android:id="@+id/btnAddProxy"
+                style="@style/Widget.Jb.Button.Outlined"
                 android:layout_width="0dp"
+                android:layout_height="@dimen/button_height"
+                android:layout_marginStart="5dp"
                 android:layout_weight="1"
+                android:text="@string/proxies_add"
+                app:icon="@drawable/ic_import"
+                app:iconGravity="textStart" />
+        </LinearLayout>
+
+        <!-- ============================================================ monitor -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/gap_l"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <ImageView
+                android:layout_width="@dimen/icon_sm"
+                android:layout_height="@dimen/icon_sm"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_monitor"
+                android:tint="@color/text_muted" />
+
+            <TextView
+                android:id="@+id/monitorTitle"
+                style="@style/Text.Jb.Section"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginStart="6dp"
-                android:layout_height="46dp"
-                android:text="Paste proxy"
-                android:textAllCaps="false"
-                android:icon="@drawable/ic_paste"
-                android:iconTint="@color/text_dim" />
-        </LinearLayout>
-
-        <!-- Fingerprint check -->
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"
-            android:text="FINGERPRINT CHECK"
-            android:textAppearance="?attr/textAppearanceTitleSmall" />
-
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:orientation="vertical"
-            android:padding="14dp"
-            android:background="@drawable/bg_card_surface">
-            <TextView
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="Open a fingerprint test site in your most recent profile and review the result before the account touches real traffic."
-                android:textSize="12sp"
-                android:textColor="@color/text_dim" />
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/fingerprintChips"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp" />
-        </LinearLayout>
-
-        <!-- Recent profiles -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            android:layout_marginBottom="8dp"
-            android:orientation="horizontal"
-            android:gravity="center_vertical">
-            <TextView
-                android:layout_width="0dp"
                 android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:text="RECENT PROFILES"
-                android:textAppearance="?attr/textAppearanceTitleSmall" />
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/home_section_alerts" />
+
             <TextView
-                android:id="@+id/seeAllProfiles"
+                android:id="@+id/monitorStatus"
+                style="@style/Text.Jb.Caption"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:text="See all"
-                android:textSize="12sp"
-                android:textStyle="bold"
-                android:textColor="@color/accent"
-                android:clickable="true" />
+                android:ellipsize="end"
+                android:maxLines="1" />
         </LinearLayout>
 
         <LinearLayout
-            android:id="@+id/recentProfiles"
+            android:id="@+id/alertContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/gap_s"
+            android:orientation="vertical" />
+
+        <!-- ============================================================= recent -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/gap_l"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/home_section_recent" />
+
+            <TextView
+                android:id="@+id/seeAllProfiles"
+                style="@style/Text.Jb.BodyMedium"
+                android:layout_width="wrap_content"
+                android:layout_height="@dimen/touch_target"
+                android:gravity="center_vertical|end"
+                android:minWidth="@dimen/touch_target"
+                android:text="@string/action_see_all"
+                android:textColor="@color/accent"
+                android:textStyle="bold" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:id="@+id/recentContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical" />
 
-        <!-- Local-first note -->
+        <TextView
+            android:id="@+id/recentEmpty"
+            style="@style/Text.Jb.BodyMedium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:paddingTop="@dimen/gap_s"
+            android:paddingBottom="@dimen/gap_s"
+            android:text="@string/home_empty_recent"
+            android:visibility="gone" />
+
+        <!-- ============================================================= verify -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:padding="14dp"
-            android:orientation="horizontal"
+            android:layout_marginTop="@dimen/gap_l"
             android:gravity="center_vertical"
-            android:background="@drawable/bg_card_surface">
-            <ImageView
-                android:layout_width="22dp"
-                android:layout_height="22dp"
-                android:src="@drawable/ic_shield_check" />
-            <LinearLayout
+            android:orientation="horizontal">
+
+            <TextView
+                style="@style/Text.Jb.Section"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="10dp"
-                android:orientation="vertical">
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="Local-first by design"
-                    android:textSize="13sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text" />
-                <TextView
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="2dp"
-                    android:text="Profiles, cookies, proxies and history are stored only on this device — no account, no cloud, no telemetry."
-                    android:textSize="11.5sp"
-                    android:textColor="@color/text_dim" />
-            </LinearLayout>
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/home_section_checks" />
+
+            <TextView
+                android:id="@+id/verifyProfileLabel"
+                style="@style/Text.Jb.Caption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1" />
         </LinearLayout>
 
-        <View android:layout_width="match_parent" android:layout_height="24dp" />
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/verifyChips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/gap_s"
+            app:chipSpacingHorizontal="8dp"
+            app:chipSpacingVertical="6dp" />
     </LinearLayout>
-</ScrollView>
+</androidx.core.widget.NestedScrollView>

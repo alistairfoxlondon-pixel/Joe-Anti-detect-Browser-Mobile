@@ -1,0 +1,273 @@
+package com.joebrowser.app.data
+
+import android.content.Context
+import android.util.Log
+import com.joebrowser.app.core.Async
+import java.util.concurrent.CopyOnWriteArrayList
+
+/**
+ * Single source of truth for profiles, saved proxies, extensions and monitor alerts.
+ *
+ * Why this exists:
+ *  - Screens never touch SQLite directly. They call the repository, which runs every query
+ *    on the background pool and delivers results on the main thread. That removes the
+ *    "database on the UI thread" class of jank and StrictMode violations.
+ *  - Writes are serialised on a single-threaded executor, so two screens editing the same
+ *    profile cannot interleave into a lost update.
+ *  - After any successful write, every registered [Listener] is notified on the main thread.
+ *    Fragments therefore stay in sync with each other, with the proxy monitor service, and
+ *    with the browser activity without polling.
+ *
+ * All callbacks are already on the main thread and are internally guarded.
+ */
+object ProfileRepository {
+
+    private const val TAG = "JoeRepo"
+
+    fun interface Listener {
+        fun onDataChanged()
+    }
+
+    private val listeners = CopyOnWriteArrayList<Listener>()
+
+    fun addListener(listener: Listener) {
+        if (!listeners.contains(listener)) listeners.add(listener)
+    }
+
+    fun removeListener(listener: Listener) {
+        listeners.remove(listener)
+    }
+
+    private fun notifyChanged() {
+        Async.onMain {
+            listeners.forEach { listener ->
+                runCatching { listener.onDataChanged() }
+                    .onFailure { Log.w(TAG, "Listener failed", it) }
+            }
+        }
+    }
+
+    /** Called by background services after changing rows without going through this object. */
+    fun notifyExternalChange() = notifyChanged()
+
+    // ------------------------------------------------------------- profiles
+
+    fun profiles(context: Context, onResult: (List<Profile>) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getAllProfiles() }) { onResult(it ?: emptyList()) }
+    }
+
+    fun profile(context: Context, id: String, onResult: (Profile?) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getProfile(id) }) { onResult(it) }
+    }
+
+    fun profileCount(context: Context, onResult: (Int) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).countProfiles() }) { onResult(it ?: 0) }
+    }
+
+    fun saveProfile(context: Context, profile: Profile, onDone: ((Profile) -> Unit)? = null) {
+        val app = context.applicationContext
+        Async.serialize {
+            val saved = runCatching {
+                db(app).saveProfile(profile)
+                profile
+            }.getOrNull()
+            if (saved != null) {
+                onDone?.let { callback -> Async.onMain { runCatching { callback(saved) } } }
+                notifyChanged()
+            } else {
+                Async.toast(app, "Could not save the profile")
+            }
+        }
+    }
+
+    /**
+     * Applies [mutate] to the freshest copy of the profile inside the serial writer, then
+     * persists it. Use this for counters (open count, last opened) that several screens
+     * may touch at once — it avoids clobbering fields another screen just wrote.
+     */
+    fun updateProfile(context: Context, id: String, mutate: (Profile) -> Unit) {
+        val app = context.applicationContext
+        Async.serialize {
+            val current = runCatching { db(app).getProfile(id) }.getOrNull() ?: return@serialize
+            runCatching {
+                mutate(current)
+                db(app).saveProfile(current)
+            }.onFailure { Log.w(TAG, "updateProfile failed", it) }
+            notifyChanged()
+        }
+    }
+
+    fun deleteProfile(context: Context, profile: Profile, keepTrash: Boolean, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching {
+                db(app).deleteProfile(profile, keepTrash)
+                ProfileStorage.erase(app, profile.id)
+            }.onFailure { Log.w(TAG, "deleteProfile failed", it) }
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
+    fun duplicateProfile(context: Context, profile: Profile, onDone: (Profile?) -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            val copy = profile.duplicate()
+            val saved = runCatching { db(app).saveProfile(copy); copy }.getOrNull()
+            Async.onMain { onDone(saved) }
+            notifyChanged()
+        }
+    }
+
+    // -------------------------------------------------------------- proxies
+
+    fun proxies(context: Context, onResult: (List<SavedProxy>) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getAllProxies() }) { onResult(it ?: emptyList()) }
+    }
+
+    fun saveProxy(context: Context, proxy: SavedProxy, onDone: (() -> Unit)? = null) {
+        val app = context.applicationContext
+        Async.serialize {
+            val ok = runCatching { db(app).saveProxy(proxy) }.isSuccess
+            if (ok) Async.onMain { onDone?.invoke() } else Async.toast(app, "Could not save the proxy")
+            notifyChanged()
+        }
+    }
+
+    fun saveProxies(context: Context, proxies: List<SavedProxy>, onDone: (Int) -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            var saved = 0
+            proxies.forEach { proxy ->
+                runCatching { db(app).saveProxy(proxy); saved++ }
+                    .onFailure { Log.w(TAG, "saveProxy failed", it) }
+            }
+            Async.onMain { onDone(saved) }
+            notifyChanged()
+        }
+    }
+
+    fun deleteProxy(context: Context, id: String, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).deleteProxy(id) }
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
+    fun watchedProxyCount(context: Context, onResult: (Int) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).countWatchedProxies() }) { onResult(it ?: 0) }
+    }
+
+    // ----------------------------------------------------------- extensions
+
+    fun extensions(context: Context, onResult: (List<ExtensionItem>) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getAllExtensions() }) { onResult(it ?: emptyList()) }
+    }
+
+    fun saveExtension(context: Context, item: ExtensionItem) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).saveExtension(item) }
+            notifyChanged()
+        }
+    }
+
+    fun deleteExtension(context: Context, id: String) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).deleteExtension(id) }
+            notifyChanged()
+        }
+    }
+
+    // -------------------------------------------------------------- history
+
+    fun addHistory(context: Context, profile: Profile, url: String, title: String) {
+        if (!Prefs.historyEnabled(context)) return
+        if (url.isBlank() || url == "about:blank" || url.startsWith("data:")) return
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).addHistory(profile.id, profile.displayName(), url, title.ifBlank { url }) }
+        }
+    }
+
+    fun history(context: Context, profileId: String? = null, limit: Int = 500, onResult: (List<HistoryEntry>) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getHistory(limit, profileId) }) { onResult(it ?: emptyList()) }
+    }
+
+    fun clearHistory(context: Context, profileId: String? = null, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).clearHistory(profileId) }
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
+    // --------------------------------------------------------------- alerts
+
+    fun alerts(context: Context, limit: Int = 20, onResult: (List<MonitorAlert>) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getAlerts(limit) }) { onResult(it ?: emptyList()) }
+    }
+
+    fun clearAlerts(context: Context, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).clearAlerts() }
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
+    // ------------------------------------------------------------- household
+
+    fun trashCount(context: Context, onResult: (Int) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).trashCount() }) { onResult(it ?: 0) }
+    }
+
+    fun emptyTrash(context: Context, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).emptyTrash() }
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
+    fun exportBackup(context: Context, includeSecrets: Boolean, onResult: (String?) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({
+            val database = db(app)
+            ExportFormat.build(
+                database.getAllProfiles(),
+                database.getAllProxies(),
+                database.getAllExtensions(),
+                includeSecrets
+            ).toString(2)
+        }) { onResult(it) }
+    }
+
+    fun resetEverything(context: Context, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching { db(app).wipeAll() }
+            ProfileStorage.eraseAll(app)
+            ProfileStorage.clearRunState(app)
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
+    private fun db(context: Context): Database = Database.get(context)
+}

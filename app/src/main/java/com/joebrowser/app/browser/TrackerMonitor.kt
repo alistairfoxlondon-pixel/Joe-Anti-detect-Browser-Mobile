@@ -7,73 +7,121 @@ import java.util.LinkedHashMap
 data class TrackerEntry(val host: String, val count: Int, val tracker: Boolean)
 
 /**
- * Native request counter + tracker detector (the built-in successor of the desktop's
- * "HTTP Tracker Plus"). Feeds the badge in the browser toolbar and the bottom sheet report.
+ * Native request counter and tracker detector.
+ *
+ * Every request the WebView makes passes through `shouldInterceptRequest`, which is where a
+ * tracking SDK is visible even when the page's own JavaScript is obfuscated: the request has
+ * to reach a known collection host eventually. The monitor keeps a per-session histogram,
+ * flags known hosts, and throttles UI updates so a page with 800 subresources does not
+ * trigger 800 layout passes.
  */
 class TrackerMonitor(private val onChange: (total: Int, trackers: Int) -> Unit) {
 
     private val counts = LinkedHashMap<String, Int>()
     private var total = 0
-
-    @Volatile
     private var trackers = 0
-
     private val mainHandler = Handler(Looper.getMainLooper())
+    private var lastNotify = 0L
+    private var pendingNotify = false
 
     fun record(url: String) {
         val host = hostOf(url) ?: return
         synchronized(this) {
             total++
-            val flagged = isTracker(host)
-            if (flagged) trackers++
+            if (isTracker(host)) trackers++
             counts[host] = (counts[host] ?: 0) + 1
         }
-        notifyChange()
+        scheduleNotify()
     }
 
     fun snapshot(): List<TrackerEntry> = synchronized(this) {
         counts.entries
-            .sortedByDescending { it.value }
-            .take(120)
+            .sortedWith(compareByDescending<Map.Entry<String, Int>> { isTracker(it.key) }.thenByDescending { it.value })
+            .take(150)
             .map { (host, count) -> TrackerEntry(host, count, isTracker(host)) }
     }
 
     fun totals(): Pair<Int, Int> = synchronized(this) { total to trackers }
 
-    fun clear() {
-        synchronized(this) { counts.clear(); total = 0; trackers = 0 }
-        notifyChange()
+    fun trackerCount(): Int = synchronized(this) { trackers }
+
+    fun reset() {
+        synchronized(this) {
+            counts.clear()
+            total = 0
+            trackers = 0
+        }
+        scheduleNotify(force = true)
     }
 
-    private fun notifyChange() {
-        val t: Int; val k: Int
-        synchronized(this) { t = total; k = trackers }
-        mainHandler.post { onChange(t, k) }
+    /** Plain-text report for the clipboard. */
+    fun report(profileName: String): String = buildString {
+        val (requests, flagged) = totals()
+        appendLine("Joe Browser HTTP Tracker")
+        appendLine("Profile: $profileName")
+        appendLine("Requests: $requests · Trackers: $flagged")
+        appendLine()
+        snapshot().forEach {
+            append(if (it.tracker) "[tracker] " else "[ok]      ")
+            append(it.host)
+            append("  ×")
+            appendLine(it.count)
+        }
+    }
+
+    private fun scheduleNotify(force: Boolean = false) {
+        val now = System.currentTimeMillis()
+        if (!force && now - lastNotify < 400L) {
+            if (pendingNotify) return
+            pendingNotify = true
+            mainHandler.postDelayed({
+                pendingNotify = false
+                dispatch()
+            }, 400L)
+            return
+        }
+        lastNotify = now
+        dispatch()
+    }
+
+    private fun dispatch() {
+        val current = synchronized(this) { total to trackers }
+        mainHandler.post {
+            runCatching { onChange(current.first, current.second) }
+        }
     }
 
     private fun hostOf(url: String): String? = try {
-        val after = url.substringAfter("://", missingDelimiterValue = "")
-        val host = after.substringBefore('/').substringBefore('?').substringBefore('#')
-        host.substringAfterLast('@').substringBefore(':').lowercase().ifBlank { null }
+        val afterScheme = url.substringAfter("://", missingDelimiterValue = "")
+        if (afterScheme.isEmpty()) return null
+        val authority = afterScheme.substringBefore('/').substringBefore('?').substringBefore('#')
+        authority.substringAfterLast('@').substringBefore(':').lowercase().ifBlank { null }
     } catch (t: Throwable) {
         null
     }
 
-    private fun isTracker(host: String): Boolean {
+    fun isTracker(host: String): Boolean {
         val h = host.lowercase()
-        return KNOWN_TRACKERS.any { h == it || h.endsWith(".$it") || h.contains(it) }
+        return KNOWN_TRACKER_HOSTS.any { h == it || h.endsWith("." + it) }
     }
 
     companion object {
-        private val KNOWN_TRACKERS = listOf(
+        /** Known collection / analytics hosts. Suffix-matched, so subdomains are covered. */
+        private val KNOWN_TRACKER_HOSTS = listOf(
             "doubleclick.net", "google-analytics.com", "googletagmanager.com", "googlesyndication.com",
-            "googleadservices.com", "connect.facebook.net", "facebook.net/tr", "analytics.tiktok.com",
-            "bat.bing.com", "scorecardresearch.com", "quantserve.com", "hotjar.com", "mixpanel.com",
-            "segment.com", "segment.io", "criteo.com", "criteo.net", "adsrvr.org", "taboola.com",
-            "outbrain.com", "clarity.ms", "fullstory.com", "amplitude.com", "branch.io",
+            "googleadservices.com", "google-analytics.cn", "connect.facebook.net", "facebook.com/tr",
+            "analytics.tiktok.com", "bat.bing.com", "clarity.ms", "scorecardresearch.com", "quantserve.com",
+            "hotjar.com", "hotjar.io", "mixpanel.com", "segment.com", "segment.io", "criteo.com", "criteo.net",
+            "adsrvr.org", "taboola.com", "outbrain.com", "fullstory.com", "amplitude.com", "branch.io",
             "appsflyer.com", "kochava.com", "adjust.com", "ads-twitter.com", "analytics.twitter.com",
-            "snap.licdn.com", "px.ads.linkedin.com", "static.ads-twitter.com", "stats.g.doubleclick.net",
-            "sb.scorecardresearch.com", "cm.g.doubleclick.net", "pagead2.googlesyndication.com"
+            "static.ads-twitter.com", "snap.licdn.com", "px.ads.linkedin.com", "ads.linkedin.com",
+            "analytics.yahoo.com", "adnxs.com", "rubiconproject.com", "pubmatic.com", "casalemedia.com",
+            "moatads.com", "serving-sys.com", "mathtag.com", "bluekai.com", "exelator.com", "demdex.net",
+            "omtrdc.net", "2o7.net", "everesttech.net", "krxd.net", "tidaltv.com", "innovid.com",
+            "ytimg.com/api/stats", "youtube.com/api/stats/ads", "sentry.io", "bugsnag.com",
+            "newrelic.com", "nr-data.net", "optimizely.com", "vwo.com", "heapanalytics.com",
+            "statcounter.com", "yandex.ru/metrika", "mc.yandex.ru", "top-fwz1.mail.ru",
+            "counter.yadro.ru", "histats.com", "liveinternet.ru", "quantserve.com"
         )
     }
 }

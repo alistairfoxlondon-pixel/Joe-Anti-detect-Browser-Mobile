@@ -1,451 +1,1149 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Profile editor.
+
+  Structure: fixed app bar, scrollable body (weight=1), fixed action bar. The body is a stack
+  of section cards; each section is a `bg_card` with a section label, so the eye can group 30
+  controls into six decisions.
+
+  Overflow rules applied here:
+   * every numeric field is bounded by an InputFilter in code, not just by the keyboard,
+   * paired fields are `0dp + weight=1` with a 8dp gutter, so they split any screen width,
+   * every label has maxLines=1 and ellipsize=end,
+   * the action bar buttons are fixed-height and weight-split, never wrap.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:background="@color/bg">
+    android:background="@color/bg"
+    android:orientation="vertical">
 
-    <!-- App bar -->
+    <!-- ============================================================== app bar -->
     <LinearLayout
         android:layout_width="match_parent"
-        android:layout_height="56dp"
-        android:orientation="horizontal"
+        android:layout_height="@dimen/toolbar_height"
+        android:background="@color/surface"
         android:gravity="center_vertical"
+        android:orientation="horizontal"
         android:paddingStart="4dp"
-        android:paddingEnd="12dp"
-        android:background="@color/card"
-        android:elevation="2dp">
+        android:paddingEnd="10dp">
+
         <ImageButton
             android:id="@+id/btnEditorBack"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:src="@drawable/ic_back"
+            android:layout_width="@dimen/touch_target"
+            android:layout_height="@dimen/touch_target"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Back" />
+            android:contentDescription="@string/action_back"
+            android:padding="13dp"
+            android:src="@drawable/ic_back"
+            android:tint="@color/text_dim" />
+
         <TextView
             android:id="@+id/editorTitle"
+            style="@style/Text.Jb.ScreenTitle"
             android:layout_width="0dp"
-            android:layout_weight="1"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
-            android:text="New profile"
-            android:textSize="17sp"
-            android:textStyle="bold"
-            android:textColor="@color/text" />
-        <ImageButton
-            android:id="@+id/btnEditorLaunch"
-            android:layout_width="44dp"
-            android:layout_height="44dp"
-            android:src="@drawable/ic_open_extern"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="Launch profile"
-            android:tint="@color/accent"
-            android:visibility="gone" />
+            android:layout_marginEnd="8dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/editor_title_new" />
+
+        <TextView
+            android:id="@+id/editorScore"
+            style="@style/Text.Jb.Label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_chip"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:paddingStart="8dp"
+            android:paddingTop="4dp"
+            android:paddingEnd="8dp"
+            android:paddingBottom="4dp"
+            android:textColor="@color/accent" />
     </LinearLayout>
 
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
+
+    <!-- ================================================================= body -->
     <ScrollView
+        android:id="@+id/editorScroll"
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1"
+        android:clipToPadding="false"
         android:fillViewport="true">
 
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:padding="16dp"
-            android:paddingBottom="24dp">
+            android:paddingStart="@dimen/screen_h_pad"
+            android:paddingTop="@dimen/gap_m"
+            android:paddingEnd="@dimen/screen_h_pad"
+            android:paddingBottom="@dimen/gap_l">
 
-            <!-- IDENTITY -->
-            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="IDENTITY" />
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+            <!-- ===================================================== identity -->
+            <TextView
+                style="@style/Text.Jb.Section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
-                android:hint="Profile name">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/editorName"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:singleLine="true"
-                    android:inputType="textCapWords"
-                    android:imeOptions="actionNext" />
-            </com.google.android.material.textfield.TextInputLayout>
-
-            <com.google.android.material.textfield.TextInputLayout
-                style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:hint="Notes (optional)">
-                <com.google.android.material.textfield.TextInputEditText
-                    android:id="@+id/editorNotes"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:minLines="1"
-                    android:maxLines="3"
-                    android:inputType="textMultiLine|textCapSentences" />
-            </com.google.android.material.textfield.TextInputLayout>
+                android:text="@string/editor_section_identity" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="14dp">
+
                 <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:hint="Group">
+                    style="@style/Widget.Jb.TextInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/editor_name">
+
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/editorGroup"
+                        android:id="@+id/editorName"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:imeOptions="actionNext"
+                        android:importantForAutofill="no"
+                        android:inputType="textCapWords"
+                        android:maxLines="1"
                         android:singleLine="true" />
                 </com.google.android.material.textfield.TextInputLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_group">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorGroup"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
+                            android:inputType="textCapSentences"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_tags">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorTags"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
+                            android:inputType="text"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput.Dropdown"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_engine">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorEngine"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput.Dropdown"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_os">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorOs"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
                 <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:hint="Tags (comma)">
+                    style="@style/Widget.Jb.TextInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/editor_start_url">
+
                     <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/editorTags"
+                        android:id="@+id/editorStartUrl"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
+                        android:importantForAutofill="no"
+                        android:inputType="textUri|textNoSuggestions"
+                        android:maxLines="1"
                         android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Jb.TextInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/editor_notes">
+
+                    <com.google.android.material.textfield.TextInputEditText
+                        android:id="@+id/editorNotes"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="top|start"
+                        android:importantForAutofill="no"
+                        android:inputType="textMultiLine|textCapSentences"
+                        android:maxLines="3"
+                        android:minLines="1" />
                 </com.google.android.material.textfield.TextInputLayout>
             </LinearLayout>
 
+            <!-- ==================================================== fingerprint -->
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
+                android:layout_marginTop="@dimen/gap_l"
+                android:gravity="center_vertical"
                 android:orientation="horizontal">
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:hint="Browser identity">
-                    <AutoCompleteTextView
-                        android:id="@+id/editorBrowserKind"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="none"
-                        android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:hint="Operating system">
-                    <AutoCompleteTextView
-                        android:id="@+id/editorOs"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="none"
-                        android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
-            </LinearLayout>
 
-            <!-- Fingerprint summary -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="16dp"
-                android:background="@color/line_soft" />
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical">
-                <TextView style="@style/JbText.SectionTitle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="FINGERPRINT" />
+                <TextView
+                    style="@style/Text.Jb.Section"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:text="@string/editor_section_fingerprint" />
+
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/btnRegenerate"
-                    style="@style/Jb.Button.Text"
+                    style="@style/Widget.Jb.Button.Text"
                     android:layout_width="wrap_content"
-                    android:layout_height="36dp"
-                    android:text="Regenerate"
-                    android:icon="@drawable/ic_refresh"
-                    app:iconSize="16dp"
-                    android:textAllCaps="false" />
+                    android:layout_height="40dp"
+                    android:minHeight="40dp"
+                    android:text="@string/editor_regenerate"
+                    app:icon="@drawable/ic_refresh"
+                    app:iconSize="16dp" />
             </LinearLayout>
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:padding="12dp"
-                android:layout_marginTop="4dp"
-                android:background="@drawable/bg_card_surface"
-                android:orientation="vertical">
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="14dp">
+
                 <TextView
                     android:id="@+id/fpSummary"
+                    style="@style/Text.Jb.Mono"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:fontFamily="monospace"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_dim"
-                    android:text="…" />
+                    android:lineSpacingExtra="3dp"
+                    android:text="" />
+
                 <TextView
                     android:id="@+id/fpWarnings"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:textSize="11sp"
                     android:textColor="@color/warning"
+                    android:textSize="11.5sp"
                     android:visibility="gone" />
+
                 <TextView
                     android:id="@+id/fpOk"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:text="✓ Identity is internally consistent"
-                    android:textSize="11sp"
+                    android:text="@string/editor_coherent"
                     android:textColor="@color/success"
-                    android:textStyle="bold" />
-            </LinearLayout>
-
-            <!-- PROXY -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="16dp"
-                android:background="@color/line_soft" />
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
-                android:gravity="center_vertical">
-                <Switch
-                    android:id="@+id/editorProxyEnabled"
-                    style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content" />
-                <TextView style="@style/JbText.SectionTitle" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="PROXY FOR THIS PROFILE" />
-                <TextView
-                    android:id="@+id/btnPickFromLibrary"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:padding="8dp"
-                    android:text="From library…"
-                    android:textSize="12sp"
+                    android:textSize="11.5sp"
                     android:textStyle="bold"
-                    android:textColor="@color/accent"
-                    android:clickable="true" />
+                    android:visibility="gone" />
             </LinearLayout>
 
-            <LinearLayout
-                android:id="@+id/proxyFieldsContainer"
+            <!-- ======================================================== display -->
+            <TextView
+                style="@style/Text.Jb.Section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_screen" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:visibility="gone">
+                android:padding="14dp">
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Jb.TextInput.Dropdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:hint="@string/editor_section_screen">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/editorDevicePreset"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:maxLines="1"
+                        android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
+                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
                     android:orientation="horizontal">
+
                     <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
+                        style="@style/Widget.Jb.TextInput"
                         android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="5dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
-                        android:hint="Protocol">
-                        <AutoCompleteTextView
-                            android:id="@+id/editorProxyScheme"
-                            android:layout_width="match_parent"
-                            android:layout_height="wrap_content"
-                            android:inputType="none"
-                            android:singleLine="true"
-                            android:text="HTTP" />
-                    </com.google.android.material.textfield.TextInputLayout>
-                    <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
-                        android:layout_width="92dp"
-                        android:hint="Port">
+                        android:hint="@string/editor_screen_width">
+
                         <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/editorProxyPort"
+                            android:id="@+id/editorScreenW"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
                             android:inputType="number"
+                            android:maxLength="4"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="5dp"
+                        android:layout_marginEnd="5dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_screen_height">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorScreenH"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
+                            android:inputType="number"
+                            android:maxLength="4"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="5dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_pixel_ratio">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorDpr"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
+                            android:inputType="numberDecimal"
                             android:maxLength="5"
+                            android:maxLines="1"
                             android:singleLine="true" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+
+                <TextView
+                    android:id="@+id/touchLabel"
+                    style="@style/Text.Jb.Caption"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
-                    android:hint="Host">
-                    <com.google.android.material.textfield.TextInputEditText
-                        android:id="@+id/editorProxyHost"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:singleLine="true"
-                        android:inputType="textUri|textNoSuggestions"
-                        android:fontFamily="monospace" />
-                </com.google.android.material.textfield.TextInputLayout>
+                    android:layout_marginTop="12dp"
+                    android:text="@string/editor_touch" />
+
+                <com.google.android.material.slider.Slider
+                    android:id="@+id/editorTouchSlider"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:stepSize="1"
+                    android:value="5"
+                    android:valueFrom="0"
+                    android:valueTo="10"
+                    app:labelBehavior="gone" />
+            </LinearLayout>
+
+            <!-- ======================================================= hardware -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_hardware" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="14dp">
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:baselineAligned="false"
                     android:orientation="horizontal">
+
                     <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        style="@style/Widget.Jb.TextInput.Dropdown"
                         android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
                         android:layout_weight="1"
-                        android:layout_marginEnd="8dp"
-                        android:hint="Username">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/editorProxyUser"
+                        android:hint="@string/editor_cores">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorCores"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:singleLine="true"
-                            android:inputType="textNoSuggestions" />
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
                     </com.google.android.material.textfield.TextInputLayout>
+
                     <com.google.android.material.textfield.TextInputLayout
-                        style="@style/Widget.Material3.TextInputLayout.OutlinedBox"
+                        style="@style/Widget.Jb.TextInput.Dropdown"
                         android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
                         android:layout_weight="1"
-                        app:endIconMode="password_toggle"
-                        android:hint="Password">
-                        <com.google.android.material.textfield.TextInputEditText
-                            android:id="@+id/editorProxyPass"
+                        android:hint="@string/editor_memory">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorMemory"
                             android:layout_width="match_parent"
                             android:layout_height="wrap_content"
-                            android:singleLine="true"
-                            android:inputType="textPassword|textNoSuggestions" />
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Jb.TextInput.Dropdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/editor_gpu_renderer">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/editorGpuRenderer"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:maxLines="2" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <TextView
+                    android:id="@+id/gpuVendorText"
+                    style="@style/Text.Jb.Caption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="6dp"
+                    android:ellipsize="end"
+                    android:maxLines="1" />
+            </LinearLayout>
+
+            <!-- ========================================================== locale -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_locale" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput.Dropdown"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_timezone">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorTimezone"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput.Dropdown"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_language">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorLanguage"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/touch_target"
+                    android:layout_marginTop="4dp"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/Text.Jb.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/editor_automatch" />
+
+                    <Switch
+                        android:id="@+id/switchAutoMatch"
+                        style="@style/Widget.Jb.Switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- =========================================================== proxy -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_proxy" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/touch_target"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/Text.Jb.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="2"
+                        android:text="@string/editor_proxy_enable" />
+
+                    <Switch
+                        android:id="@+id/switchProxy"
+                        style="@style/Widget.Jb.Switch"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/proxyFields"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical"
+                    android:visibility="gone">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Jb.TextInput.Dropdown"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:hint="@string/editor_proxy_type">
+
+                            <AutoCompleteTextView
+                                android:id="@+id/editorProxyType"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="none"
+                                android:maxLines="1"
+                                android:singleLine="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Jb.TextInput"
+                            android:layout_width="92dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:hint="@string/editor_proxy_port">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editorProxyPort"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:importantForAutofill="no"
+                                android:inputType="number"
+                                android:maxLength="5"
+                                android:maxLines="1"
+                                android:singleLine="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:hint="@string/editor_proxy_host">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorProxyHost"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:fontFamily="monospace"
+                            android:importantForAutofill="no"
+                            android:inputType="textUri|textNoSuggestions"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:baselineAligned="false"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Jb.TextInput"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginEnd="6dp"
+                            android:layout_weight="1"
+                            android:hint="@string/editor_proxy_user">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editorProxyUser"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:importantForAutofill="no"
+                                android:inputType="textNoSuggestions"
+                                android:maxLines="1"
+                                android:singleLine="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+
+                        <com.google.android.material.textfield.TextInputLayout
+                            style="@style/Widget.Jb.TextInput"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="6dp"
+                            android:layout_weight="1"
+                            android:hint="@string/editor_proxy_pass"
+                            app:endIconMode="password_toggle">
+
+                            <com.google.android.material.textfield.TextInputEditText
+                                android:id="@+id/editorProxyPass"
+                                android:layout_width="match_parent"
+                                android:layout_height="wrap_content"
+                                android:inputType="textPassword|textNoSuggestions"
+                                android:maxLines="1"
+                                android:singleLine="true" />
+                        </com.google.android.material.textfield.TextInputLayout>
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnProxyCheck"
+                            style="@style/Widget.Jb.Button.Outlined"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:minHeight="40dp"
+                            android:text="@string/editor_proxy_check"
+                            android:textSize="12.5sp" />
+
+                        <com.google.android.material.button.MaterialButton
+                            android:id="@+id/btnProxyLibrary"
+                            style="@style/Widget.Jb.Button.Text"
+                            android:layout_width="wrap_content"
+                            android:layout_height="40dp"
+                            android:minHeight="40dp"
+                            android:text="@string/editor_proxy_library"
+                            android:textSize="12.5sp" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/proxyStatus"
+                        style="@style/Text.Jb.Caption"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:maxLines="2"
+                        android:text="@string/editor_proxy_idle" />
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ====================================================== protection -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_protection" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="2dp">
+
+                <include
+                    android:id="@+id/rowCanvas"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowAudio"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowWebgl"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowFont"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowMedia"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowDnt"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowBattery"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowUnlock"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowFresh"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
                 <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="6dp"
-                    android:gravity="center_vertical">
-                    <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnEditorCheckProxy"
-                        style="@style/Jb.Button.Secondary"
-                        android:layout_width="wrap_content"
-                        android:layout_height="40dp"
-                        android:text="Check connection"
-                        android:textAllCaps="false" />
-                    <TextView
-                        android:id="@+id/editorProxyResult"
+                    android:layout_marginBottom="10dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput.Dropdown"
                         android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
                         android:layout_weight="1"
+                        android:hint="@string/editor_webrtc">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorWebrtc"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput.Dropdown"
+                        android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_marginStart="10dp"
-                        android:singleLine="true"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_geo">
+
+                        <AutoCompleteTextView
+                            android:id="@+id/editorGeo"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:inputType="none"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+
+                <LinearLayout
+                    android:id="@+id/geoCoordinates"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="10dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal"
+                    android:visibility="gone">
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginEnd="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_lat">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorLat"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
+                            android:inputType="numberDecimal|numberSigned"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <com.google.android.material.textfield.TextInputLayout
+                        style="@style/Widget.Jb.TextInput"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="6dp"
+                        android:layout_weight="1"
+                        android:hint="@string/editor_lng">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/editorLng"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content"
+                            android:importantForAutofill="no"
+                            android:inputType="numberDecimal|numberSigned"
+                            android:maxLines="1"
+                            android:singleLine="true" />
+                    </com.google.android.material.textfield.TextInputLayout>
+                </LinearLayout>
+            </LinearLayout>
+
+            <!-- ========================================================== typing -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_typing" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="10dp">
+
+                <include
+                    android:id="@+id/rowHuman"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <include
+                    android:id="@+id/rowJitter"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Jb.TextInput.Dropdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:hint="@string/editor_human_speed">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/editorPasteSpeed"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:maxLines="1"
+                        android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
+            </LinearLayout>
+
+            <!-- ====================================================== monitoring -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_watch" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="10dp">
+
+                <include
+                    android:id="@+id/rowWatch"
+                    layout="@layout/row_switch"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content" />
+
+                <LinearLayout
+                    android:id="@+id/rowWatchInterval"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/touch_target"
+                    android:background="?attr/selectableItemBackground"
+                    android:clickable="true"
+                    android:focusable="true"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/Text.Jb.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
                         android:ellipsize="end"
-                        android:text=""
-                        android:textSize="11sp"
-                        android:textColor="@color/text_dim" />
-                </LinearLayout>
-            </LinearLayout>
+                        android:maxLines="1"
+                        android:text="@string/editor_watch_interval" />
 
-            <!-- HARDENING -->
-            <View
-                android:layout_width="match_parent"
-                android:layout_height="1dp"
-                android:layout_marginTop="16dp"
-                android:background="@color/line_soft" />
-            <TextView style="@style/JbText.SectionTitle" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="12dp" android:text="HARDENING &amp; PRIVACY" />
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-                <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Canvas noise" android:textSize="13sp" android:textColor="@color/text" />
-                    <Switch android:id="@+id/editorCanvasNoise" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" />
-                </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Audio noise" android:textSize="13sp" android:textColor="@color/text" />
-                    <Switch android:id="@+id/editorAudioNoise" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" />
-                </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Hardware noise" android:textSize="13sp" android:textColor="@color/text" />
-                    <Switch android:id="@+id/editorHardwareNoise" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" android:checked="true" />
-                </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal">
-                    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:orientation="vertical">
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Fresh session" android:textSize="13sp" android:textColor="@color/text" />
-                        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Clear cookies, storage and history when this profile closes" android:textSize="10sp" android:textColor="@color/text_faint" />
-                    </LinearLayout>
-                    <Switch android:id="@+id/editorFreshSession" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-                </LinearLayout>
-                <LinearLayout android:layout_width="match_parent" android:layout_height="48dp" android:gravity="center_vertical" android:orientation="horizontal">
-                    <TextView android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Do Not Track header" android:textSize="13sp" android:textColor="@color/text" />
-                    <Switch android:id="@+id/editorDoNotTrack" style="@style/Widget.Material3.CompoundButton.MaterialSwitch" android:layout_width="wrap_content" android:layout_height="wrap_content" />
-                </LinearLayout>
-            </LinearLayout>
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:orientation="horizontal">
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:hint="WebRTC mode">
-                    <AutoCompleteTextView
-                        android:id="@+id/editorWebrtcMode"
-                        android:layout_width="match_parent"
+                    <TextView
+                        android:id="@+id/watchIntervalValue"
+                        style="@style/Text.Jb.BodyMedium"
+                        android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:inputType="none"
-                        android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
-                <com.google.android.material.textfield.TextInputLayout
-                    style="@style/Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp"
-                    android:hint="Geolocation">
-                    <AutoCompleteTextView
-                        android:id="@+id/editorGeoMode"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content"
-                        android:inputType="none"
-                        android:singleLine="true" />
-                </com.google.android.material.textfield.TextInputLayout>
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:textColor="@color/accent"
+                        android:textStyle="bold" />
+                </LinearLayout>
             </LinearLayout>
+
+            <!-- ========================================================= storage -->
+            <TextView
+                style="@style/Text.Jb.Section"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="@dimen/gap_l"
+                android:text="@string/editor_section_storage" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="18dp"
-                android:orientation="horizontal">
+                android:layout_marginTop="@dimen/gap_s"
+                android:background="@drawable/bg_card"
+                android:orientation="vertical"
+                android:paddingStart="14dp"
+                android:paddingTop="2dp"
+                android:paddingEnd="14dp"
+                android:paddingBottom="10dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/touch_target"
+                    android:gravity="center_vertical"
+                    android:orientation="horizontal">
+
+                    <TextView
+                        style="@style/Text.Jb.Body"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:ellipsize="end"
+                        android:maxLines="1"
+                        android:text="@string/editor_storage_used" />
+
+                    <TextView
+                        android:id="@+id/storageValue"
+                        style="@style/Text.Jb.Caption"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:ellipsize="end"
+                        android:maxLines="1" />
+                </LinearLayout>
+
+                <TextView
+                    android:id="@+id/isolationValue"
+                    style="@style/Text.Jb.Caption"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="8dp"
+                    android:maxLines="2" />
+
                 <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnEditorDelete"
-                    style="@style/Jb.Button.Secondary"
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp"
-                    android:layout_height="46dp"
-                    android:text="Delete"
-                    android:textAllCaps="false"
-                    android:visibility="gone"
-                    android:textColor="@color/danger"
-                    android:strokeColor="@color/danger" />
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/btnEditorSave"
-                    style="@style/Jb.Button.Primary"
-                    android:layout_width="0dp"
-                    android:layout_weight="2"
-                    android:layout_marginStart="6dp"
-                    android:layout_height="46dp"
-                    android:text="Save profile"
-                    android:textAllCaps="false" />
+                    android:id="@+id/btnClearData"
+                    style="@style/Widget.Jb.Button.Outlined"
+                    android:layout_width="match_parent"
+                    android:layout_height="@dimen/button_height"
+                    android:text="@string/profiles_clear_data" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
+
+    <!-- ========================================================= action bar -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
+
+    <LinearLayout
+        android:id="@+id/editorActionBar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="@color/surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="10dp">
+
+        <ImageButton
+            android:id="@+id/btnEditorDelete"
+            android:layout_width="@dimen/touch_target"
+            android:layout_height="@dimen/touch_target"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/action_delete"
+            android:padding="13dp"
+            android:src="@drawable/ic_trash"
+            android:tint="@color/danger"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEditorSave"
+            style="@style/Widget.Jb.Button"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:text="@string/editor_save" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btnEditorSaveOpen"
+            style="@style/Widget.Jb.Button.Outlined"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/button_height"
+            android:layout_marginStart="8dp"
+            android:layout_weight="1"
+            android:text="@string/editor_save_and_open" />
+    </LinearLayout>
 </LinearLayout>

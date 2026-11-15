@@ -1,20 +1,329 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  All user-facing copy lives here so screens stay declarative and nothing is duplicated.
+  Copy rules applied throughout: short, factual, no marketing filler, no repeated feature
+  explanations. Explanatory sentences exist only where the user would otherwise be guessing
+  (destructive actions, degraded kernel, permissions).
+-->
 <resources>
+
     <string name="app_name">Joe Browser</string>
-    <string name="settings">Settings</string>
-    <string name="history">History</string>
-    <string name="open_source_licenses">Open source licenses</string>
+
+    <!-- Bottom navigation -->
     <string name="nav_home">Home</string>
     <string name="nav_profiles">Profiles</string>
     <string name="nav_proxies">Proxies</string>
-    <string name="nav_browsers">Browsers</string>
-    <string name="nav_extensions">Extensions</string>
-    <string name="paste_as_human">Paste as Human</string>
-    <string name="fingerprint_test_browserscan">BrowserScan</string>
+    <string name="nav_browsers">Engines</string>
+    <string name="nav_tools">Tools</string>
+
+    <!-- Generic actions -->
     <string name="action_save">Save</string>
     <string name="action_cancel">Cancel</string>
     <string name="action_delete">Delete</string>
     <string name="action_edit">Edit</string>
     <string name="action_close">Close</string>
     <string name="action_retry">Retry</string>
+    <string name="action_back">Back</string>
+    <string name="action_done">Done</string>
+    <string name="action_clear">Clear</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_open">Open</string>
+    <string name="action_copy_report">Copy report</string>
+    <string name="action_check_now">Check now</string>
+    <string name="action_check_all">Check all</string>
+    <string name="action_launch">Launch</string>
+    <string name="action_rename">Rename</string>
+    <string name="action_duplicate">Duplicate</string>
+    <string name="action_see_all">See all</string>
+
+    <!-- Dashboard -->
+    <string name="home_title">Dashboard</string>
+    <string name="home_greeting">Joe Browser</string>
+    <string name="home_subtitle">Isolated identities on this device</string>
+    <string name="home_metric_profiles">Profiles</string>
+    <string name="home_metric_proxies">Proxies online</string>
+    <string name="home_metric_running">Open windows</string>
+    <string name="home_new_profile">New profile</string>
+    <string name="home_section_recent">Recent profiles</string>
+    <string name="home_section_alerts">Monitor alerts</string>
+    <string name="home_section_checks">Verify a profile</string>
+    <string name="home_checks_hint">Opens the site inside the selected identity.</string>
+    <string name="home_empty_recent">No profiles yet. Create one to start.</string>
+    <string name="home_empty_alerts">No alerts. Watched proxies are healthy.</string>
+    <string name="home_kernel_title">Kernel</string>
+    <string name="home_kernel_isolated">Isolated storage</string>
+    <string name="home_kernel_shared">Shared storage</string>
+    <string name="home_kernel_docstart">Early injection</string>
+    <string name="home_kernel_late">Fallback injection</string>
+    <string name="home_monitor_running">Monitor active</string>
+    <string name="home_monitor_idle">Monitor idle</string>
+
+    <!-- Profiles -->
+    <string name="profiles_title">Profiles</string>
+    <string name="profiles_search_hint">Search name, group, tag</string>
+    <string name="profiles_empty_title">No profiles yet</string>
+    <string name="profiles_empty_body">Each profile is a separate identity: its own storage, proxy and fingerprint.</string>
+    <string name="profiles_no_match_title">Nothing matches</string>
+    <string name="profiles_no_match_body">Change the search text or pick another group.</string>
+    <string name="profiles_create_first">Create a profile</string>
+    <string name="profiles_new">New profile</string>
+    <string name="profiles_sort">Sort</string>
+    <string name="profiles_filter_all">All</string>
+    <string name="profiles_clear_data">Clear browsing data</string>
+    <string name="profiles_clear_data_body">Erases cookies, site storage, cache and history for “%1$s”. The identity and proxy are kept.</string>
+    <string name="profiles_delete_title">Delete “%1$s”?</string>
+    <string name="profiles_delete_body_trash">Moves the profile to the trash. Its history is removed.</string>
+    <string name="profiles_delete_body_forever">Permanently deletes the profile, its storage and its history.</string>
+    <string name="profiles_count">%1$d profiles</string>
+    <string name="profiles_count_filtered">%1$d of %2$d</string>
+
+    <!-- Profile editor -->
+    <string name="editor_title_new">New profile</string>
+    <string name="editor_title_edit">Edit profile</string>
+    <string name="editor_section_identity">Identity</string>
+    <string name="editor_name">Profile name</string>
+    <string name="editor_notes">Notes</string>
+    <string name="editor_group">Group</string>
+    <string name="editor_tags">Tags</string>
+    <string name="editor_engine">Browser</string>
+    <string name="editor_os">Operating system</string>
+    <string name="editor_start_url">Start page</string>
+    <string name="editor_section_fingerprint">Fingerprint</string>
+    <string name="editor_regenerate">Regenerate</string>
+    <string name="editor_coherence">Coherence %1$d%%</string>
+    <string name="editor_coherent">Consistent identity</string>
+    <string name="editor_section_screen">Display</string>
+    <string name="editor_screen_width">Width</string>
+    <string name="editor_screen_height">Height</string>
+    <string name="editor_pixel_ratio">Pixel ratio</string>
+    <string name="editor_section_hardware">Hardware</string>
+    <string name="editor_cores">CPU cores</string>
+    <string name="editor_memory">Memory (GB)</string>
+    <string name="editor_touch">Touch points</string>
+    <string name="editor_gpu_vendor">GPU vendor</string>
+    <string name="editor_gpu_renderer">GPU renderer</string>
+    <string name="editor_section_locale">Locale</string>
+    <string name="editor_timezone">Timezone</string>
+    <string name="editor_language">Language</string>
+    <string name="editor_automatch">Match locale to proxy</string>
+    <string name="editor_notifications">Notifications</string>
+    <string name="editor_section_proxy">Proxy</string>
+    <string name="editor_proxy_enable">Use a proxy for this profile</string>
+    <string name="editor_proxy_type">Protocol</string>
+    <string name="editor_proxy_host">Host</string>
+    <string name="editor_proxy_port">Port</string>
+    <string name="editor_proxy_user">Username</string>
+    <string name="editor_proxy_pass">Password</string>
+    <string name="editor_proxy_check">Check</string>
+    <string name="editor_proxy_library">From library</string>
+    <string name="editor_proxy_idle">Not checked</string>
+    <string name="editor_section_protection">Protection</string>
+    <string name="editor_canvas">Canvas noise</string>
+    <string name="editor_audio">Audio noise</string>
+    <string name="editor_hardware_noise">WebGL noise</string>
+    <string name="editor_font_noise">Font metrics</string>
+    <string name="editor_media_noise">Media devices</string>
+    <string name="editor_dnt">Do Not Track</string>
+    <string name="editor_battery">Battery API</string>
+    <string name="editor_webrtc">WebRTC</string>
+    <string name="editor_geo">Geolocation</string>
+    <string name="editor_fresh">Clear data on close</string>
+    <string name="editor_unlock">Allow selection and copy</string>
+    <string name="editor_watch">Watch this proxy</string>
+    <string name="editor_watch_interval">Watch interval</string>
+    <string name="editor_human_paste">Human typing</string>
+    <string name="editor_human_speed">Typing speed</string>
+    <string name="editor_section_typing">Typing</string>
+    <string name="editor_section_watch">Monitoring</string>
+    <string name="editor_section_storage">Storage</string>
+    <string name="editor_storage_used">Profile storage</string>
+    <string name="editor_save">Save profile</string>
+    <string name="editor_save_and_open">Save &amp; open</string>
+    <string name="editor_name_required">Name is required</string>
+    <string name="editor_saved">Profile saved</string>
+    <string name="editor_created">Profile created</string>
+    <string name="editor_interval_value">every %1$d s</string>
+    <string name="editor_custom_ua">Custom user agent</string>
+    <string name="editor_lat">Latitude</string>
+    <string name="editor_lng">Longitude</string>
+    <string name="editor_human_jitter">Keystroke rhythm</string>
+    <string name="editor_regenerated">New identity generated</string>
+    <string name="editor_isolated">Isolated WebView storage bucket</string>
+    <string name="editor_shared">Shared WebView storage — update Android System WebView</string>
+    <string name="editor_unsaved_title">Unsaved changes</string>
+    <string name="editor_unsaved_body">Save this profile before closing?</string>
+    <string name="action_discard">Discard</string>
+
+    <!-- Proxies -->
+    <string name="proxies_title">Proxies</string>
+    <string name="proxies_device_title">This device</string>
+    <string name="proxies_device_idle">Not checked</string>
+    <string name="proxies_monitor_label">Background monitor</string>
+    <string name="proxies_add">Add proxy</string>
+    <string name="proxies_empty_title">No proxies saved</string>
+    <string name="proxies_empty_body">Paste a list from the clipboard or add one manually.</string>
+    <string name="proxies_library">Library</string>
+    <string name="proxies_never_checked">Not checked</string>
+    <string name="proxies_ok">Online</string>
+    <string name="proxies_failed">Unreachable</string>
+    <string name="proxies_untested">Not checked</string>
+    <string name="proxies_delete_title">Delete proxy?</string>
+    <string name="proxies_delete_body">“%1$s” will be removed from the library.</string>
+    <string name="proxies_rename">Rename proxy</string>
+    <string name="proxies_copied">Copied</string>
+    <string name="proxies_import_title">Add proxy</string>
+    <string name="proxies_import_paste">Paste one per line</string>
+    <string name="proxies_import_manual">or enter manually</string>
+    <string name="proxies_import_name">Name (optional)</string>
+    <string name="proxies_import_name_long">Label for this proxy</string>
+    <string name="proxies_import_watch">Watch for outages and IP rotation</string>
+    <string name="proxies_import_parse">Preview</string>
+    <string name="proxies_import_save">Check &amp; save</string>
+    <string name="proxies_import_nothing">Nothing recognized in that text</string>
+    <string name="proxies_import_invalid">Enter a valid host and port</string>
+    <string name="proxies_import_count">%1$d proxy ready to import</string>
+    <string name="proxies_import_count_skipped">%1$d ready · %2$d line(s) skipped</string>
+    <string name="proxies_alerts_title">Alerts</string>
+    <string name="proxies_clear_alerts">Clear</string>
+    <string name="proxies_alert_offline">Offline</string>
+    <string name="proxies_alert_recovered">Recovered</string>
+    <string name="proxies_alert_rotated">Rotated</string>
+
+    <!-- Engines -->
+    <string name="engines_title">Browser engines</string>
+    <string name="engines_body">Rendering is always the system WebView. The engine below is the identity each profile reports.</string>
+    <string name="engines_used_by">%1$d profile(s)</string>
+    <string name="engines_unused">Not used</string>
+    <string name="engines_create">Create profile with %1$s</string>
+    <string name="engines_builds">Builds</string>
+    <string name="engines_latest">Latest %1$s</string>
+    <string name="engines_rendering">Rendering</string>
+    <string name="engines_rendering_value">System WebView (Blink)</string>
+    <string name="engines_firefox_note">Gecko identities are user-agent level only.</string>
+
+    <!-- Tools -->
+    <string name="tools_title">Tools</string>
+    <string name="tools_section_proxy_monitor">Proxy monitor</string>
+    <string name="tools_monitor_enabled">Run in background</string>
+    <string name="tools_monitor_interval">Check interval</string>
+    <string name="tools_monitor_status">Status</string>
+    <string name="tools_section_typing">Human typing</string>
+    <string name="tools_human_enabled">Enable paste as human</string>
+    <string name="tools_human_speed">Default speed</string>
+    <string name="tools_human_preview">Preview timing</string>
+    <string name="tools_section_browser">Browser defaults</string>
+    <string name="tools_history">Keep browsing history</string>
+    <string name="tools_trash">Keep deleted profiles in trash</string>
+    <string name="tools_tracker">Count HTTP requests</string>
+    <string name="tools_unlock">Allow selection and copy</string>
+    <string name="tools_section_appearance">Appearance</string>
+    <string name="tools_theme">Theme</string>
+    <string name="tools_start_url">Default start page</string>
+    <string name="tools_section_data">Data</string>
+    <string name="tools_export_full">Full backup</string>
+    <string name="tools_export_safe">Backup without passwords</string>
+    <string name="tools_export_note">Passwords are encrypted with the device key and stay readable only here.</string>
+    <string name="tools_empty_trash">Empty trash</string>
+    <string name="tools_trash_count">%1$d item(s)</string>
+    <string name="tools_reset">Reset all data</string>
+    <string name="tools_reset_title">Reset all data?</string>
+    <string name="tools_reset_body">Every profile, proxy, extension and history entry will be deleted from this device. This cannot be undone.</string>
+    <string name="tools_section_about">About</string>
+    <string name="tools_version">Version %1$s (%2$s)</string>
+    <string name="tools_licenses">Open source licenses</string>
+    <string name="tools_storage_used">Storage used</string>
+    <string name="tools_export_chooser">Export backup</string>
+    <string name="tools_saved">Saved</string>
+    <string name="tools_interval_30">30 s</string>
+    <string name="tools_interval_60">1 min</string>
+    <string name="tools_interval_120">2 min</string>
+    <string name="tools_interval_300">5 min</string>
+    <string name="tools_interval_600">10 min</string>
+
+    <!-- Browser -->
+    <string name="browser_url_hint">Search or enter address</string>
+    <string name="browser_error_title">Page could not be loaded</string>
+    <string name="browser_error_body">Check the connection or this profile’s proxy.</string>
+    <string name="browser_ssl_title">Certificate error</string>
+    <string name="browser_ssl_body">The site’s certificate could not be verified.</string>
+    <string name="browser_ssl_go_back">Go back</string>
+    <string name="browser_ssl_proceed">Proceed anyway</string>
+    <string name="browser_paste_menu">Paste as human</string>
+    <string name="browser_paste_speed">Typing speed</string>
+    <string name="browser_fingerprint_check">Fingerprint check</string>
+    <string name="browser_tracker">HTTP tracker</string>
+    <string name="browser_clear_data">Clear browsing data</string>
+    <string name="browser_clear_data_title">Clear browsing data?</string>
+    <string name="browser_clear_data_body">Cookies, site storage, cache and history for “%1$s” will be erased. The identity and proxy are kept.</string>
+    <string name="browser_cleared">Browsing data cleared</string>
+    <string name="browser_paste_no_field">Tap a text field first</string>
+    <string name="browser_paste_empty">Clipboard is empty</string>
+    <string name="browser_paste_started">Typing %1$s</string>
+    <string name="browser_paste_progress">Typing %1$d of %2$d</string>
+    <string name="browser_tracker_title">HTTP tracker</string>
+    <string name="browser_tracker_empty">No requests recorded yet</string>
+    <string name="browser_tracker_summary">%1$d requests · %2$d trackers</string>
+    <string name="browser_proxy_ok">Proxy %1$s · %2$d ms</string>
+    <string name="browser_proxy_failed">Proxy unreachable — loading may fail</string>
+    <string name="browser_proxy_checking">Checking proxy…</string>
+    <string name="browser_proxy_unsupported">This WebView cannot route proxy traffic — update Android System WebView</string>
+    <string name="browser_download_started">Download started</string>
+    <string name="browser_download_failed">Could not start the download</string>
+    <string name="browser_kernel_fallback">Fingerprint layer applied at page start. Update Android System WebView for pre-load injection.</string>
+    <string name="browser_kernel_shared">Profile storage is shared on this WebView build. Update Android System WebView.</string>
+    <string name="browser_external_failed">No app can open that link</string>
+    <string name="browser_profile_missing">Profile not found</string>
+    <string name="browser_find_hint">Find in page</string>
+    <string name="browser_find_prev">Previous match</string>
+    <string name="browser_find_next">Next match</string>
+    <string name="browser_forward">Forward</string>
+    <string name="browser_reload">Reload</string>
+    <string name="browser_menu">Menu</string>
+    <string name="browser_kernel_ok">Isolated</string>
+    <string name="browser_menu_open_external">Open in another app</string>
+    <string name="browser_menu_copy">Copy address</string>
+    <string name="browser_menu_find">Find in page</string>
+    <string name="browser_menu_edit_profile">Edit profile</string>
+    <string name="browser_menu_reload_identity">Reload identity</string>
+    <string name="browser_menu_no_clipboard">Clipboard is empty</string>
+    <string name="browser_fullscreen_hint">Fullscreen — use back to exit</string>
+    <string name="browser_find_no_match">No matches</string>
+    <string name="browser_find_matches">%1$d of %2$d</string>
+
+    <!-- History -->
+    <string name="history_title">History</string>
+    <string name="history_clear_all">Clear all</string>
+    <string name="history_clear_title">Clear all history?</string>
+    <string name="history_clear_body">Every profile’s browsing history on this device will be erased. Profiles are not deleted.</string>
+    <string name="history_clear_profile_body">History for “%1$s” will be erased. The profile itself is kept.</string>
+    <string name="history_empty_title">No history yet</string>
+    <string name="history_empty_body">Visited pages appear here when history is enabled.</string>
+    <string name="history_clear">Clear history</string>
+    <string name="history_search">Search history</string>
+    <string name="history_empty">No pages match this search</string>
+    <string name="history_all">All profiles</string>
+    <string name="history_open_failed">Could not open that link</string>
+    <string name="history_deleted">Entry removed</string>
+
+    <!-- Licenses -->
+    <string name="licenses_title">Open source licenses</string>
+    <string name="licenses_version">Joe Browser %1$s</string>
+    <string name="licenses_privacy_title">What this app does and does not do</string>
+    <string name="licenses_privacy_body">Fingerprint values are applied inside this device only. Nothing is uploaded: profiles, proxies and history stay in private app storage, proxy passwords are encrypted with a device-bound AES-GCM key, and the only network calls the app makes on its own are the proxy health checks you enable and the IP/geo lookups they perform.</string>
+
+    <!-- Status / errors -->
+    <string name="status_checking">Checking…</string>
+    <string name="status_saved">Saved</string>
+    <string name="status_deleted">Deleted</string>
+    <string name="status_failed">Failed</string>
+    <string name="error_generic">Something went wrong</string>
+    <string name="error_no_handler">No app can handle that</string>
+    <string name="error_profile_not_found">Profile not found</string>
+    <string name="error_save_failed">Could not save</string>
+    <string name="loading">Loading…</string>
+    <string name="switch_on">On</string>
+    <string name="switch_off">Off</string>
+    <string name="none">None</string>
+    <string name="direct">Direct</string>
+    <string name="never">Never</string>
 </resources>

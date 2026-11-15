@@ -1,38 +1,67 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@+id/menuPasteHuman"
-        android:icon="@drawable/ic_keyboard"
-        android:title="Paste as Human"
-        android:showAsAction="never" />
-    <item android:id="@+id/menuPasteSpeed"
-        android:title="Typing speed"
-        android:showAsAction="never">
-        <menu>
-            <group android:checkableBehavior="single">
-                <item android:id="@+id/speedRelaxed" android:title="Relaxed (60–135 ms)" android:checkable="true" />
-                <item android:id="@+id/speedNatural" android:title="Natural (35–105 ms)" android:checkable="true" android:checked="true" />
-                <item android:id="@+id/speedFast" android:title="Fast (15–45 ms)" android:checkable="true" />
-                <item android:id="@+id/speedInstant" android:title="Instant" android:checkable="true" />
-            </group>
-        </menu>
-    </item>
-    <item android:id="@+id/menuFingerprint"
-        android:title="Fingerprint check"
-        android:showAsAction="never">
-        <menu>
-            <item android:id="@+id/fpBrowserScan" android:title="BrowserScan.net" />
-            <item android:id="@+id/fpIpHey" android:title="IPHey.com" />
-            <item android:id="@+id/fpPixelScan" android:title="PixelScan.com" />
-            <item android:id="@+id/fpIpFighter" android:title="IPFighter.com" />
-            <item android:id="@+id/fpWhoer" android:title="Whoer.net" />
-        </menu>
-    </item>
-    <item android:id="@+id/menuHttpTracker"
-        android:icon="@drawable/ic_shield_check"
-        android:title="HTTP Tracker"
-        android:showAsAction="never" />
-    <item android:id="@+id/menuClearData"
-        android:icon="@drawable/ic_delete"
-        android:title="Clear browsing data"
-        android:showAsAction="never" />
+    <group android:id="@+id/groupPaste">
+        <item
+            android:id="@+id/menuPasteHuman"
+            android:icon="@drawable/ic_keyboard"
+            android:title="@string/browser_paste_menu" />
+        <item android:id="@+id/menuPasteSpeed" android:title="@string/browser_paste_speed">
+            <menu>
+                <group android:checkableBehavior="single">
+                    <item
+                        android:id="@+id/speedRelaxed"
+                        android:checkable="true"
+                        android:title="Relaxed · 55–135 ms" />
+                    <item
+                        android:id="@+id/speedNatural"
+                        android:checkable="true"
+                        android:checked="true"
+                        android:title="Natural · 35–105 ms" />
+                    <item
+                        android:id="@+id/speedFast"
+                        android:checkable="true"
+                        android:title="Fast · 15–45 ms" />
+                    <item
+                        android:id="@+id/speedInstant"
+                        android:checkable="true"
+                        android:title="Instant" />
+                </group>
+            </menu>
+        </item>
+    </group>
+    <group android:id="@+id/groupFingerprint">
+        <item android:id="@+id/menuFingerprint" android:title="@string/browser_fingerprint_check">
+            <menu>
+                <item android:id="@+id/fpBrowserScan" android:title="BrowserScan" />
+                <item android:id="@+id/fpIpHey" android:title="IPHey" />
+                <item android:id="@+id/fpPixelScan" android:title="PixelScan" />
+                <item android:id="@+id/fpIpFighter" android:title="IPFighter" />
+                <item android:id="@+id/fpWhoer" android:title="Whoer" />
+            </menu>
+        </item>
+    </group>
+    <group android:id="@+id/groupPage">
+        <item
+            android:id="@+id/menuFindInPage"
+            android:title="@string/browser_menu_find" />
+        <item
+            android:id="@+id/menuCopyAddress"
+            android:title="@string/browser_menu_copy" />
+        <item
+            android:id="@+id/menuOpenExternal"
+            android:title="@string/browser_menu_open_external" />
+        <item
+            android:id="@+id/menuEditProfile"
+            android:title="@string/browser_menu_edit_profile" />
+    </group>
+    <group android:id="@+id/groupData">
+        <item
+            android:id="@+id/menuHttpTracker"
+            android:icon="@drawable/ic_shield_check"
+            android:title="@string/browser_tracker" />
+        <item
+            android:id="@+id/menuClearData"
+            android:icon="@drawable/ic_trash"
+            android:title="@string/browser_clear_data" />
+    </group>
 </menu>
