@@ -61,7 +61,7 @@
                     android:maxLines="1"
                     android:text="@string/tools_monitor_enabled" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchMonitor"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -160,7 +160,7 @@
                     android:maxLines="1"
                     android:text="@string/tools_human_enabled" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchHumanPaste"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -182,7 +182,7 @@
                     android:maxLines="1"
                     android:text="@string/editor_human_jitter" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchJitter"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -267,7 +267,7 @@
                     android:maxLines="1"
                     android:text="@string/tools_history" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchHistory"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -289,7 +289,7 @@
                     android:maxLines="1"
                     android:text="@string/tools_tracker" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchTracker"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -311,7 +311,7 @@
                     android:maxLines="1"
                     android:text="@string/tools_unlock" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchUnlockSelection"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -371,7 +371,7 @@
                     android:maxLines="1"
                     android:text="@string/tools_trash" />
 
-                <Switch
+                <com.google.android.material.materialswitch.MaterialSwitch
                     android:id="@+id/switchTrash"
                     style="@style/Widget.Jb.Switch"
                     android:layout_width="wrap_content"
@@ -395,7 +395,7 @@
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="@string/tools_empty_trash" />
+                    android:text="@string/tools_trash_manage_title" />
 
                 <TextView
                     android:id="@+id/valueTrashCount"
@@ -411,7 +411,7 @@
                     android:layout_height="@dimen/icon_sm"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right"
-                    android:tint="@color/text_muted" />
+                    app:tint="@color/text_muted" />
             </LinearLayout>
 
             <LinearLayout
@@ -472,7 +472,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginBottom="@dimen/gap_s"
-                android:maxLines="4"
                 android:text="@string/tools_export_note" />
 
             <com.google.android.material.button.MaterialButton
@@ -573,7 +572,7 @@
                     android:layout_height="@dimen/icon_sm"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_chevron_right"
-                    android:tint="@color/text_muted" />
+                    app:tint="@color/text_muted" />
             </LinearLayout>
         </LinearLayout>
     </LinearLayout>

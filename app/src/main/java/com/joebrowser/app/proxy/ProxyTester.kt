@@ -44,7 +44,8 @@ data class ProxyTestResult(
 object ProxyTester {
 
     private const val IP_ECHO = "https://api.ipify.org?format=json"
-    private const val IP_GEO = "http://ip-api.com/json/?fields=status,country,countryCode,city,timezone,org,query"
+    private const val IP_GEO_HTTPS = "https://ipwho.is/"
+    private const val IP_GEO_FALLBACK = "http://ip-api.com/json/?fields=status,country,countryCode,city,timezone,org,query"
     private const val DEFAULT_TIMEOUT = 12_000
     private const val MAX_BODY_CHARS = 64 * 1024
 
@@ -52,6 +53,11 @@ object ProxyTester {
     fun checkDirectDevice(timeoutMs: Int = DEFAULT_TIMEOUT): ProxyTestResult {
         val started = System.currentTimeMillis()
         return try {
+            val whois = probeIpWhois("", Proxy.NO_PROXY, timeoutMs)
+            if (whois != null && whois.ip.isNotBlank()) {
+                val latency = (System.currentTimeMillis() - started).toInt()
+                return whois.copy(latencyMs = latency)
+            }
             val outcome = httpGet(IP_ECHO, Proxy.NO_PROXY, timeoutMs)
             val body = outcome.bodyOrNull()
                 ?: return fail(outcome.errorOrBlank(), started)
@@ -60,8 +66,8 @@ object ProxyTester {
             val latency = (System.currentTimeMillis() - started).toInt()
             val geo = geoFor(ip, timeoutMs)
             ProxyTestResult(
-                ok = true, ip = ip, country = geo.first, countryCode = geo.second,
-                city = geo.third, timezone = geo.fourth, latencyMs = latency
+                ok = true, ip = ip, country = geo.country, countryCode = geo.countryCode,
+                city = geo.city, timezone = geo.timezone, org = geo.org, latencyMs = latency
             )
         } catch (t: Throwable) {
             fail(t.message ?: "Unreachable", started)
@@ -76,17 +82,22 @@ object ProxyTester {
         return try {
             relay = LocalProxyRelay.start(config)
             val local = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", relay.port))
+            val whois = probeIpWhois("", local, timeoutMs)
+            if (whois != null && whois.ip.isNotBlank()) {
+                val latency = (System.currentTimeMillis() - started).toInt()
+                return whois.copy(latencyMs = latency)
+            }
             val outcome = httpGet(IP_ECHO, local, timeoutMs)
             val body = outcome.bodyOrNull()
                 ?: return fail(outcome.errorOrBlank(), started)
             val ip = runCatching { JSONObject(body).optString("ip") }.getOrDefault("")
             if (ip.isBlank()) return fail("Upstream answered with an unexpected body (no exit IP)", started)
             val latency = (System.currentTimeMillis() - started).toInt()
-            val geo = geoForVia(local, timeoutMs).takeIf { it.second.isNotBlank() }
+            val geo = geoForVia(local, timeoutMs).takeIf { it.countryCode.isNotBlank() }
                 ?: geoFor(ip, timeoutMs)
             ProxyTestResult(
-                ok = true, ip = ip, country = geo.first, countryCode = geo.second,
-                city = geo.third, timezone = geo.fourth, latencyMs = latency
+                ok = true, ip = ip, country = geo.country, countryCode = geo.countryCode,
+                city = geo.city, timezone = geo.timezone, org = geo.org, latencyMs = latency
             )
         } catch (t: Throwable) {
             fail(t.message ?: "Unreachable", started)
@@ -203,47 +214,86 @@ object ProxyTester {
 
     // ---------------------------------------------------------------- internals
 
-    private fun geoFor(ip: String, timeoutMs: Int): Quadruple {
+    private data class GeoInfo(
+        val country: String = "",
+        val countryCode: String = "",
+        val city: String = "",
+        val timezone: String = "",
+        val org: String = ""
+    )
+
+    private fun probeIpWhois(ip: String, proxy: Proxy, timeoutMs: Int): ProxyTestResult? {
+        return try {
+            val target = if (ip.isBlank()) IP_GEO_HTTPS else "$IP_GEO_HTTPS$ip"
+            val body = httpGet(target, proxy, timeoutMs).bodyOrNull() ?: return null
+            val json = JSONObject(body)
+            if (!json.optBoolean("success", true)) return null
+            val exitIp = json.optString("ip", "")
+            if (exitIp.isBlank()) return null
+            val tzObj = json.optJSONObject("timezone")
+            val connObj = json.optJSONObject("connection")
+            ProxyTestResult(
+                ok = true,
+                ip = exitIp,
+                country = json.optString("country", ""),
+                countryCode = json.optString("country_code", ""),
+                city = json.optString("city", ""),
+                timezone = tzObj?.optString("id", "") ?: json.optString("timezone", ""),
+                org = connObj?.optString("isp", "")?.ifBlank { connObj.optString("org", "") } ?: ""
+            )
+        } catch (t: Throwable) {
+            null
+        }
+    }
+
+    private fun geoFor(ip: String, timeoutMs: Int): GeoInfo {
+        probeIpWhois(ip, Proxy.NO_PROXY, timeoutMs)?.let {
+            if (it.countryCode.isNotBlank()) {
+                return GeoInfo(it.country, it.countryCode, it.city, it.timezone, it.org)
+            }
+        }
         return try {
             val body = httpGet(
                 "http://ip-api.com/json/$ip?fields=status,country,countryCode,city,timezone,org",
                 Proxy.NO_PROXY,
                 timeoutMs
-            ).bodyOrNull()
-            if (body == null) Quadruple("", "", "", "")
-            else {
-                val json = JSONObject(body)
-                if (json.optString("status") != "success") Quadruple("", "", "", "")
-                else Quadruple(
-                    json.optString("country", ""),
-                    json.optString("countryCode", ""),
-                    json.optString("city", ""),
-                    json.optString("timezone", "")
-                )
-            }
-        } catch (t: Throwable) {
-            Quadruple("", "", "", "")
-        }
-    }
-
-    private fun geoForVia(proxy: Proxy, timeoutMs: Int): Quadruple {
-        return try {
-            val body = httpGet(IP_GEO, proxy, timeoutMs).bodyOrNull()
-                ?: return Quadruple("", "", "", "")
+            ).bodyOrNull() ?: return GeoInfo()
             val json = JSONObject(body)
-            if (json.optString("status") != "success") Quadruple("", "", "", "")
-            else Quadruple(
-                json.optString("country", ""),
-                json.optString("countryCode", ""),
-                json.optString("city", ""),
-                json.optString("timezone", "")
+            if (json.optString("status") != "success") GeoInfo()
+            else GeoInfo(
+                country = json.optString("country", ""),
+                countryCode = json.optString("countryCode", ""),
+                city = json.optString("city", ""),
+                timezone = json.optString("timezone", ""),
+                org = json.optString("org", "")
             )
         } catch (t: Throwable) {
-            Quadruple("", "", "", "")
+            GeoInfo()
         }
     }
 
-    private data class Quadruple(val first: String, val second: String, val third: String, val fourth: String)
+    private fun geoForVia(proxy: Proxy, timeoutMs: Int): GeoInfo {
+        probeIpWhois("", proxy, timeoutMs)?.let {
+            if (it.countryCode.isNotBlank()) {
+                return GeoInfo(it.country, it.countryCode, it.city, it.timezone, it.org)
+            }
+        }
+        return try {
+            val body = httpGet(IP_GEO_FALLBACK, proxy, timeoutMs).bodyOrNull()
+                ?: return GeoInfo()
+            val json = JSONObject(body)
+            if (json.optString("status") != "success") GeoInfo()
+            else GeoInfo(
+                country = json.optString("country", ""),
+                countryCode = json.optString("countryCode", ""),
+                city = json.optString("city", ""),
+                timezone = json.optString("timezone", ""),
+                org = json.optString("org", "")
+            )
+        } catch (t: Throwable) {
+            GeoInfo()
+        }
+    }
 
     private fun fail(message: String, started: Long): ProxyTestResult =
         ProxyTestResult(ok = false, latencyMs = (System.currentTimeMillis() - started).toInt(), error = message)

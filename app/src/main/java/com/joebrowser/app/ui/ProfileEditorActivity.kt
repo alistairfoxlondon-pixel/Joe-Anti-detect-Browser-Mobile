@@ -13,6 +13,7 @@ import android.widget.AutoCompleteTextView
 import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.widget.doAfterTextChanged
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
@@ -74,39 +75,43 @@ class ProfileEditorActivity : AppCompatActivity() {
 
         val requestedEngine = BrowserEngine.of(intent.getStringExtra(EXTRA_ENGINE))
         editingId = intent.getStringExtra(EXTRA_PROFILE_ID)?.takeIf { it.isNotBlank() }
-        profile = loadProfile(requestedEngine)
 
         binding.editorTitle.setText(
             if (editingId == null) R.string.editor_title_new else R.string.editor_title_edit
         )
         binding.btnEditorDelete.visibility = if (editingId == null) View.GONE else View.VISIBLE
 
-        setupDropdowns()
-        configureRows()
-        populate()
-        bindActions()
-        updateFingerprintSummary()
-        updateProxyVisibility()
-        updateGeoVisibility()
-        updateWatchVisibility()
-        refreshStorage()
+        Async.compute({ loadProfileSync(requestedEngine) }) { loaded ->
+            if (isFinishing || isDestroyed) return@compute
+            profile = loaded ?: Profile(browserKind = requestedEngine.id)
+            if (editingId != null && profile.name.isBlank() && profile.openCount == 0 && profile.lastOpened == 0L) {
+                // Row disappeared between list and edit
+                editingId = null
+                binding.editorTitle.setText(R.string.editor_title_new)
+                binding.btnEditorDelete.visibility = View.GONE
+            }
+            setupDropdowns()
+            configureRows()
+            populate()
+            bindActions()
+            updateFingerprintSummary()
+            updateProxyVisibility()
+            updateGeoVisibility()
+            updateWatchVisibility()
+            refreshStorage()
+        }
     }
 
     // ------------------------------------------------------------------- load
 
-    private fun loadProfile(requestedEngine: BrowserEngine): Profile {
+    private fun loadProfileSync(requestedEngine: BrowserEngine): Profile {
         val existingId = editingId
         if (existingId != null) {
             val existing = runCatching { Database.get(this).getProfile(existingId) }.getOrNull()
             if (existing != null) return existing
-            // The row disappeared between list and edit: fall through to a fresh profile.
-            editingId = null
         }
         val fresh = Profile(browserKind = requestedEngine.id)
         FingerprintFactory.regenerate(fresh.fp, "Android", null, requestedEngine)
-        // A new profile must not be an exact twin of an existing one: the seed is part of the
-        // signature, but two profiles created back to back can still land on the same screen, GPU
-        // and locale. FingerprintFactory.ensureUnique re-rolls the seed until it differs.
         val existing = runCatching {
             Database.get(this).getAllProfiles().map { FingerprintFactory.signature(it.fp) }
         }.getOrDefault(emptyList())
@@ -115,6 +120,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         fresh.tools = ToolConfig(
             humanPaste = Prefs.humanPasteEnabled(this),
             humanPasteSpeed = Prefs.humanPasteSpeed(this),
+            humanPasteJitter = Prefs.humanPasteJitter(this),
             proxyWatch = Prefs.monitorEnabled(this),
             proxyWatchIntervalSec = Prefs.monitorIntervalSec(this),
             unlockSelection = Prefs.unlockSelection(this),
@@ -276,64 +282,88 @@ class ProfileEditorActivity : AppCompatActivity() {
         }
         row.rowSwitch.isChecked = false
         row.rowSwitch.setOnCheckedChangeListener { _, checked ->
+            if (populating) return@setOnCheckedChangeListener
             onChange(checked)
             markDirty()
             updateFingerprintSummary()
+        }
+        row.root.setOnClickListener {
+            row.rowSwitch.toggle()
         }
     }
 
     // ------------------------------------------------------------------ render
 
     private fun populate() {
-        val fp = profile.fp
-        binding.editorName.setText(profile.name)
-        binding.editorGroup.setText(profile.group)
-        binding.editorTags.setText(profile.tags)
-        binding.editorNotes.setText(profile.notes)
-        binding.editorStartUrl.setText(profile.startUrl)
-        binding.editorEngine.setText(profile.engine.title, false)
-        binding.editorOs.setText(fp.os, false)
+        populating = true
+        try {
+            val fp = profile.fp
+            binding.editorName.setText(profile.name)
+            binding.editorGroup.setText(profile.group)
+            binding.editorTags.setText(profile.tags)
+            binding.editorNotes.setText(profile.notes)
+            binding.editorStartUrl.setText(profile.startUrl)
+            binding.editorEngine.setText(profile.engine.title, false)
+            binding.editorOs.setText(fp.os, false)
 
-        binding.editorCores.setText(fp.cores.toString(), false)
-        binding.editorMemory.setText(fp.memory.toString() + " GB", false)
-        binding.gpuVendorText.text = fp.webglVendor
-        binding.editorUserAgent.setText(fp.userAgentOverride)
-        binding.editorTimezone.setText(fp.timezone, false)
-        binding.editorLanguage.setText(fp.language, false)
-        binding.switchAutoMatch.isChecked = fp.autoMatchProxy
-        binding.switchAutoMatch.setOnCheckedChangeListener { _, checked ->
-            fp.autoMatchProxy = checked
-            markDirty()
+            binding.editorCores.setText(fp.cores.toString(), false)
+            binding.editorMemory.setText(fp.memory.toString() + " GB", false)
+            binding.gpuVendorText.text = fp.webglVendor
+            binding.editorUserAgent.setText(fp.userAgentOverride)
+            binding.editorTimezone.setText(fp.timezone, false)
+            binding.editorLanguage.setText(fp.language, false)
+            binding.switchAutoMatch.isChecked = fp.autoMatchProxy
+            binding.switchAutoMatch.setOnCheckedChangeListener { _, checked ->
+                if (populating) return@setOnCheckedChangeListener
+                fp.autoMatchProxy = checked
+                markDirty()
+            }
+
+            binding.rowCanvas.configureCheck(fp.canvasNoise)
+            binding.rowAudio.configureCheck(fp.audioNoise)
+            binding.rowWebgl.configureCheck(fp.hardwareNoise)
+            binding.rowFont.configureCheck(fp.fontNoise)
+            binding.rowMedia.configureCheck(fp.mediaNoise)
+            binding.rowDnt.configureCheck(fp.doNotTrack)
+            binding.rowBattery.configureCheck(fp.spoofBattery)
+            binding.rowUnlock.configureCheck(profile.tools.unlockSelection)
+            binding.rowFresh.configureCheck(profile.freshSession)
+            binding.rowHuman.configureCheck(profile.tools.humanPaste)
+            binding.rowJitter.configureCheck(profile.tools.humanPasteJitter)
+            binding.rowWatch.configureCheck(profile.tools.proxyWatch)
+
+            binding.switchProxy.isChecked = profile.proxy.enabled
+            binding.editorProxyType.setText(
+                if (profile.proxy.type == "none") "http" else profile.proxy.type,
+                false
+            )
+            binding.editorProxyHost.setText(profile.proxy.host)
+            binding.editorProxyPort.setText(
+                if (profile.proxy.port > 0) profile.proxy.port.toString() else ""
+            )
+            binding.editorProxyUser.setText(profile.proxy.user)
+            binding.editorProxyPass.setText(profile.proxy.password)
+
+            binding.editorWebrtc.setText(fp.webrtcMode, false)
+            binding.editorGeo.setText(fp.geoMode, false)
+            binding.editorLat.setText(fp.geoLat)
+            binding.editorLng.setText(fp.geoLng)
+            binding.editorPasteSpeed.setText(HumanPaste.speedById(profile.tools.humanPasteSpeed).label, false)
+            val clampedSec = profile.tools.proxyWatchIntervalSec.coerceIn(15, 300)
+            val snappedSec = ((clampedSec / 15) * 15).coerceIn(15, 300)
+            binding.watchIntervalSlider.value = snappedSec.toFloat()
+            binding.watchIntervalValue.text =
+                getString(R.string.editor_interval_value, intervalLabel(snappedSec))
+            binding.proxyStatus.setText(R.string.editor_proxy_idle)
+
+            populateIdentityFields()
+        } finally {
+            populating = false
         }
 
-        binding.rowCanvas.configureCheck(fp.canvasNoise)
-        binding.rowAudio.configureCheck(fp.audioNoise)
-        binding.rowWebgl.configureCheck(fp.hardwareNoise)
-        binding.rowFont.configureCheck(fp.fontNoise)
-        binding.rowMedia.configureCheck(fp.mediaNoise)
-        binding.rowDnt.configureCheck(fp.doNotTrack)
-        binding.rowBattery.configureCheck(fp.spoofBattery)
-        binding.rowUnlock.configureCheck(profile.tools.unlockSelection)
-        binding.rowFresh.configureCheck(profile.freshSession)
-        binding.rowHuman.configureCheck(profile.tools.humanPaste)
-        binding.rowJitter.configureCheck(profile.tools.humanPasteJitter)
-        binding.rowWatch.configureCheck(profile.tools.proxyWatch)
-
-        binding.editorWebrtc.setText(fp.webrtcMode, false)
-        binding.editorGeo.setText(fp.geoMode, false)
-        binding.editorLat.setText(fp.geoLat)
-        binding.editorLng.setText(fp.geoLng)
-        binding.editorPasteSpeed.setText(HumanPaste.speedById(profile.tools.humanPasteSpeed).label, false)
-        binding.watchIntervalValue.text =
-            getString(R.string.editor_interval_value, intervalLabel(profile.tools.proxyWatchIntervalSec))
-        binding.proxyStatus.setText(R.string.editor_proxy_idle)
-
-        populateIdentityFields()
-
-        // Numeric field guards. DPR is stored in tenths (5 → 0.5x, 30 → 3.0x).
+        // Numeric field guards.
         binding.editorScreenW.filters = arrayOf(UiKit.rangeFilter(200, 7680))
         binding.editorScreenH.filters = arrayOf(UiKit.rangeFilter(200, 4320))
-        binding.editorDpr.filters = arrayOf(UiKit.rangeFilter(5, 80))
         binding.editorProxyPort.filters = arrayOf(UiKit.rangeFilter(1, 65535))
 
         binding.editorTouchSlider.addOnChangeListener { _, value, fromUser ->
@@ -352,29 +382,46 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.editorProxyHost, binding.editorProxyPort, binding.editorProxyUser,
             binding.editorProxyPass, binding.editorLat, binding.editorLng
         ).forEach { field ->
-            field.setOnFocusChangeListener { _, hasFocus -> if (!hasFocus) syncFromInputs() }
+            field.doAfterTextChanged {
+                if (!populating) {
+                    markDirty()
+                    syncFromInputs()
+                }
+            }
         }
     }
 
+    private var populating = false
+
     /** Re-renders only the identity-derived fields (after regenerate / OS change / locale sync). */
     private fun populateIdentityFields() {
-        val fp = profile.fp
-        binding.editorScreenW.setText(fp.screenW.toString())
-        binding.editorScreenH.setText(fp.screenH.toString())
-        binding.editorDpr.setText((fp.pixelRatio * 10).toInt().toString())
-        binding.editorDevicePreset.setText(
-            fp.screenW.toString() + " × " + fp.screenH + " @ " + fp.pixelRatio + "x", false
-        )
-        binding.editorTouchSlider.value = fp.touchPoints.coerceIn(0, 10).toFloat()
-        binding.touchLabel.text = getString(R.string.editor_touch) + " · " + fp.touchPoints
-        binding.editorCores.setText(fp.cores.toString(), false)
-        binding.editorMemory.setText(fp.memory.toString() + " GB", false)
-        rebuildGpuDropdown()
-        binding.editorGpuRenderer.setText(fp.webglRenderer, false)
-        binding.gpuVendorText.text = fp.webglVendor
-        binding.editorTimezone.setText(fp.timezone, false)
-        binding.editorLanguage.setText(fp.language, false)
-        updateFingerprintSummary()
+        populating = true
+        try {
+            val fp = profile.fp
+            binding.editorScreenW.setText(fp.screenW.toString())
+            binding.editorScreenH.setText(fp.screenH.toString())
+            binding.editorDpr.setText(formatDpr(fp.pixelRatio))
+            binding.editorDevicePreset.setText(
+                fp.screenW.toString() + " × " + fp.screenH + " @ " + formatDpr(fp.pixelRatio) + "x", false
+            )
+            binding.editorTouchSlider.value = fp.touchPoints.coerceIn(0, 10).toFloat()
+            binding.touchLabel.text = getString(R.string.editor_touch) + " · " + fp.touchPoints
+            binding.editorCores.setText(fp.cores.toString(), false)
+            binding.editorMemory.setText(fp.memory.toString() + " GB", false)
+            rebuildGpuDropdown()
+            binding.editorGpuRenderer.setText(fp.webglRenderer, false)
+            binding.gpuVendorText.text = fp.webglVendor
+            binding.editorTimezone.setText(fp.timezone, false)
+            binding.editorLanguage.setText(fp.language, false)
+            updateFingerprintSummary()
+        } finally {
+            populating = false
+        }
+    }
+
+    private fun formatDpr(dpr: Double): String {
+        val text = String.format(java.util.Locale.US, "%.3f", dpr).trimEnd('0').trimEnd('.')
+        return if (text.contains('.')) text else "$text.0"
     }
 
     // ---------------------------------------------------------------- actions
@@ -685,14 +732,20 @@ class ProfileEditorActivity : AppCompatActivity() {
 
     private fun syncFromInputs() {
         val fp = profile.fp
+        val prevW = fp.screenW
+        val prevH = fp.screenH
+        val prevRatio = fp.pixelRatio
         binding.editorScreenW.text?.toString()?.toIntOrNull()?.let { fp.screenW = it.coerceIn(200, 7680) }
         binding.editorScreenH.text?.toString()?.toIntOrNull()?.let { fp.screenH = it.coerceIn(200, 4320) }
-        binding.editorDpr.text?.toString()?.toIntOrNull()?.let {
-            fp.pixelRatio = (it / 10.0).takeIf { ratio -> ratio in 0.5..8.0 } ?: fp.pixelRatio
+        binding.editorDpr.text?.toString()?.replace(',', '.')?.toDoubleOrNull()?.let { parsed ->
+            val ratio = if (parsed > 8.0) parsed / 10.0 else parsed
+            if (ratio in 0.5..8.0) fp.pixelRatio = ratio
         }
         fp.availW = fp.screenW
         fp.availH = if (fp.deviceType == "mobile") fp.screenH else (fp.screenH - 48).coerceAtLeast(200)
-        fp.manualScreen = true
+        if (fp.screenW != prevW || fp.screenH != prevH || fp.pixelRatio != prevRatio) {
+            fp.manualScreen = true
+        }
         // Assign unconditionally: with `takeIf { it.isNotEmpty() }` a user who cleared the fields
         // kept the old coordinates, so deleting a custom location silently did nothing.
         fp.geoLat = binding.editorLat.text?.toString()?.trim().orEmpty()
@@ -819,9 +872,9 @@ class ProfileEditorActivity : AppCompatActivity() {
     }
 
     private fun intervalLabel(seconds: Int): String = when {
-        seconds < 60 -> "$seconds s"
-        seconds / 60 <= 1 -> "1 min"
-        else -> "${seconds / 60} min"
+        seconds < 60 -> "${seconds}s"
+        seconds % 60 == 0 -> "${seconds / 60}m"
+        else -> "${seconds / 60}m ${seconds % 60}s"
     }
 
     companion object {

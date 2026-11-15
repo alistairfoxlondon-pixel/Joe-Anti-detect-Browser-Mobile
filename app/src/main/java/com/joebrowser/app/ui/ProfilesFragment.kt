@@ -43,8 +43,16 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     private var _binding: FragmentProfilesBinding? = null
     private val binding get() = _binding!!
 
+    private val selectedIds = linkedSetOf<String>()
+
     private val adapter = ProfileAdapter(
-        onLaunch = { profile -> BrowserActivity.launch(requireContext(), profile.id) },
+        isSelected = { id -> id in selectedIds },
+        selectionActive = { selectedIds.isNotEmpty() },
+        onLaunch = { profile ->
+            if (selectedIds.isNotEmpty()) toggleSelection(profile.id)
+            else BrowserActivity.launch(requireContext(), profile.id)
+        },
+        onLongPress = { profile -> toggleSelection(profile.id) },
         onEdit = { profile -> (activity as? MainActivity)?.openProfileEditor(profile.id) },
         onMenu = { profile, anchor -> showMenu(profile, anchor) },
         onDelete = { profile -> confirmDelete(profile) }
@@ -127,19 +135,195 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     private fun showMenu(profile: Profile, anchor: View) {
         val popup = PopupMenu(requireContext(), anchor)
         popup.menu.add(0, ACTION_EDIT, 0, getString(R.string.action_edit))
-        popup.menu.add(0, ACTION_DUPLICATE, 1, getString(R.string.action_duplicate))
-        popup.menu.add(0, ACTION_CLEAR, 2, getString(R.string.profiles_clear_data))
-        popup.menu.add(0, ACTION_DELETE, 3, getString(R.string.action_delete))
+        popup.menu.add(0, ACTION_SWITCH_PROXY, 1, getString(R.string.profiles_quick_proxy))
+        popup.menu.add(0, ACTION_NEW_FINGERPRINT, 2, getString(R.string.profiles_new_fingerprint))
+        popup.menu.add(0, ACTION_DUPLICATE, 3, getString(R.string.action_duplicate))
+        popup.menu.add(0, ACTION_SELECT, 4, getString(R.string.profiles_batch_select))
+        popup.menu.add(0, ACTION_CLEAR, 5, getString(R.string.profiles_clear_data))
+        popup.menu.add(0, ACTION_DELETE, 6, getString(R.string.action_delete))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 ACTION_EDIT -> (activity as? MainActivity)?.openProfileEditor(profile.id)
+                ACTION_SWITCH_PROXY -> showQuickProxyPicker(listOf(profile))
+                ACTION_NEW_FINGERPRINT -> rerollFingerprint(profile)
                 ACTION_DUPLICATE -> duplicate(profile)
+                ACTION_SELECT -> toggleSelection(profile.id)
                 ACTION_CLEAR -> confirmClearData(profile)
                 ACTION_DELETE -> confirmDelete(profile)
             }
             true
         }
         popup.show()
+    }
+
+    private fun toggleSelection(id: String) {
+        if (!selectedIds.add(id)) selectedIds.remove(id)
+        updateSelectionUi()
+        adapter.notifyDataSetChanged()
+    }
+
+    private fun updateSelectionUi() {
+        val b = _binding ?: return
+        if (selectedIds.isEmpty()) {
+            applyFilters()
+            b.profilesCount.setOnClickListener(null)
+            b.profilesCount.setTextColor(ContextCompat.getColor(requireContext(), R.color.text_muted))
+            b.fabNewProfile.setText(R.string.profiles_new)
+            b.fabNewProfile.setIconResource(R.drawable.ic_plus)
+            b.fabNewProfile.setOnClickListener { (activity as? MainActivity)?.openProfileEditor() }
+        } else {
+            b.profilesCount.text = getString(R.string.profiles_selected_count, selectedIds.size)
+            b.profilesCount.setTextColor(ContextCompat.getColor(requireContext(), R.color.accent))
+            b.profilesCount.setOnClickListener {
+                selectedIds.clear()
+                updateSelectionUi()
+                adapter.notifyDataSetChanged()
+            }
+            b.fabNewProfile.visibility = View.VISIBLE
+            b.fabNewProfile.text = getString(R.string.profiles_batch_actions, selectedIds.size)
+            b.fabNewProfile.setIconResource(R.drawable.ic_layers)
+            b.fabNewProfile.setOnClickListener { showBatchActionsDialog() }
+        }
+    }
+
+    private fun showBatchActionsDialog() {
+        val targets = allProfiles.filter { it.id in selectedIds }
+        if (targets.isEmpty()) {
+            selectedIds.clear()
+            updateSelectionUi()
+            return
+        }
+        val options = arrayOf(
+            getString(R.string.profiles_quick_proxy),
+            getString(R.string.profiles_batch_group),
+            getString(R.string.profiles_new_fingerprint),
+            getString(R.string.action_delete),
+            getString(R.string.profiles_batch_clear_selection)
+        )
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.profiles_batch_actions, targets.size))
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> showQuickProxyPicker(targets)
+                    1 -> promptBatchGroup(targets)
+                    2 -> batchRerollFingerprint(targets)
+                    3 -> confirmBatchDelete(targets)
+                    4 -> {
+                        selectedIds.clear()
+                        updateSelectionUi()
+                        adapter.notifyDataSetChanged()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
+    }
+
+    private fun showQuickProxyPicker(targets: List<Profile>) {
+        val ctx = requireContext()
+        ProfileRepository.proxies(ctx) { proxies ->
+            if (!isAdded) return@proxies
+            val labels = mutableListOf(getString(R.string.direct))
+            proxies.forEach { saved ->
+                val state = if (saved.config.online) " · ${saved.config.latencyMs} ms" else ""
+                labels.add("${saved.displayName()} (${saved.config.type.uppercase()}$state)")
+            }
+            MaterialAlertDialogBuilder(ctx)
+                .setTitle(R.string.profiles_quick_proxy)
+                .setItems(labels.toTypedArray()) { _, which ->
+                    val chosen = if (which == 0) com.joebrowser.app.data.ProxyConfig.direct()
+                    else proxies[which - 1].config.duplicate()
+                    targets.forEach { target ->
+                        ProfileRepository.updateProfile(ctx, target.id) {
+                            it.proxy = chosen.duplicate()
+                        }
+                    }
+                    selectedIds.clear()
+                    Async.toast(ctx, getString(R.string.status_saved))
+                    updateSelectionUi()
+                    refresh()
+                }
+                .setNegativeButton(R.string.action_cancel, null)
+                .show()
+        }
+    }
+
+    private fun promptBatchGroup(targets: List<Profile>) {
+        val ctx = requireContext()
+        val input = android.widget.EditText(ctx).apply {
+            hint = getString(R.string.editor_group)
+            setSingleLine(true)
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, pad)
+        }
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.profiles_batch_group)
+            .setView(input)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val groupName = input.text?.toString()?.trim().orEmpty()
+                targets.forEach { target ->
+                    ProfileRepository.updateProfile(ctx, target.id) { it.group = groupName }
+                }
+                selectedIds.clear()
+                Async.toast(ctx, getString(R.string.status_saved))
+                updateSelectionUi()
+                refresh()
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
+    }
+
+    private fun rerollFingerprint(profile: Profile) {
+        val ctx = requireContext()
+        val existingSigs = allProfiles.map { com.joebrowser.app.fingerprint.FingerprintFactory.signature(it.fp) }
+        ProfileRepository.updateProfile(ctx, profile.id) { p ->
+            com.joebrowser.app.fingerprint.FingerprintFactory.regenerate(
+                p.fp, p.fp.os, p.proxy.lastCountryCode.takeIf { it.isNotBlank() }, p.engine
+            )
+            com.joebrowser.app.fingerprint.FingerprintFactory.ensureUnique(p.fp, existingSigs)
+            p.browserVersion = p.fp.browserVersion
+        }
+        Async.toast(ctx, getString(R.string.profiles_fingerprint_regenerated))
+    }
+
+    private fun batchRerollFingerprint(targets: List<Profile>) {
+        val ctx = requireContext()
+        val sigs = allProfiles.map { com.joebrowser.app.fingerprint.FingerprintFactory.signature(it.fp) }.toMutableList()
+        targets.forEach { target ->
+            ProfileRepository.updateProfile(ctx, target.id) { p ->
+                com.joebrowser.app.fingerprint.FingerprintFactory.regenerate(
+                    p.fp, p.fp.os, p.proxy.lastCountryCode.takeIf { it.isNotBlank() }, p.engine
+                )
+                com.joebrowser.app.fingerprint.FingerprintFactory.ensureUnique(p.fp, sigs)
+                sigs.add(com.joebrowser.app.fingerprint.FingerprintFactory.signature(p.fp))
+                p.browserVersion = p.fp.browserVersion
+            }
+        }
+        selectedIds.clear()
+        Async.toast(ctx, getString(R.string.profiles_fingerprint_regenerated))
+        updateSelectionUi()
+    }
+
+    private fun confirmBatchDelete(targets: List<Profile>) {
+        val ctx = requireContext()
+        val keepTrash = Prefs.trashEnabled(ctx)
+        MaterialAlertDialogBuilder(ctx)
+            .setTitle(getString(R.string.profiles_batch_delete_title, targets.size))
+            .setMessage(
+                getString(
+                    if (keepTrash) R.string.profiles_delete_body_trash else R.string.profiles_delete_body_forever
+                )
+            )
+            .setPositiveButton(R.string.action_delete) { _, _ ->
+                targets.forEach { p ->
+                    ProfileRepository.deleteProfile(ctx, p, keepTrash)
+                }
+                selectedIds.clear()
+                updateSelectionUi()
+                refresh()
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
     }
 
     private fun duplicate(profile: Profile) {
@@ -264,16 +448,20 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         adapter.submit(filtered)
 
         val filtering = needle.isNotEmpty() || selectedGroup != null
-        binding.profilesCount.text = if (filtering) {
-            getString(R.string.profiles_count_filtered, filtered.size, allProfiles.size)
+        if (selectedIds.isNotEmpty()) {
+            binding.profilesCount.text = getString(R.string.profiles_selected_count, selectedIds.size)
         } else {
-            getString(R.string.profiles_count, filtered.size)
+            binding.profilesCount.text = if (filtering) {
+                getString(R.string.profiles_count_filtered, filtered.size, allProfiles.size)
+            } else {
+                getString(R.string.profiles_count, filtered.size)
+            }
         }
 
         val empty = filtered.isEmpty()
         binding.emptyState.visibility = if (empty) View.VISIBLE else View.GONE
         binding.profileList.visibility = if (empty) View.INVISIBLE else View.VISIBLE
-        binding.fabNewProfile.visibility = if (empty) View.GONE else View.VISIBLE
+        binding.fabNewProfile.visibility = if (empty && selectedIds.isEmpty()) View.GONE else View.VISIBLE
 
         // Distinguish "no profiles at all" from "nothing matched the filter".
         if (empty) {
@@ -296,7 +484,10 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     // ----------------------------------------------------------------- adapter
 
     private class ProfileAdapter(
+        private val isSelected: (String) -> Boolean,
+        private val selectionActive: () -> Boolean,
         private val onLaunch: (Profile) -> Unit,
+        private val onLongPress: (Profile) -> Unit,
         private val onEdit: (Profile) -> Unit,
         private val onMenu: (Profile, View) -> Unit,
         private val onDelete: (Profile) -> Unit
@@ -321,16 +512,23 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
             fun bind(profile: Profile) {
                 val context = view.root.context
+                val selected = isSelected(profile.id)
 
-                view.profileAvatar.text = profile.initials()
+                view.profileCard.setBackgroundResource(
+                    if (selected) R.drawable.bg_accent_soft else R.drawable.bg_card
+                )
+                view.profileAvatar.text = if (selected) "✓" else profile.initials()
                 view.profileAvatar.background = UiKit.avatarBackground(profile.id)
                 view.profileName.text = profile.displayName()
 
-                if (profile.status.isBlank()) {
+                val statusChipText = profile.status.ifBlank {
+                    profile.group.takeIf { it.isNotBlank() }.orEmpty()
+                }
+                if (statusChipText.isBlank()) {
                     view.profileStatus.visibility = View.GONE
                 } else {
                     view.profileStatus.visibility = View.VISIBLE
-                    view.profileStatus.text = profile.status
+                    view.profileStatus.text = statusChipText
                 }
 
                 view.profileOsIcon.setImageResource(UiKit.osIconRes(profile.fp.os))
@@ -344,7 +542,6 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
                 view.profileOpened.text = if (profile.openCount > 0) profile.lastOpenedText() else ""
 
-                // Proxy state line: the dot is the semantic signal, the text names the endpoint.
                 val proxy = profile.proxy
                 view.proxyDot.setBackgroundResource(
                     when {
@@ -365,17 +562,25 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                     ContextCompat.getColor(context, if (proxy.online) R.color.success else R.color.text_muted)
                 )
 
-                // Fresh-session marker doubles as the "cleared on close" badge.
                 view.profileBadge.visibility = if (profile.freshSession) View.VISIBLE else View.GONE
                 view.profileBadge.imageTintList = ColorStateList.valueOf(
                     ContextCompat.getColor(context, R.color.accent)
                 )
 
-                view.profileLaunch.setOnClickListener { onLaunch(profile) }
+                view.profileLaunch.setText(
+                    if (selectionActive()) R.string.profiles_select_toggle else R.string.action_open
+                )
+                view.profileLaunch.setOnClickListener {
+                    if (selectionActive()) onLongPress(profile) else BrowserActivity.launch(context, profile.id)
+                }
                 view.profileEdit.setOnClickListener { onEdit(profile) }
                 view.profileMore.setOnClickListener { onMenu(profile, it) }
                 view.profileDelete.setOnClickListener { onDelete(profile) }
                 view.root.setOnClickListener { onLaunch(profile) }
+                view.root.setOnLongClickListener {
+                    onLongPress(profile)
+                    true
+                }
             }
         }
     }
@@ -391,5 +596,8 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         private const val ACTION_DUPLICATE = 102
         private const val ACTION_CLEAR = 103
         private const val ACTION_DELETE = 104
+        private const val ACTION_SWITCH_PROXY = 105
+        private const val ACTION_NEW_FINGERPRINT = 106
+        private const val ACTION_SELECT = 107
     }
 }

@@ -13,12 +13,14 @@
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/profileCard"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginBottom="@dimen/gap_s"
     android:background="@drawable/bg_card"
     android:clickable="true"
     android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
     android:orientation="vertical"
     android:paddingStart="12dp"
     android:paddingTop="12dp"
@@ -93,7 +95,7 @@
                     android:layout_marginStart="6dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_check_circle"
-                    android:tint="@color/success"
+                    app:tint="@color/success"
                     android:visibility="gone" />
             </LinearLayout>
 
@@ -110,7 +112,7 @@
                     android:layout_height="13dp"
                     android:contentDescription="@null"
                     android:src="@drawable/ic_os_android"
-                    android:tint="@color/text_muted" />
+                    app:tint="@color/text_muted" />
 
                 <TextView
                     android:id="@+id/profileMeta"
@@ -179,7 +181,7 @@
             android:contentDescription="@string/action_edit"
             android:padding="10dp"
             android:src="@drawable/ic_more"
-            android:tint="@color/text_muted" />
+            app:tint="@color/text_muted" />
     </LinearLayout>
 
     <!-- Row 4: quick action strip -->
@@ -224,6 +226,6 @@
             android:contentDescription="@string/action_delete"
             android:padding="10dp"
             android:src="@drawable/ic_trash"
-            android:tint="@color/text_muted" />
+            app:tint="@color/text_muted" />
     </LinearLayout>
 </LinearLayout>

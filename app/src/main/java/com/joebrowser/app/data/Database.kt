@@ -158,6 +158,66 @@ class Database private constructor(context: Context) :
 
     fun trashCount(): Int = count("trash", null, null)
 
+    fun getAllTrashedProfiles(): List<Pair<Profile, Long>> {
+        val out = mutableListOf<Pair<Profile, Long>>()
+        try {
+            readableDatabase.query(
+                "trash",
+                arrayOf("json", "deleted_at"),
+                null,
+                null,
+                null,
+                null,
+                "deleted_at DESC"
+            ).use { c ->
+                while (c.moveToNext()) {
+                    runCatching {
+                        val profile = Profile.fromJson(JSONObject(c.getString(0)))
+                        val deletedAt = c.getLong(1)
+                        out.add(profile to deletedAt)
+                    }
+                }
+            }
+        } catch (t: Throwable) {
+            Log.w(Async.TAG, "getAllTrashedProfiles failed", t)
+        }
+        return out
+    }
+
+    fun restoreTrashedProfile(id: String): Profile? {
+        val db = writableDatabase
+        var restored: Profile? = null
+        db.beginTransaction()
+        try {
+            db.query("trash", arrayOf("json"), "id = ?", arrayOf(id), null, null, null).use { c ->
+                if (c.moveToFirst()) {
+                    restored = Profile.fromJson(JSONObject(c.getString(0)))
+                }
+            }
+            val p = restored
+            if (p != null) {
+                val values = ContentValues().apply {
+                    put("id", p.id)
+                    put("name", p.name)
+                    put("group_name", p.group)
+                    put("json", p.toJson(includeSecret = true).toString())
+                    put("created", p.created)
+                    put("last_opened", p.lastOpened)
+                }
+                db.insertWithOnConflict("profiles", null, values, SQLiteDatabase.CONFLICT_REPLACE)
+                db.delete("trash", "id = ?", arrayOf(id))
+            }
+            db.setTransactionSuccessful()
+        } finally {
+            runCatching { db.endTransaction() }
+        }
+        return restored
+    }
+
+    fun deleteTrashedForever(id: String) {
+        writableDatabase.delete("trash", "id = ?", arrayOf(id))
+    }
+
     fun emptyTrash() {
         writableDatabase.delete("trash", null, null)
     }

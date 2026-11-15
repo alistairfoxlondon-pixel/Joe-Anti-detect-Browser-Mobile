@@ -119,6 +119,17 @@ function makeEnvironment(cfg) {
     get: function () { return { effectiveType: '3g', rtt: 200, downlink: 2, saveData: true }; },
     configurable: true, enumerable: true
   });
+  Object.defineProperty(navProto, 'userAgentData', {
+    get: function () {
+      return {
+        brands: [{ brand: 'Android WebView', version: '100' }],
+        mobile: true,
+        platform: 'Android',
+        getHighEntropyValues: function () { return Promise.resolve({}); }
+      };
+    },
+    configurable: true, enumerable: true
+  });
   Object.defineProperty(navProto, 'getBattery', {
     value: function getBattery() {
       return Promise.resolve({ charging: false, chargingTime: Infinity, dischargingTime: 900, level: 0.5 });
@@ -152,6 +163,7 @@ function makeEnvironment(cfg) {
   env.globalThis = env;
   env.top = env;
   env.parent = env;
+  env.NavigatorUAData = function () {};
   env.Navigator = function () {};
   env.Navigator.prototype = navProto;
   env.Screen = function () {};
@@ -438,9 +450,25 @@ check('Chrome/Windows: deviceMemory present', win.nav.deviceMemory, 8);
 check('Chrome/Windows: pdfViewerEnabled true', win.nav.pdfViewerEnabled, 'true');
 
 // An Android profile: the platform token Blink really reports.
-const android = identity({ platform: 'Linux armv8l' });
+const android = identity({
+  platform: 'Linux armv8l',
+  os: 'Android',
+  deviceType: 'mobile',
+  fullVersion: '134.0.6998.89',
+  androidModel: 'Pixel 8',
+  platformVersion: '14.0.0'
+});
 check('Android: platform is the Blink value', android.nav.platform, 'Linux armv8l');
 check('Android: not the bogus armv81', android.nav.platform === 'Linux armv81', false);
+const androidEntropy = await android.nav.userAgentData.getHighEntropyValues([
+  'architecture', 'model', 'platformVersion', 'uaFullVersion'
+]);
+check('Android UA-CH: architecture is arm (not x86)', androidEntropy.architecture, 'arm');
+check('Android UA-CH: model matches', androidEntropy.model, 'Pixel 8');
+check('Android UA-CH: uaFullVersion matches full build', androidEntropy.uaFullVersion, '134.0.6998.89');
+
+const winEntropy = await win.nav.userAgentData.getHighEntropyValues(['architecture']);
+check('Windows UA-CH: architecture is x86', winEntropy.architecture, 'x86');
 
 console.log('\nper-profile separation');
 check('cores differ per profile', otherEnv.navigator.hardwareConcurrency, otherCfg.cores);

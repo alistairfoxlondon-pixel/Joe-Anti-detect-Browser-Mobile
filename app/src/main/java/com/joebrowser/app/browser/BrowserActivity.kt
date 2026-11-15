@@ -76,12 +76,24 @@ class BrowserActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBrowserBinding
     private var profile: Profile? = null
 
-    /** Returns the badge to the live proxy state once a transient message has been read. */
+    /** Returns the tracker badge to the live request readout once a paste message settles. */
     private val badgeReset = Runnable {
-        if (!isFinishing && !isDestroyed && ::binding.isInitialized) bindProxyBadge()
+        if (!isFinishing && !isDestroyed && ::binding.isInitialized) refreshTrackerChip()
     }
     private var kernel: BrowserKernel? = null
     private var webView: WebView? = null
+
+    private data class BrowserTab(
+        val id: String = java.util.UUID.randomUUID().toString(),
+        var webView: WebView,
+        var title: String = "",
+        var url: String = "",
+        var desktopViewport: Boolean = false
+    )
+
+    private val tabs = mutableListOf<BrowserTab>()
+    private var activeTabIndex: Int = -1
+    private val visitedUrls = linkedSetOf<String>()
 
     private var tracker: TrackerMonitor? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
@@ -147,7 +159,7 @@ class BrowserActivity : AppCompatActivity() {
         wireFindBar()
         wireBackHandling()
 
-        val web = createWebView()
+        val web = createTabWebView()
         if (web == null) {
             binding.browserStateAction.visibility = View.GONE
             showState(R.drawable.ic_warning, R.string.browser_error_title, R.string.browser_no_webview)
@@ -155,27 +167,30 @@ class BrowserActivity : AppCompatActivity() {
             binding.btnNavReload.isEnabled = false
             binding.btnNavBack.isEnabled = false
             binding.btnNavForward.isEnabled = false
+            binding.btnTabs.visibility = View.GONE
             binding.btnBrowserMenu.visibility = View.GONE
             return
         }
+        val initialUrl = intent.getStringExtra(EXTRA_URL)?.takeIf { it.isNotBlank() }
+            ?: savedState?.getString(STATE_URL)
+            ?: loaded.startUrl.ifBlank { Prefs.defaultStartUrl(this) }
+
+        val firstTab = BrowserTab(webView = web, url = initialUrl)
+        tabs.clear()
+        tabs.add(firstTab)
+        activeTabIndex = 0
         webView = web
         binding.browserWebViewFrame.addView(
-            web, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            web, 0, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
-        kernel?.install(web)
-        HumanPaste.attachBridge(web) { message -> onPasteMessage(message) }
+        updateTabBadge()
 
-        // One click target for both jobs: the badge reports the live count while checking a
-        // relay, then shows the tracker line once requests arrive. It reuses the same corner of
-        // the chrome either way, and the count is visible without opening the sheet.
-        binding.browserProxyBadge.setOnClickListener { showTrackerSheet() }
-        binding.browserProxyBadge.isClickable = true
+        binding.browserTrackerBadge.setOnClickListener { showTrackerSheet() }
+        binding.browserTrackerBadge.isClickable = true
         tracker = TrackerMonitor { total, trackers ->
             if (::binding.isInitialized) updateTrackerBadge(total, trackers)
         }
 
-        // Session bookkeeping happens at launch, not at exit: a window the user swipes away
-        // must still count as opened, and Home sorts by last-opened.
         Prefs.setLastProfileId(this, loaded.id)
         if (savedState == null) {
             ProfileRepository.updateProfile(this, loaded.id) {
@@ -185,12 +200,115 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
 
-        pendingUrl = intent.getStringExtra(EXTRA_URL)?.takeIf { it.isNotBlank() }
-            ?: savedState?.getString(STATE_URL)
-            ?: loaded.startUrl.ifBlank { Prefs.defaultStartUrl(this) }
+        pendingUrl = initialUrl
+        visitedUrls.add(initialUrl)
 
         if (savedState != null) web.restoreState(savedState)
         verifyProxyThenLoad(loaded)
+    }
+
+    /** Creates a fully-bound, fingerprinted WebView ready for a tab in this profile session. */
+    private fun createTabWebView(): WebView? {
+        val web = createWebView() ?: return null
+        kernel?.install(web)
+        HumanPaste.attachBridge(web) { message -> onPasteMessage(message) }
+        return web
+    }
+
+    private fun activeTab(): BrowserTab? = tabs.getOrNull(activeTabIndex)
+
+    private fun updateTabBadge() {
+        if (!::binding.isInitialized) return
+        binding.btnTabs.text = tabs.size.coerceAtLeast(1).toString()
+    }
+
+    private fun openNewTab(initialUrl: String? = null) {
+        val loaded = profile ?: return
+        val web = createTabWebView() ?: return
+        val url = initialUrl?.takeIf { it.isNotBlank() }
+            ?: loaded.startUrl.ifBlank { Prefs.defaultStartUrl(this) }
+        val tab = BrowserTab(webView = web, url = url)
+        tabs.add(tab)
+        switchToTab(tabs.lastIndex, navigateIfBlank = false)
+        load(url)
+    }
+
+    private fun switchToTab(index: Int, navigateIfBlank: Boolean = true) {
+        if (index !in tabs.indices) return
+        val current = activeTab()?.webView
+        if (current != null) {
+            runCatching { binding.browserWebViewFrame.removeView(current) }
+        }
+        activeTabIndex = index
+        val target = tabs[index]
+        webView = target.webView
+        if (target.webView.parent == null) {
+            binding.browserWebViewFrame.addView(
+                target.webView,
+                0,
+                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+            )
+        }
+        binding.browserStateCard.visibility = View.GONE
+        updateTabBadge()
+        val liveUrl = target.webView.url ?: target.url
+        if (liveUrl.isNotBlank()) {
+            syncUrlField(liveUrl)
+        } else if (navigateIfBlank) {
+            val fallback = profile?.startUrl?.ifBlank { Prefs.defaultStartUrl(this) }.orEmpty()
+            if (fallback.isNotBlank()) load(fallback)
+        }
+        updateNavButtons()
+    }
+
+    private fun closeTab(index: Int) {
+        if (index !in tabs.indices) return
+        if (tabs.size <= 1) {
+            // Closing the last tab resets it to the profile's start URL instead of killing the window
+            val start = profile?.startUrl?.ifBlank { Prefs.defaultStartUrl(this) }.orEmpty()
+            tabs[0].webView.clearHistory()
+            load(start)
+            return
+        }
+        val removed = tabs.removeAt(index)
+        runCatching { binding.browserWebViewFrame.removeView(removed.webView) }
+        runCatching { removed.webView.stopLoading() }
+        runCatching { removed.webView.webChromeClient = null }
+        runCatching { removed.webView.destroy() }
+        val nextIndex = when {
+            activeTabIndex == index -> (index - 1).coerceAtLeast(0)
+            activeTabIndex > index -> activeTabIndex - 1
+            else -> activeTabIndex
+        }
+        activeTabIndex = -1
+        switchToTab(nextIndex)
+    }
+
+    private fun showTabSwitcher() {
+        if (tabs.isEmpty()) return
+        val labels = tabs.mapIndexed { idx, tab ->
+            val prefix = if (idx == activeTabIndex) "● " else "○ "
+            val label = tab.title.ifBlank {
+                tab.webView.title?.takeIf { it.isNotBlank() }
+                    ?: tab.webView.url?.takeIf { it.isNotBlank() }
+                    ?: tab.url.ifBlank { getString(R.string.browser_tab_untitled) }
+            }
+            prefix + label
+        }.toTypedArray()
+
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.browser_tabs_title, tabs.size))
+            .setItems(labels) { _, which ->
+                switchToTab(which)
+            }
+            .setPositiveButton(R.string.browser_menu_new_tab) { _, _ ->
+                openNewTab()
+            }
+            .setNeutralButton(R.string.browser_tab_close) { _, _ ->
+                closeTab(activeTabIndex)
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
     }
 
     private fun onKernelStatus(status: BrowserKernel.KernelStatus) {
@@ -202,9 +320,9 @@ class BrowserActivity : AppCompatActivity() {
         binding.browserKernelChip.setTextColor(
             ContextCompat.getColor(this, if (isolated) R.color.success else R.color.warning)
         )
-        val warning = status.warning
-        if (warning != null && status.injection == BrowserKernel.InjectionMode.EARLY_FALLBACK) {
-            // One line, dismissible, never a blocking dialog on every page.
+        if (!isolated) {
+            Async.toast(this, getString(R.string.browser_kernel_shared_toast))
+        } else if (status.warning != null && status.injection == BrowserKernel.InjectionMode.EARLY_FALLBACK) {
             Async.toast(this, getString(R.string.browser_kernel_fallback))
         }
     }
@@ -223,6 +341,10 @@ class BrowserActivity : AppCompatActivity() {
             android.util.Log.e(Async.TAG, "WebView provider unavailable", t)
             return null
         }
+        // CRITICAL: WebViewCompat.setProfile MUST be the very first call on a newly constructed
+        // WebView before getSettings(), setWebViewClient, or any other WebView method!
+        kernel?.bindProfileEarly(web)
+
         web.setBackgroundColor(ContextCompat.getColor(this, R.color.bg))
 
         val settings: WebSettings = web.settings
@@ -238,7 +360,7 @@ class BrowserActivity : AppCompatActivity() {
             settings.displayZoomControls = false
             settings.mediaPlaybackRequiresUserGesture = false
             settings.javaScriptCanOpenWindowsAutomatically = true
-            settings.setSupportMultipleWindows(false)
+            settings.setSupportMultipleWindows(true)
             settings.cacheMode = WebSettings.LOAD_DEFAULT
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
             profile?.let { loaded ->
@@ -291,7 +413,7 @@ class BrowserActivity : AppCompatActivity() {
             binding.browserProxyBadge.visibility = View.VISIBLE
             binding.browserProxyBadge.text = getString(R.string.browser_proxy_unsupported)
             binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.warning))
-            Async.toast(this, getString(R.string.browser_proxy_unsupported))
+            Async.toast(this, getString(R.string.browser_proxy_unsupported_toast))
             onReady()
             return
         }
@@ -323,7 +445,7 @@ class BrowserActivity : AppCompatActivity() {
 
     /** Removes a previous override so a "direct" profile never inherits another one. */
     private fun clearProxyOverride(onDone: () -> Unit) {
-        if (!proxyApplied || !WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
             onDone()
             return
         }
@@ -337,20 +459,33 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun bindProxyResult(result: ProxyTestResult) {
         binding.browserProxyBadge.visibility = View.VISIBLE
-        // Always tappable: the badge is the entry point to the tracker sheet, so it must never
-        // be left looking inert.
         binding.browserProxyBadge.isClickable = true
         if (result.ok) {
+            val loc = result.countryCode.ifBlank { result.country.ifBlank { result.ip } }
             binding.browserProxyBadge.text =
-                getString(R.string.browser_proxy_ok, result.country.ifBlank { result.ip }, result.latencyMs)
+                getString(R.string.browser_proxy_ok, loc, result.latencyMs)
             binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
+            binding.browserProxyBadge.setOnClickListener {
+                val detail = listOfNotNull(
+                    result.ip.takeIf { it.isNotBlank() }?.let { "Exit IP: $it" },
+                    listOf(result.city, result.country).filter { it.isNotBlank() }.joinToString(", ").takeIf { it.isNotBlank() }?.let { "Location: $it" },
+                    result.timezone.takeIf { it.isNotBlank() }?.let { "Timezone: $it" },
+                    result.org.takeIf { it.isNotBlank() }?.let { "ISP: $it" },
+                    "Latency: ${result.latencyMs} ms"
+                ).joinToString("\n")
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(getString(R.string.browser_proxy_ok, loc, result.latencyMs))
+                    .setMessage(detail)
+                    .setPositiveButton(R.string.action_recheck) { _, _ -> retryProxy() }
+                    .setNegativeButton(R.string.action_close, null)
+                    .show()
+            }
         } else {
             binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
             binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.danger))
-            binding.browserProxyBadge.isClickable = true
             binding.browserProxyBadge.setOnClickListener {
                 MaterialAlertDialogBuilder(this)
-                    .setTitle(R.string.browser_proxy_failed)
+                    .setTitle(R.string.browser_proxy_failed_detail)
                     .setMessage(result.error.ifBlank { getString(R.string.browser_error_body) })
                     .setPositiveButton(R.string.action_retry) { _, _ -> retryProxy() }
                     .setNegativeButton(R.string.action_cancel, null)
@@ -370,7 +505,7 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     /**
-     * Puts the badge back to whatever the live session state is: hidden for a direct profile,
+     * Puts the proxy badge back to whatever the live session state is: hidden for a direct profile,
      * the last measurement for a routed one, or "checking" while a fresh probe is in flight.
      */
     private fun bindProxyBadge() {
@@ -381,12 +516,13 @@ class BrowserActivity : AppCompatActivity() {
             return
         }
         binding.browserProxyBadge.visibility = View.VISIBLE
-        binding.browserProxyBadge.setOnClickListener(null)
-        binding.browserProxyBadge.isClickable = false
+        binding.browserProxyBadge.setOnClickListener { retryProxy() }
+        binding.browserProxyBadge.isClickable = true
         when {
             config.lastIp.isNotBlank() && config.latencyMs >= 0 -> {
+                val loc = config.lastCountryCode.ifBlank { config.lastCountry.ifBlank { config.lastIp } }
                 binding.browserProxyBadge.text =
-                    getString(R.string.browser_proxy_ok, config.lastCountry.ifBlank { config.lastIp }, config.latencyMs)
+                    getString(R.string.browser_proxy_ok, loc, config.latencyMs)
                 binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
             }
             config.lastError.isNotBlank() -> {
@@ -397,6 +533,15 @@ class BrowserActivity : AppCompatActivity() {
                 binding.browserProxyBadge.text = getString(R.string.browser_proxy_checking)
                 binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
             }
+        }
+    }
+
+    private fun refreshTrackerChip() {
+        val (total, trackers) = tracker?.totals() ?: (0 to 0)
+        if (total > 0 && (profile?.tools?.httpTracker != false) && Prefs.trackerEnabled(this)) {
+            updateTrackerBadge(total, trackers)
+        } else {
+            binding.browserTrackerBadge.visibility = View.GONE
         }
     }
 
@@ -411,6 +556,11 @@ class BrowserActivity : AppCompatActivity() {
         binding.btnNavBack.setOnClickListener { goBack() }
         binding.btnNavForward.setOnClickListener { goForward() }
         binding.btnNavReload.setOnClickListener { reloadOrStop() }
+        binding.btnTabs.setOnClickListener { showTabSwitcher() }
+        binding.btnTabs.setOnLongClickListener {
+            openNewTab()
+            true
+        }
         binding.btnBrowserMenu.setOnClickListener { showMenu(it) }
         binding.browserUrlField.setOnEditorActionListener { _, actionId, event ->
             val isGo = actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO ||
@@ -468,6 +618,8 @@ class BrowserActivity : AppCompatActivity() {
         val url = normalizeUrl(rawUrl)
         pendingUrl = url
         if (url.isBlank()) return
+        activeTab()?.url = url
+        visitedUrls.add(url)
         binding.browserStateCard.visibility = View.GONE
         binding.browserLoading.visibility = View.VISIBLE
         binding.browserProgress.progress = 0
@@ -520,6 +672,7 @@ class BrowserActivity : AppCompatActivity() {
         // still paste as human because the app-wide default happened to be on.
         popup.menu.findItem(R.id.menuPasteHuman).isEnabled =
             profile?.tools?.humanPaste ?: Prefs.humanPasteEnabled(this)
+        popup.menu.findItem(R.id.menuDesktopSite)?.isChecked = activeTab()?.desktopViewport == true
 
         popup.setOnMenuItemClickListener { item -> onMenuItem(item) }
         popup.show()
@@ -533,6 +686,9 @@ class BrowserActivity : AppCompatActivity() {
             R.id.speedNatural -> { setSpeed("natural", item); true }
             R.id.speedFast -> { setSpeed("fast", item); true }
             R.id.speedInstant -> { setSpeed("instant", item); true }
+            R.id.menuNewTab -> { openNewTab(); true }
+            R.id.menuDesktopSite -> { toggleDesktopViewport(); true }
+            R.id.menuCookies -> { showCookieManagerDialog(); true }
             R.id.menuHttpTracker -> { showTrackerSheet(); true }
             R.id.menuClearData -> { confirmClearData(); true }
             R.id.menuFindInPage -> { toggleFindBar(true); true }
@@ -577,16 +733,16 @@ class BrowserActivity : AppCompatActivity() {
         if (total <= 0) return
         when (parts[0]) {
             "progress" -> {
-                binding.browserProxyBadge.visibility = View.VISIBLE
-                binding.browserProxyBadge.text = getString(R.string.browser_paste_progress, typed, total)
-                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.accent))
+                binding.browserTrackerBadge.visibility = View.VISIBLE
+                binding.browserTrackerBadge.text = getString(R.string.browser_paste_progress, typed, total)
+                binding.browserTrackerBadge.setTextColor(ContextCompat.getColor(this, R.color.accent))
             }
             "done" -> {
-                binding.browserProxyBadge.text = getString(R.string.browser_paste_done, typed)
-                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
-                // Let the proxy badge reclaim the slot shortly after typing finishes.
-                binding.browserProxyBadge.removeCallbacks(badgeReset)
-                binding.browserProxyBadge.postDelayed(badgeReset, 2500L)
+                binding.browserTrackerBadge.visibility = View.VISIBLE
+                binding.browserTrackerBadge.text = getString(R.string.browser_paste_done, typed)
+                binding.browserTrackerBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
+                binding.browserTrackerBadge.removeCallbacks(badgeReset)
+                binding.browserTrackerBadge.postDelayed(badgeReset, 2500L)
             }
         }
     }
@@ -602,17 +758,15 @@ class BrowserActivity : AppCompatActivity() {
             Async.toast(this, getString(R.string.browser_paste_empty))
             return
         }
-        // Profile is the source of truth: the editor lets each profile choose its own cadence,
-        // and the in-session menu writes straight back to it (see setSpeed). Reading the global
-        // preference here would ignore every per-profile choice the user made.
         val configured = profile?.tools?.humanPasteSpeed?.takeIf { it.isNotBlank() }
         val speed = configured ?: Prefs.humanPasteSpeed(this)
         val jitter = profile?.tools?.humanPasteJitter ?: Prefs.humanPasteJitter(this)
         Async.toast(this, getString(R.string.browser_paste_started, HumanPaste.describe(clipboard, speed)))
         HumanPaste.setProgressSink { typed, total ->
             if (!isFinishing && !isDestroyed && ::binding.isInitialized) {
-                binding.browserProxyBadge.visibility = View.VISIBLE
-                binding.browserProxyBadge.text = getString(R.string.browser_paste_progress, typed, total)
+                binding.browserTrackerBadge.visibility = View.VISIBLE
+                binding.browserTrackerBadge.text = getString(R.string.browser_paste_progress, typed, total)
+                binding.browserTrackerBadge.setTextColor(ContextCompat.getColor(this, R.color.accent))
             }
         }
         HumanPaste.type(
@@ -686,13 +840,125 @@ class BrowserActivity : AppCompatActivity() {
      * number the feature exists to show was the one number kept off screen.
      */
     private fun updateTrackerBadge(total: Int, trackers: Int) {
-        if (total <= 0) return
-        binding.browserProxyBadge.visibility = View.VISIBLE
-        binding.browserProxyBadge.text =
+        if (total <= 0 || (profile?.tools?.httpTracker == false) || !Prefs.trackerEnabled(this)) return
+        binding.browserTrackerBadge.visibility = View.VISIBLE
+        binding.browserTrackerBadge.text =
             getString(R.string.browser_tracker_badge, total, trackers)
-        binding.browserProxyBadge.setTextColor(
+        binding.browserTrackerBadge.setTextColor(
             ContextCompat.getColor(this, if (trackers > 0) R.color.warning else R.color.text_muted)
         )
+    }
+
+    private fun toggleDesktopViewport() {
+        val tab = activeTab() ?: return
+        val loaded = profile ?: return
+        tab.desktopViewport = !tab.desktopViewport
+        tab.webView.settings.useWideViewPort = true
+        tab.webView.settings.loadWithOverviewMode = true
+        val baseUa = com.joebrowser.app.fingerprint.FingerprintFactory.userAgent(loaded.fp, loaded.engine)
+        tab.webView.settings.userAgentString = if (tab.desktopViewport && loaded.fp.deviceType != "desktop") {
+            com.joebrowser.app.fingerprint.FingerprintFactory.userAgent(
+                loaded.fp.duplicate().apply {
+                    os = "Windows"
+                    deviceType = "desktop"
+                },
+                loaded.engine
+            )
+        } else {
+            baseUa
+        }
+        tab.webView.reload()
+    }
+
+    private fun showCookieManagerDialog() {
+        val loaded = profile ?: return
+        val cm = kernel?.activeCookieManager() ?: CookieManager.getInstance()
+        val options = arrayOf(
+            getString(R.string.browser_cookies_import),
+            getString(R.string.browser_cookies_export),
+            getString(R.string.browser_cookies_clear)
+        )
+        MaterialAlertDialogBuilder(this)
+            .setTitle(getString(R.string.browser_cookies_title, loaded.displayName()))
+            .setItems(options) { _, which ->
+                when (which) {
+                    0 -> promptImportCookies(cm, loaded)
+                    1 -> exportCookiesToClipboard(cm)
+                    2 -> {
+                        kernel?.clearCookies()
+                        Async.toast(this, getString(R.string.browser_cookies_cleared))
+                        webView?.reload()
+                    }
+                }
+            }
+            .setNegativeButton(R.string.action_close, null)
+            .show()
+    }
+
+    private fun promptImportCookies(cm: CookieManager, loaded: Profile) {
+        val input = android.widget.EditText(this).apply {
+            hint = getString(R.string.browser_cookies_import_hint)
+            minLines = 5
+            maxLines = 10
+            textSize = 12.5f
+            gravity = android.view.Gravity.TOP or android.view.Gravity.START
+            inputType = android.text.InputType.TYPE_CLASS_TEXT or
+                android.text.InputType.TYPE_TEXT_FLAG_MULTI_LINE or
+                android.text.InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
+            val pad = (16 * resources.displayMetrics.density).toInt()
+            setPadding(pad, pad, pad, pad)
+        }
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.browser_cookies_import)
+            .setView(input)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val raw = input.text?.toString().orEmpty()
+                val parsed = CookieExporter.parse(raw)
+                if (parsed.isEmpty()) {
+                    Async.toast(this, getString(R.string.browser_cookies_import_empty))
+                } else {
+                    val count = CookieExporter.importInto(cm, parsed)
+                    parsed.forEach { visitedUrls.add(it.targetUrl()) }
+                    Async.toast(this, getString(R.string.browser_cookies_imported, count, loaded.displayName()))
+                    webView?.reload()
+                }
+            }
+            .setNeutralButton(R.string.proxies_import_paste) { _, _ ->
+                val clip = runCatching {
+                    val manager = getSystemService(Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                    manager.primaryClip?.takeIf { it.itemCount > 0 }?.getItemAt(0)?.coerceToText(this)?.toString()
+                }.getOrNull().orEmpty()
+                val parsed = CookieExporter.parse(clip)
+                if (parsed.isEmpty()) {
+                    Async.toast(this, getString(R.string.browser_cookies_import_empty))
+                } else {
+                    val count = CookieExporter.importInto(cm, parsed)
+                    parsed.forEach { visitedUrls.add(it.targetUrl()) }
+                    Async.toast(this, getString(R.string.browser_cookies_imported, count, loaded.displayName()))
+                    webView?.reload()
+                }
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
+    }
+
+    private fun exportCookiesToClipboard(cm: CookieManager) {
+        val urls = linkedSetOf<String>()
+        urls.addAll(visitedUrls)
+        tabs.forEach { tab ->
+            tab.webView.url?.let { urls.add(it) }
+            if (tab.url.isNotBlank()) urls.add(tab.url)
+        }
+        tracker?.snapshot()?.forEach { entry ->
+            urls.add("https://${entry.host}/")
+        }
+        val (json, count) = CookieExporter.exportJsonForUrls(cm, urls)
+        if (count == 0) {
+            Async.toast(this, getString(R.string.browser_cookies_none))
+        } else {
+            Async.copyToClipboard(this, json)
+            Async.toast(this, getString(R.string.browser_cookies_exported, count))
+        }
     }
 
     private fun showTrackerSheet() {
@@ -776,18 +1042,23 @@ class BrowserActivity : AppCompatActivity() {
      * page loads, and the user is told the difference at the moment they download.
      */
     private fun download(url: String, userAgent: String?, disposition: String?, mimeType: String?) {
+        val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
+        if (scheme != "http" && scheme != "https") {
+            Async.toast(this, getString(R.string.browser_download_failed))
+            return
+        }
         val loaded = profile
         val guessed = runCatching { android.webkit.URLUtil.guessFileName(url, disposition, mimeType) }
             .getOrNull()?.takeIf { it.isNotBlank() } ?: "download.bin"
         val fileName = uniqueDownloadName(guessed)
+        val cookieHeader = runCatching { kernel?.activeCookieManager()?.getCookie(url) }.getOrNull()
         val request = runCatching {
             DownloadManager.Request(Uri.parse(url)).apply {
-                setMimeType(mimeType)
+                if (!mimeType.isNullOrBlank()) setMimeType(mimeType)
                 if (!userAgent.isNullOrBlank()) addRequestHeader("User-Agent", userAgent)
+                if (!cookieHeader.isNullOrBlank()) addRequestHeader("Cookie", cookieHeader)
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                // Goes to the public Downloads folder so the user can find it in Files.
                 setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
-                allowScanningByMediaScanner()
                 setDescription(
                     if (loaded?.proxy?.enabled == true) {
                         getString(R.string.browser_download_direct_note, loaded.name)
@@ -954,39 +1225,55 @@ class BrowserActivity : AppCompatActivity() {
             request: WebResourceRequest?
         ): WebResourceResponse? {
             val url = request?.url?.toString()
-            if (!url.isNullOrBlank() && Prefs.trackerEnabled(this@BrowserActivity)) {
+            val trackerOn = (profile?.tools?.httpTracker != false) && Prefs.trackerEnabled(this@BrowserActivity)
+            if (!url.isNullOrBlank() && trackerOn) {
                 tracker?.record(url)
             }
             return null
         }
 
         override fun onPageStarted(view: WebView?, url: String?, favicon: Bitmap?) {
-            syncUrlField(url)
-            binding.browserLoading.visibility = View.VISIBLE
-            binding.browserStateCard.visibility = View.GONE
+            if (url != null) {
+                tabs.find { it.webView === view }?.url = url
+                visitedUrls.add(url)
+            }
+            if (view === webView) {
+                syncUrlField(url)
+                binding.browserLoading.visibility = View.VISIBLE
+                binding.browserStateCard.visibility = View.GONE
+                updateNavButtons()
+            }
             kernel?.injectFallback(view ?: return)
-            updateNavButtons()
         }
 
         override fun onPageCommitVisible(view: WebView?, url: String?) {
-            binding.browserLoading.visibility = View.GONE
+            if (view === webView) binding.browserLoading.visibility = View.GONE
             kernel?.injectOnCommit(view ?: return)
         }
 
         override fun onPageFinished(view: WebView?, url: String?) {
-            binding.browserLoading.visibility = View.GONE
-            binding.browserProgress.progress = 0
-            syncUrlField(url)
-            updateNavButtons()
+            if (url != null) {
+                tabs.find { it.webView === view }?.apply {
+                    this.url = url
+                    this.title = view?.title.orEmpty()
+                }
+                visitedUrls.add(url)
+            }
+            if (view === webView) {
+                binding.browserLoading.visibility = View.GONE
+                binding.browserProgress.progress = 0
+                syncUrlField(url)
+                updateNavButtons()
+                val query = binding.browserFindInput.text?.toString().orEmpty()
+                if (binding.browserFindBar.visibility == View.VISIBLE && query.isNotBlank()) {
+                    view?.findAllAsync(query)
+                }
+            }
             val loaded = profile
             if (loaded != null && url != null && !url.startsWith("about:")) {
                 ProfileRepository.addHistory(
                     this@BrowserActivity, loaded, url, view?.title.orEmpty()
                 )
-            }
-            val query = binding.browserFindInput.text?.toString().orEmpty()
-            if (binding.browserFindBar.visibility == View.VISIBLE && query.isNotBlank()) {
-                view?.findAllAsync(query)
             }
         }
 
@@ -1023,28 +1310,33 @@ class BrowserActivity : AppCompatActivity() {
         }
 
         override fun onRenderProcessGone(view: WebView?, detail: RenderProcessGoneDetail?): Boolean {
-            // Recover instead of letting the framework kill the app: drop the dead WebView and
-            // rebuild it with the same profile (identity and bucket are re-applied).
             runCatching { binding.browserWebViewFrame.removeView(view) }
             runCatching { view?.destroy() }
-            webView = null
             val loaded = profile
             if (loaded == null) {
                 finish()
                 return true
             }
             Async.toast(this@BrowserActivity, getString(R.string.browser_error_body))
-            val replacement = createWebView() ?: run {
+            val replacement = createTabWebView() ?: run {
                 finish()
                 return true
             }
-            webView = replacement
-            binding.browserWebViewFrame.addView(
-                replacement,
-                ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
-            )
-            kernel?.install(replacement)
-            replacement.loadUrl(pendingUrl.ifBlank { loaded.startUrl })
+            val crashedTab = tabs.find { it.webView === view }
+            if (crashedTab != null) {
+                crashedTab.webView = replacement
+            }
+            if (webView === view || webView == null) {
+                webView = replacement
+                binding.browserWebViewFrame.addView(
+                    replacement,
+                    0,
+                    ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
+                )
+            }
+            val targetUrl = crashedTab?.url?.takeIf { it.isNotBlank() }
+                ?: pendingUrl.ifBlank { loaded.startUrl }
+            replacement.loadUrl(targetUrl)
             return true
         }
     }
@@ -1052,12 +1344,14 @@ class BrowserActivity : AppCompatActivity() {
     private inner class SessionChromeClient : WebChromeClient() {
 
         override fun onProgressChanged(view: WebView?, newProgress: Int) {
+            if (view !== webView) return
             binding.browserProgress.progress = newProgress
             binding.browserLoading.visibility =
                 if (newProgress in 1..99) View.VISIBLE else View.GONE
         }
 
         override fun onReceivedTitle(view: WebView?, title: String?) {
+            tabs.find { it.webView === view }?.title = title.orEmpty()
             binding.browserProfileName.text = profile?.displayName() ?: return
         }
 
@@ -1124,19 +1418,13 @@ class BrowserActivity : AppCompatActivity() {
             isUserGesture: Boolean,
             resultMsg: Message?
         ): Boolean {
-            // Pop-ups are routed into the same session rather than a second window we cannot
-            // fingerprint: this keeps the identity guarantee intact.
+            // Open target=_blank / window.open links inside a real fingerprinted session tab!
             val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
-            val popup = createWebView() ?: return false
-            popup.webViewClient = object : WebViewClient() {
-                override fun shouldOverrideUrlLoading(v: WebView?, request: WebResourceRequest?): Boolean {
-                    val url = request?.url?.toString() ?: return false
-                    load(url)
-                    popup.destroy()
-                    return true
-                }
-            }
-            transport.webView = popup
+            val newWeb = createTabWebView() ?: return false
+            val newTab = BrowserTab(webView = newWeb)
+            tabs.add(newTab)
+            switchToTab(tabs.lastIndex, navigateIfBlank = false)
+            transport.webView = newWeb
             resultMsg.sendToTarget()
             return true
         }
@@ -1207,16 +1495,48 @@ class BrowserActivity : AppCompatActivity() {
      */
     private fun refreshIdentityIfEdited() {
         val current = profile ?: return
-        val web = webView ?: return
         val active = kernel ?: return
         ProfileRepository.profile(this, current.id) { latest ->
             if (latest == null || isFinishing || isDestroyed) return@profile
+            val previousProxy = current.proxy
             profile = latest
             binding.browserEngineChip.text = latest.engine.title
             binding.browserProfileName.text = latest.displayName()
-            // The kernel compares the rebuilt payload, so an unrelated edit (a renamed
-            // profile, a new tag) does not reload the page under the user.
-            if (active.refreshScript(web, latest)) web.reload()
+            binding.browserAvatar.text = latest.initials()
+            val updatedUa =
+                com.joebrowser.app.fingerprint.FingerprintFactory.userAgent(latest.fp, latest.engine)
+            tabs.forEach { tab ->
+                if (!tab.desktopViewport) tab.webView.settings.userAgentString = updatedUa
+            }
+
+            val proxyChanged = previousProxy.type != latest.proxy.type ||
+                previousProxy.host != latest.proxy.host ||
+                previousProxy.port != latest.proxy.port ||
+                previousProxy.user != latest.proxy.user ||
+                previousProxy.password != latest.proxy.password
+
+            val scriptChanged = active.refreshScript(tabs.map { it.webView }, latest)
+
+            if (proxyChanged) {
+                runCatching { relay?.close() }
+                relay = null
+                if (latest.proxy.enabled) {
+                    applyProxyOverride(latest) {
+                        if (isFinishing || isDestroyed) return@applyProxyOverride
+                        webView?.reload()
+                        ProxyMonitorEngine.verifyBeforeLaunch(this, latest) { result ->
+                            if (!isFinishing && !isDestroyed) bindProxyResult(result)
+                        }
+                    }
+                } else {
+                    hideProxyBadge()
+                    clearProxyOverride {
+                        if (!isFinishing && !isDestroyed) webView?.reload()
+                    }
+                }
+            } else if (scriptChanged) {
+                webView?.reload()
+            }
         }
     }
 
@@ -1228,13 +1548,16 @@ class BrowserActivity : AppCompatActivity() {
         trackerSheet?.dismiss()
         trackerSheet = null
         HumanPaste.clearProgressSink()
-        binding.browserProxyBadge.removeCallbacks(badgeReset)
-        runCatching { binding.browserWebViewFrame.removeAllViews() }
-        runCatching { webView?.stopLoading() }
-        runCatching { webView?.webChromeClient = null }
-        // destroy() detaches the client; assigning null is not allowed by the platform API.
-        runCatching { webView?.stopLoading() }
-        runCatching { webView?.destroy() }
+        if (::binding.isInitialized) {
+            binding.browserTrackerBadge.removeCallbacks(badgeReset)
+            runCatching { binding.browserWebViewFrame.removeAllViews() }
+        }
+        tabs.forEach { tab ->
+            runCatching { tab.webView.stopLoading() }
+            runCatching { tab.webView.webChromeClient = null }
+            runCatching { tab.webView.destroy() }
+        }
+        tabs.clear()
         webView = null
         kernel = null
         super.onDestroy()

@@ -53,17 +53,17 @@
             android:contentDescription="@string/history_title"
             android:padding="13dp"
             android:src="@drawable/ic_history"
-            android:tint="@color/text_dim" />
+            app:tint="@color/text_dim" />
 
         <ImageButton
-            android:id="@+id/btnSettings"
+            android:id="@+id/btnQuickNewProfile"
             android:layout_width="@dimen/touch_target"
             android:layout_height="@dimen/touch_target"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/tools_title"
+            android:contentDescription="@string/profiles_new"
             android:padding="13dp"
-            android:src="@drawable/ic_tune"
-            android:tint="@color/text_dim" />
+            android:src="@drawable/ic_plus"
+            app:tint="@color/accent" />
     </LinearLayout>
 
     <View

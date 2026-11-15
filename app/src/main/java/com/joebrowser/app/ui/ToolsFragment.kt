@@ -284,19 +284,55 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
 
     private fun emptyTrash() {
         val context = requireContext()
-        Async.compute({ Database.get(context).trashCount() }) { count ->
-            val trash = count ?: 0
-            if (trash == 0) {
-                Async.toast(context, "Trash is empty")
-                return@compute
+        ProfileRepository.trashedProfiles(context) { items ->
+            if (!isAdded) return@trashedProfiles
+            if (items.isEmpty()) {
+                Async.toast(context, getString(R.string.tools_trash_empty_toast))
+                return@trashedProfiles
             }
+            val labels = items.map { (p, deletedAt) ->
+                val ago = android.text.format.DateUtils.getRelativeTimeSpanString(
+                    deletedAt, System.currentTimeMillis(), android.text.format.DateUtils.MINUTE_IN_MILLIS
+                )
+                "${p.displayName()} (${p.engine.title} · $ago)"
+            }.toTypedArray()
+
             MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.tools_empty_trash)
-                .setMessage("$trash profile(s) will be permanently erased.")
-                .setPositiveButton(R.string.action_delete) { _, _ ->
-                    ProfileRepository.emptyTrash(context) { refresh() }
+                .setTitle(R.string.tools_trash_manage_title)
+                .setItems(labels) { _, which ->
+                    val (selected, _) = items[which]
+                    MaterialAlertDialogBuilder(context)
+                        .setTitle(selected.displayName())
+                        .setMessage(getString(R.string.tools_trash_item_prompt, selected.displayName()))
+                        .setPositiveButton(R.string.action_restore) { _, _ ->
+                            ProfileRepository.restoreFromTrash(context, selected.id) {
+                                Async.toast(context, getString(R.string.tools_trash_restored, selected.displayName()))
+                                refresh()
+                            }
+                        }
+                        .setNeutralButton(R.string.action_delete_forever) { _, _ ->
+                            ProfileRepository.deleteTrashedForever(context, selected.id) {
+                                Async.toast(context, getString(R.string.status_deleted))
+                                refresh()
+                            }
+                        }
+                        .setNegativeButton(R.string.action_cancel, null)
+                        .show()
                 }
-                .setNegativeButton(R.string.action_cancel, null)
+                .setNeutralButton(R.string.tools_empty_trash) { _, _ ->
+                    MaterialAlertDialogBuilder(context)
+                        .setTitle(R.string.tools_empty_trash)
+                        .setMessage(getString(R.string.tools_trash_confirm_all, items.size))
+                        .setPositiveButton(R.string.action_delete) { _, _ ->
+                            ProfileRepository.emptyTrash(context) {
+                                Async.toast(context, getString(R.string.status_deleted))
+                                refresh()
+                            }
+                        }
+                        .setNegativeButton(R.string.action_cancel, null)
+                        .show()
+                }
+                .setNegativeButton(R.string.action_close, null)
                 .show()
         }
     }
