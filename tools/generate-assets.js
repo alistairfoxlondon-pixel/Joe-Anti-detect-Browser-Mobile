@@ -1,0 +1,390 @@
+#!/usr/bin/env node
+/**
+ * Joe Browser asset generator.
+ *
+ * Regenerates every brand asset and every UI icon from source, so the app never carries a
+ * hand-edited vector that drifts from the rest of the set:
+ *
+ *   1. Icons   — tools/icon-set.json names a Lucide glyph (ISC licence) per Android drawable
+ *                name; each glyph is stroked at a uniform 2.0 weight on a 24dp grid and
+ *                emitted as a vector drawable with a theme tint.
+ *   2. Logo    — one mark, drawn from the same 24dp geometry: a rounded shield cupped over a
+ *                keyhole. Emitted as ic_logo.xml (theme aware) plus the adaptive launcher
+ *                foreground/monochrome layers.
+ *   3. Art     — store icon, feature graphic and the in-app hero pattern, rasterised with
+ *                @resvg/resvg-js so they can be reviewed as images.
+ *
+ * Usage:  node tools/generate-assets.js [--icons-only]
+ * Requires (dev machine only, never at build time): lucide-static, @resvg/resvg-js,
+ * opentype.js, @expo-google-fonts/plus-jakarta-sans.
+ */
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const RES = path.join(ROOT, 'app/src/main/res');
+const TOOLS = __dirname;
+const MODULES =
+  process.env.JOE_TOOL_MODULES ||
+  (fs.existsSync(path.join(TOOLS, 'node_modules/@resvg'))
+    ? path.join(TOOLS, 'node_modules')
+    : '/tmp/tools/node_modules');
+const VENDOR_ICONS = path.join(TOOLS, 'icons-src');
+
+const BRAND = {
+  deep: '#0B3D2E',
+  deepPressed: '#082F23',
+  accent: '#0E7C55',
+  accentBright: '#12996A',
+  ivory: '#F3F8F4',
+  line: '#DCE5DE',
+  muted: '#6C7D71',
+};
+
+const iconsOnly = process.argv.includes('--icons-only');
+// --check regenerates in memory and compares with what is committed, without writing.
+const checkOnly = process.argv.includes('--check');
+
+// ---------------------------------------------------------------- lucide parse
+
+/** Pull every <path>/<circle>/<rect>/<line>/<polyline>/<polygon>/<ellipse> out of a Lucide SVG. */
+function parseLucide(svg) {
+  const shapes = [];
+  const re = /<(path|circle|rect|line|polyline|polygon|ellipse)\b([^>]*)\/?>/g;
+  let m;
+  while ((m = re.exec(svg))) {
+    const tag = m[1];
+    const attrs = {};
+    const attrRe = /([a-zA-Z0-9-]+)="([^"]*)"/g;
+    let a;
+    while ((a = attrRe.exec(m[2]))) attrs[a[1]] = a[2];
+    shapes.push({ tag, attrs });
+  }
+  return shapes;
+}
+
+const num = (v) => {
+  const n = Number(v);
+  if (!Number.isFinite(n)) throw new Error('bad number: ' + v);
+  return Math.round(n * 1000) / 1000;
+};
+
+const pt = (x, y) => `${num(x)},${num(y)}`;
+
+/** Convert a shape element to one or more SVG path `d` strings (all strokes). */
+function shapeToPath(shape) {
+  const { tag, attrs } = shape;
+  switch (tag) {
+    case 'path':
+      return [attrs.d];
+    case 'circle': {
+      const cx = num(attrs.cx), cy = num(attrs.cy), r = num(attrs.r);
+      return [
+        `M${pt(cx - r, cy)}a${r},${r} 0 1,0 ${r * 2},0a${r},${r} 0 1,0 ${-r * 2},0Z`,
+      ];
+    }
+    case 'ellipse': {
+      const cx = num(attrs.cx), cy = num(attrs.cy), rx = num(attrs.rx), ry = num(attrs.ry);
+      return [`M${pt(cx - rx, cy)}a${rx},${ry} 0 1,0 ${rx * 2},0a${rx},${ry} 0 1,0 ${-rx * 2},0Z`];
+    }
+    case 'rect': {
+      const x = num(attrs.x), y = num(attrs.y), w = num(attrs.width), h = num(attrs.height);
+      const rx = num(attrs.rx || 0), ry = num(attrs.ry || attrs.rx || 0);
+      if (!rx && !ry) {
+        return [`M${pt(x, y)}h${w}v${h}h${-w}Z`];
+      }
+      const r = Math.min(rx, w / 2), s = Math.min(ry, h / 2);
+      return [
+        `M${pt(x + r, y)}h${num(w - 2 * r)}a${r},${s} 0 0 1 ${r},${s}v${num(h - 2 * s)}` +
+          `a${r},${s} 0 0 1 ${-r},${s}h${num(-(w - 2 * r))}a${r},${s} 0 0 1 ${-r},${-s}` +
+          `v${num(-(h - 2 * s))}a${r},${s} 0 0 1 ${r},${-s}Z`,
+      ];
+    }
+    case 'line':
+      return [`M${pt(attrs.x1, attrs.y1)}L${pt(attrs.x2, attrs.y2)}`];
+    case 'polyline':
+    case 'polygon': {
+      const pts = attrs.points.trim().split(/[\s,]+/).map(Number);
+      let d = '';
+      for (let i = 0; i < pts.length; i += 2) {
+        d += (i === 0 ? 'M' : 'L') + pt(pts[i], pts[i + 1]);
+      }
+      return [d + (tag === 'polygon' ? 'Z' : '')];
+    }
+    default:
+      return [];
+  }
+}
+
+/** Icons that read better as a solid silhouette than as strokes (nav glyphs, check). */
+const FILLED = new Set([
+  'ic_check', 'ic_back', 'ic_chevron_down', 'ic_chevron_right', 'ic_plus', 'ic_close',
+  'ic_launch', 'ic_eye', 'ic_tag', 'ic_bolt', 'ic_globe',
+]);
+
+const STROKE_BOLD = new Set([
+  'ic_nav_home', 'ic_nav_profiles', 'ic_nav_proxies', 'ic_nav_browsers', 'ic_tune',
+  'ic_arrow_back', 'ic_check',
+]);
+
+function escapeXml(s) {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+}
+
+function vectorDrawable({ paths, stroke, fill, width = 24, viewport = 24, tint = true }) {
+  const head =
+    `<?xml version="1.0" encoding="utf-8"?>\n` +
+    `<!-- Generated by tools/generate-assets.js from tools/icon-set.json — do not edit. -->\n` +
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android"\n` +
+    `    android:width="${width}dp"\n` +
+    `    android:height="${width}dp"\n` +
+    `    android:viewportWidth="${viewport}"\n` +
+    `    android:viewportHeight="${viewport}"` +
+    (tint ? `\n    android:tint="?attr/colorControlNormal"` : '') +
+    `>\n`;
+  const body = paths
+    .map((d) => {
+      let p = `    <path\n        android:pathData="${escapeXml(d)}"\n`;
+      // Exactly one fillColor attribute, always: duplicates are invalid XML.
+      p += `        android:fillColor="${fill || '#00000000'}"\n`;
+      if (stroke) {
+        p += `        android:strokeColor="#FF000000"\n`;
+        p += `        android:strokeWidth="${stroke.width}"\n`;
+        p += `        android:strokeLineCap="${stroke.cap}"\n`;
+        p += `        android:strokeLineJoin="${stroke.join}"\n`;
+      }
+      return p + `        />`;
+    })
+    .join('\n');
+  return head + body + `\n</vector>\n`;
+}
+
+// ------------------------------------------------------------------- icon pass
+
+/** Write helper that honours --check: compare instead of overwrite. */
+let driftCount = 0;
+function writeResource(target, content) {
+  if (checkOnly) {
+    const current = fs.existsSync(target) ? fs.readFileSync(target, 'utf8') : '';
+    if (current !== content) {
+      driftCount++;
+      console.log(`  drift: ${path.relative(ROOT, target)}`);
+    }
+    return;
+  }
+  fs.writeFileSync(target, content);
+}
+
+function generateIcons() {
+  const spec = JSON.parse(fs.readFileSync(path.join(TOOLS, 'icon-set.json'), 'utf8'));
+  const lucideDir = fs.existsSync(VENDOR_ICONS)
+    ? VENDOR_ICONS
+    : path.join(MODULES, 'lucide-static/icons');
+  const written = [];
+  for (const [name, def] of Object.entries(spec.icons)) {
+    const svgPath = path.join(lucideDir, def.lucide + '.svg');
+    if (!fs.existsSync(svgPath)) {
+      console.warn(`  skip ${name}: no lucide glyph ${def.lucide}`);
+      continue;
+    }
+    const shapes = parseLucide(fs.readFileSync(svgPath, 'utf8'));
+    const paths = shapes.flatMap(shapeToPath).filter(Boolean);
+    const filled = FILLED.has(name);
+    const strokeWidth = STROKE_BOLD.has(name) ? 2.15 : 2.0;
+    const xml = filled
+      ? vectorDrawable({ paths, stroke: { width: strokeWidth, cap: 'round', join: 'round' }, fill: '#FF000000' })
+      : vectorDrawable({ paths, stroke: { width: strokeWidth, cap: 'round', join: 'round' }, fill: null });
+    writeResource(path.join(RES, 'drawable', name + '.xml'), xml);
+    written.push(name);
+  }
+  console.log(`icons: ${written.length} drawables from ${Object.keys(spec.icons).length} entries`);
+  return written;
+}
+
+// --------------------------------------------------------------- brand mark
+
+/**
+ * The mark: a shield whose lower half is a keyhole. Drawn on the same 24dp grid as the icon
+ * set, with a 1.6 stroke that reads down to 20dp. Two shapes only, so it stays crisp at
+ * launcher sizes: the shield outline, then the keyway that makes it "identity", not "security".
+ */
+const MARK = {
+  shield:
+    'M12,2.4 L19.7,5.3 V11.4 C19.7,16.2 16.4,20.4 12,21.9 C7.6,20.4 4.3,16.2 4.3,11.4 V5.3 Z',
+  keyway:
+    'M12,7.55 C10.55,7.55 9.4,8.7 9.4,10.15 C9.4,11.25 10.05,12.2 11,12.6 V15.1 C11,15.6 11.45,16 12,16 C12.55,16 13,15.6 13,15.1 V12.6 C13.95,12.2 14.6,11.25 14.6,10.15 C14.6,8.7 13.45,7.55 12,7.55 Z',
+};
+
+function markSvg({ shieldFill, keyFill, stroke, size = 24 }) {
+  return (
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 24 24">` +
+    `<path d="${MARK.shield}" fill="${shieldFill || 'none'}" stroke="${stroke || 'none'}" stroke-width="1.6" stroke-linejoin="round"/>` +
+    `<path d="${MARK.keyway}" fill="${keyFill}"/>` +
+    `</svg>`
+  );
+}
+
+function generateMark() {
+  // In-app mark: renders white on the deep-green hero, and accent-green on light surfaces.
+  const xml =
+    `<?xml version="1.0" encoding="utf-8"?>\n` +
+    `<!-- Generated by tools/generate-assets.js — the Joe Browser mark. -->\n` +
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android"\n` +
+    `    android:width="24dp"\n` +
+    `    android:height="24dp"\n` +
+    `    android:viewportWidth="24"\n` +
+    `    android:viewportHeight="24">\n` +
+    `    <path\n` +
+    `        android:fillColor="@color/accent"\n` +
+    `        android:strokeColor="@color/accent"\n` +
+    `        android:strokeWidth="1.5"\n` +
+    `        android:strokeLineJoin="round"\n` +
+    `        android:pathData="${MARK.shield}" />\n` +
+    `    <path\n` +
+    `        android:fillColor="@color/surface"\n` +
+    `        android:pathData="${MARK.keyway}" />\n` +
+    `</vector>\n`;
+  writeResource(path.join(RES, 'drawable/ic_logo.xml'), xml);
+
+  // Launcher foreground: 108dp grid, logo art inside the 66dp safe circle.
+  const fg =
+    `<?xml version="1.0" encoding="utf-8"?>\n` +
+    `<!-- Generated by tools/generate-assets.js — adaptive launcher foreground. -->\n` +
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android"\n` +
+    `    android:width="108dp"\n` +
+    `    android:height="108dp"\n` +
+    `    android:viewportWidth="108"\n` +
+    `    android:viewportHeight="108">\n` +
+    `    <group android:scaleX="2.5" android:scaleY="2.5" android:translateX="24" android:translateY="24">\n` +
+    `        <path\n` +
+    `            android:fillColor="#FFFFFFFF"\n` +
+    `            android:strokeColor="#FFFFFFFF"\n` +
+    `            android:strokeWidth="1.35"\n` +
+    `            android:strokeLineJoin="round"\n` +
+    `            android:pathData="${MARK.shield}" />\n` +
+    `        <path\n` +
+    `            android:fillColor="${BRAND.deep}"\n` +
+    `            android:pathData="${MARK.keyway}" />\n` +
+    `    </group>\n` +
+    `</vector>\n`;
+  writeResource(path.join(RES, 'drawable/ic_launcher_foreground.xml'), fg);
+
+  const mono =
+    `<?xml version="1.0" encoding="utf-8"?>\n` +
+    `<!-- Generated by tools/generate-assets.js — themed launcher icon. -->\n` +
+    `<vector xmlns:android="http://schemas.android.com/apk/res/android"\n` +
+    `    android:width="108dp"\n` +
+    `    android:height="108dp"\n` +
+    `    android:viewportWidth="108"\n` +
+    `    android:viewportHeight="108">\n` +
+    `    <group android:scaleX="2.5" android:scaleY="2.5" android:translateX="24" android:translateY="24">\n` +
+    `        <path\n` +
+    `            android:fillColor="#FF000000"\n` +
+    `            android:pathData="${MARK.shield}M12,7.55 C10.55,7.55 9.4,8.7 9.4,10.15 C9.4,11.25 10.05,12.2 11,12.6 V15.1 C11,15.6 11.45,16 12,16 C12.55,16 13,15.6 13,15.1 V12.6 C13.95,12.2 14.6,11.25 14.6,10.15 C14.6,8.7 13.45,7.55 12,7.55 Z"\n` +
+    `            android:fillType="evenOdd" />\n` +
+    `    </group>\n` +
+    `</vector>\n`;
+  writeResource(path.join(RES, 'drawable/ic_launcher_monochrome.xml'), mono);
+
+  // Splash: the mark, large, in brand green on the page background.
+  const splash =
+    `<?xml version="1.0" encoding="utf-8"?>\n` +
+    `<layer-list xmlns:android="http://schemas.android.com/apk/res/android">\n` +
+    `    <item android:drawable="@color/bg" />\n` +
+    `    <item\n` +
+    `        android:width="72dp"\n` +
+    `        android:height="72dp"\n` +
+    `        android:gravity="center"\n` +
+    `        android:drawable="@drawable/ic_logo" />\n` +
+    `</layer-list>\n`;
+  writeResource(path.join(RES, 'drawable/splash_background.xml'), splash);
+
+  console.log('mark: ic_logo, launcher foreground/monochrome, splash');
+}
+
+// --------------------------------------------------------------- store art
+
+async function generateArt() {
+  const { Resvg } = require(path.join(MODULES, '@resvg/resvg-js'));
+  const opentype = require(path.join(MODULES, 'opentype.js'));
+
+  const fontPath = (w) =>
+    path.join(MODULES, '@expo-google-fonts/plus-jakarta-sans', w, `PlusJakartaSans_${w}.ttf`);
+  const fonts = {};
+  for (const w of ['400Regular', '500Medium', '600SemiBold', '700Bold', '800ExtraBold']) {
+    const p = fontPath(w);
+    // opentype v1 exposes parse(); loadSync() is gone from newer releases.
+    if (fs.existsSync(p)) fonts[w] = opentype.parse(fs.readFileSync(p).buffer.slice(0));
+  }
+
+  const text = (str, opts) => {
+    const font = fonts[opts.weight || '700Bold'];
+    // Draw glyph by glyph: opentype's shaping path rejects Jakarta's variable-font GSUB
+    // tables, while the metrics we need (advance width, contours) work fine per glyph.
+    const tracking = (opts.tracking || 0) * opts.size;
+    let pen = 0;
+    const parts = [];
+    for (const ch of str) {
+      const glyph = font.charToGlyph(ch);
+      const d = glyph.getPath(pen, 0, opts.size).toPathData(2);
+      if (d) parts.push(d);
+      pen += glyph.advanceWidth * (opts.size / font.unitsPerEm) + tracking;
+    }
+    const width = pen - (str.length > 0 ? tracking : 0);
+    const dx = opts.anchor === 'middle' ? -width / 2 : opts.anchor === 'end' ? -width : 0;
+    return `<g transform="translate(${(opts.x + dx).toFixed(2)} ${opts.y})"><path d="${parts.join('')}" fill="${opts.fill}"/></g>`;
+  };
+
+  const render = (svg, out, width) => {
+    const png = new Resvg(svg, { fitTo: { mode: 'width', value: width } }).render().asPng();
+    fs.mkdirSync(path.dirname(out), { recursive: true });
+    fs.writeFileSync(out, png);
+  };
+
+  // --- store icon 512 -------------------------------------------------------------------
+  const iconSvg = (size) =>
+    `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">` +
+    `<rect width="512" height="512" fill="${BRAND.deep}"/>` +
+    `<g transform="translate(120 112) scale(11.3)" stroke-linejoin="round">` +
+    `<path d="${MARK.shield}" fill="#FFFFFF"/>` +
+    `<path d="${MARK.keyway}" fill="${BRAND.deep}"/>` +
+    `</g></svg>`;
+  render(iconSvg(512), path.join(ROOT, 'store-assets/ic_launcher_512.png'), 512);
+
+  // --- feature graphic 1024x500 ---------------------------------------------------------
+  const feat =
+    `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">` +
+    `<rect width="1024" height="500" fill="${BRAND.deep}"/>` +
+    // Two stacked profile cards, right-aligned: the product idea as one visual gesture.
+    `<g opacity="0.13" fill="#FFFFFF">` +
+    `<rect x="916" y="84" width="170" height="130" rx="24" transform="rotate(9 1001 149)"/>` +
+    `</g>` +
+    `<g opacity="0.20" fill="#FFFFFF">` +
+    `<rect x="898" y="300" width="180" height="130" rx="24" transform="rotate(-6 988 365)"/>` +
+    `</g>` +
+    `<g transform="translate(88 132) scale(9.4)" stroke-linejoin="round">` +
+    `<path d="${MARK.shield}" fill="#FFFFFF"/>` +
+    `<path d="${MARK.keyway}" fill="${BRAND.deep}"/>` +
+    `</g>` +
+    text('Joe Browser', { x: 372, y: 250, size: 92, fill: '#FFFFFF', weight: '800ExtraBold', tracking: -0.018 }) +
+    text('One device. Every identity isolated.', { x: 376, y: 318, size: 36, fill: '#BFE3CF', weight: '500Medium' }) +
+    text('PROFILES  ·  FINGERPRINTS  ·  PROXIES', { x: 378, y: 372, size: 22, fill: BRAND.accentBright, weight: '700Bold', tracking: 0.06 }) +
+    `</svg>`;
+  render(feat, path.join(ROOT, 'store-assets/feature-graphic.png'), 1024);
+
+  // --- README/docs preview (kept out of the APK) ----------------------------------------
+  render(feat, path.join(ROOT, 'docs/brand-feature-graphic.png'), 1024);
+  render(iconSvg(512), path.join(ROOT, 'docs/brand-icon.png'), 256);
+
+  console.log('art: store icon, feature graphic, docs previews');
+}
+
+(async () => {
+  generateIcons();
+  generateMark();
+  if (!iconsOnly && !checkOnly) await generateArt();
+  if (checkOnly) {
+    console.log(driftCount === 0 ? 'assets: up to date' : `assets: ${driftCount} file(s) out of date`);
+    process.exit(driftCount === 0 ? 0 : 1);
+  }
+})();

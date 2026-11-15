@@ -1,0 +1,69 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Settings / tool row: leading icon tile, one-line title + optional one-line caption,
+  trailing accessory (switch, value or chevron) supplied by the caller.
+
+  Every row is 56dp tall so a settings screen reads as one rhythm rather than five heights.
+  The caption is capped at one line and ellipsised: no row can grow, so nothing shifts when a
+  value changes length.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:minHeight="56dp"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingTop="8dp"
+    android:paddingEnd="14dp"
+    android:paddingBottom="8dp">
+
+    <ImageView
+        android:id="@+id/rowIcon"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:contentDescription="@null"
+        android:src="@drawable/ic_settings"
+        app:tint="@color/text_dim" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="14dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/rowTitle"
+            style="@style/Text.Jb.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="Keep history" />
+
+        <TextView
+            android:id="@+id/rowCaption"
+            style="@style/Text.Jb.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:visibility="gone"
+            tools:text="Saved per profile"
+            tools:visibility="visible" />
+    </LinearLayout>
+
+    <FrameLayout
+        android:id="@+id/rowAccessory"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="10dp" />
+</LinearLayout>

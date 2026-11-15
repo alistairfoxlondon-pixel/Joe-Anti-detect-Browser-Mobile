@@ -2,13 +2,12 @@
 <!--
   App shell.
 
-  Layout contract:
-   * Fixed 56dp top bar + BottomNavigationView pinned to the bottom + fragment container with
-     weight=1. Nothing overlaps: the container is the only stretchable child, so no tab can
-     push the nav bar off-screen on a small device.
-   * The top bar uses a hairline divider instead of elevation so it reads the same in both
-     themes.
-   * Icon buttons are 48dp targets inside the 56dp bar (never clipped).
+  Three bands, no overlap:
+   1. A 56dp header carrying the brand mark, the current screen's name and two actions.
+   2. The fragment host, which is the only stretchable region (weight=1), so no tab can push
+      the navigation bar off screen on a small device.
+   3. A bottom navigation bar with a hairline top border instead of elevation, so light and
+      dark read identically.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -17,7 +16,6 @@
     android:background="@color/bg"
     android:orientation="vertical">
 
-    <!-- Top bar -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -25,7 +23,7 @@
         android:background="@color/surface"
         android:gravity="center_vertical"
         android:orientation="horizontal"
-        android:paddingStart="14dp"
+        android:paddingStart="16dp"
         android:paddingEnd="6dp">
 
         <ImageView
@@ -34,36 +32,30 @@
             android:contentDescription="@string/app_name"
             android:src="@drawable/ic_logo" />
 
+        <!-- The screen name, not the app name: the tab bar already says which app you are in. -->
         <TextView
             android:id="@+id/versionLabel"
             style="@style/Text.Jb.ScreenTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginStart="10dp"
+            android:layout_marginStart="11dp"
             android:layout_weight="1"
             android:ellipsize="end"
             android:maxLines="1"
-            android:text="@string/app_name" />
+            android:text="@string/nav_home" />
 
         <ImageButton
             android:id="@+id/btnHistory"
-            android:layout_width="@dimen/touch_target"
-            android:layout_height="@dimen/touch_target"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/history_title"
-            android:padding="13dp"
-            android:src="@drawable/ic_history"
-            app:tint="@color/text_dim" />
+            android:src="@drawable/ic_history" />
 
         <ImageButton
             android:id="@+id/btnQuickNewProfile"
-            android:layout_width="@dimen/touch_target"
-            android:layout_height="@dimen/touch_target"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/profiles_new"
-            android:padding="13dp"
             android:src="@drawable/ic_plus"
-            app:tint="@color/accent" />
+            android:tint="@color/accent" />
     </LinearLayout>
 
     <View
@@ -71,7 +63,6 @@
         android:layout_height="1dp"
         android:background="@color/line_soft" />
 
-    <!-- Fragment host: the only stretchable region of the screen -->
     <FrameLayout
         android:id="@+id/fragmentContainer"
         android:layout_width="match_parent"
@@ -88,10 +79,9 @@
         style="@style/Widget.Jb.NavView"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:minHeight="64dp"
+        android:minHeight="62dp"
         app:menu="@menu/bottom_nav" />
 
-    <!-- Transient scrim used while a tab animation runs; kept out of the layout flow. -->
     <View
         android:id="@+id/tabScrim"
         android:layout_width="0dp"

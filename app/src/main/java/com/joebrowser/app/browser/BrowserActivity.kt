@@ -729,6 +729,8 @@ class BrowserActivity : AppCompatActivity() {
             R.id.fpPixelScan -> { load("https://pixelscan.net/"); true }
             R.id.fpIpFighter -> { load("https://ipfighter.com/"); true }
             R.id.fpWhoer -> { load("https://whoer.net/"); true }
+            R.id.fpCreepJs -> { load("https://abrahamjuliot.github.io/creepjs/"); true }
+            R.id.fpSanny -> { load("https://bot.sannysoft.com/"); true }
             else -> false
         }
     }

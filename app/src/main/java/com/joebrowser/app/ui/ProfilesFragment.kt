@@ -3,7 +3,6 @@ package com.joebrowser.app.ui
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -53,9 +52,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
             else BrowserActivity.launch(requireContext(), profile.id)
         },
         onLongPress = { profile -> toggleSelection(profile.id) },
-        onEdit = { profile -> (activity as? MainActivity)?.openProfileEditor(profile.id) },
-        onMenu = { profile, anchor -> showMenu(profile, anchor) },
-        onDelete = { profile -> confirmDelete(profile) }
+        onMenu = { profile, anchor -> showMenu(profile, anchor) }
     )
 
     private var allProfiles: List<Profile> = emptyList()
@@ -136,15 +133,17 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         val popup = PopupMenu(requireContext(), anchor)
         popup.menu.add(0, ACTION_EDIT, 0, getString(R.string.action_edit))
         popup.menu.add(0, ACTION_SWITCH_PROXY, 1, getString(R.string.profiles_quick_proxy))
-        popup.menu.add(0, ACTION_NEW_FINGERPRINT, 2, getString(R.string.profiles_new_fingerprint))
-        popup.menu.add(0, ACTION_DUPLICATE, 3, getString(R.string.action_duplicate))
-        popup.menu.add(0, ACTION_SELECT, 4, getString(R.string.profiles_batch_select))
-        popup.menu.add(0, ACTION_CLEAR, 5, getString(R.string.profiles_clear_data))
-        popup.menu.add(0, ACTION_DELETE, 6, getString(R.string.action_delete))
+        popup.menu.add(0, ACTION_TEST_FINGERPRINT, 2, getString(R.string.profiles_test_fp))
+        popup.menu.add(0, ACTION_NEW_FINGERPRINT, 3, getString(R.string.profiles_new_fingerprint))
+        popup.menu.add(0, ACTION_DUPLICATE, 4, getString(R.string.action_duplicate))
+        popup.menu.add(0, ACTION_SELECT, 5, getString(R.string.profiles_batch_select))
+        popup.menu.add(0, ACTION_CLEAR, 6, getString(R.string.profiles_clear_data))
+        popup.menu.add(0, ACTION_DELETE, 7, getString(R.string.action_delete))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 ACTION_EDIT -> (activity as? MainActivity)?.openProfileEditor(profile.id)
                 ACTION_SWITCH_PROXY -> showQuickProxyPicker(listOf(profile))
+                ACTION_TEST_FINGERPRINT -> FingerprintLabActivity.launch(requireContext(), profile.id)
                 ACTION_NEW_FINGERPRINT -> rerollFingerprint(profile)
                 ACTION_DUPLICATE -> duplicate(profile)
                 ACTION_SELECT -> toggleSelection(profile.id)
@@ -488,9 +487,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         private val selectionActive: () -> Boolean,
         private val onLaunch: (Profile) -> Unit,
         private val onLongPress: (Profile) -> Unit,
-        private val onEdit: (Profile) -> Unit,
-        private val onMenu: (Profile, View) -> Unit,
-        private val onDelete: (Profile) -> Unit
+        private val onMenu: (Profile, View) -> Unit
     ) : RecyclerView.Adapter<ProfileAdapter.Holder>() {
 
         private var items: List<Profile> = emptyList()
@@ -563,9 +560,8 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 )
 
                 view.profileBadge.visibility = if (profile.freshSession) View.VISIBLE else View.GONE
-                view.profileBadge.imageTintList = ColorStateList.valueOf(
-                    ContextCompat.getColor(context, R.color.accent)
-                )
+                view.profileBadgeDot.visibility = if (profile.proxy.enabled && profile.proxy.online)
+                    View.VISIBLE else View.GONE
 
                 view.profileLaunch.setText(
                     if (selectionActive()) R.string.profiles_select_toggle else R.string.action_open
@@ -573,9 +569,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 view.profileLaunch.setOnClickListener {
                     if (selectionActive()) onLongPress(profile) else BrowserActivity.launch(context, profile.id)
                 }
-                view.profileEdit.setOnClickListener { onEdit(profile) }
                 view.profileMore.setOnClickListener { onMenu(profile, it) }
-                view.profileDelete.setOnClickListener { onDelete(profile) }
                 view.root.setOnClickListener { onLaunch(profile) }
                 view.root.setOnLongClickListener {
                     onLongPress(profile)
@@ -598,6 +592,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         private const val ACTION_DELETE = 104
         private const val ACTION_SWITCH_PROXY = 105
         private const val ACTION_NEW_FINGERPRINT = 106
+        private const val ACTION_TEST_FINGERPRINT = 108
         private const val ACTION_SELECT = 107
     }
 }

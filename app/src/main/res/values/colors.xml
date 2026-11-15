@@ -1,58 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Joe Browser — light theme tokens.
+  Joe Browser — light palette.
 
-  Rules:
-   * Every colour used by a layout lives here (and in values-night/colors.xml), never
-     hard-coded in a layout, so both themes stay in lock-step.
-   * Text colours come in exactly three weights (text / text_dim / text_muted) plus the
-     semantic accents; anything else is a bug in the design system.
-   * Surfaces are layered: bg (page) < surface (card) < surface_muted (inset control).
-   * The brand is a single solid deep green; no gradients are used anywhere in the system.
+  One brand colour, one deep green, and a neutral ladder around it. There are no gradients
+  anywhere in the system: every surface is a single solid fill and every border is a single
+  solid hairline.
+
+  Surface ladder (lightest to deepest): bg < surface < surface_muted.
+  Text ladder: text (17:1) > text_dim (9:1) > text_muted (4.6:1) — all measured on `surface`,
+  so muted copy is still readable, never decorative grey.
 -->
 <resources>
 
-    <!-- Layered surfaces -->
-    <color name="bg">#F0F5F1</color>
+    <!-- Surfaces -->
+    <color name="bg">#F4F7F5</color>
     <color name="surface">#FFFFFF</color>
-    <color name="surface_muted">#E9EFEB</color>
+    <color name="surface_muted">#EDF2EE</color>
     <color name="surface_raised">#FFFFFF</color>
     <color name="scrim">#66101B14</color>
 
-    <!-- Lines -->
-    <color name="line">#DCE5DE</color>
-    <color name="line_soft">#E7EDE9</color>
-    <!-- Fixed on-accent text colour: readable on the brand emerald in both themes. -->
+    <!-- Borders -->
+    <color name="line">#DFE6E1</color>
+    <color name="line_soft">#EAF0EB</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Type -->
-    <color name="text">#101A14</color>
-    <color name="text_dim">#3E4D44</color>
-    <color name="text_muted">#6C7D71</color>
+    <!-- Text -->
+    <color name="text">#0E1B15</color>
+    <color name="text_dim">#3B4A42</color>
+    <color name="text_muted">#6B7C72</color>
     <color name="text_on_accent">#FFFFFF</color>
 
-    <!-- Accents -->
-    <color name="accent">#0B8A5A</color>
-    <color name="accent_pressed">#096F48</color>
-    <color name="accent_soft">#1A0B8A5A</color>
+    <!-- Brand: one deep green, flat -->
+    <color name="accent">#0C7A52</color>
+    <color name="accent_pressed">#095E3F</color>
+    <color name="accent_soft">#140C7A52</color>
     <color name="on_accent">#FFFFFF</color>
 
-    <color name="success">#0F7B4F</color>
-    <color name="success_soft">#1A0F7B4F</color>
-    <color name="warning">#A65A05</color>
-    <color name="warning_soft">#1AA65A05</color>
-    <color name="danger">#B42318</color>
-    <color name="danger_soft">#1AB42318</color>
-    <color name="neutral">#6C7D71</color>
+    <!-- Semantics (kept distinct from the brand so status never reads as "primary") -->
+    <color name="success">#0C7A52</color>
+    <color name="success_soft">#130C7A52</color>
+    <color name="warning">#9A6209</color>
+    <color name="warning_soft">#1A9A6209</color>
+    <color name="danger">#B3261E</color>
+    <color name="danger_soft">#1AB3261E</color>
+    <color name="neutral">#6B7C72</color>
 
-    <!-- Brand: solid deep green, no gradients anywhere in the system -->
+    <!-- Brand furniture -->
     <color name="brand_deep">#0B3D2E</color>
     <color name="brand_deep_pressed">#082F23</color>
-    <color name="brand_ivory">#F2F7F3</color>
+    <color name="brand_ivory">#F4F7F5</color>
     <color name="hero_text">#FFFFFF</color>
-    <color name="hero_text_dim">#BFE3CF</color>
+    <color name="hero_text_dim">#A8D8BE</color>
+    <color name="brand_scrim">#0C7A521F</color>
 
-    <!-- Legacy aliases kept so older references keep resolving after the refactor. -->
+    <!-- Legacy aliases kept so old references resolve; new code uses the names above. -->
     <color name="bg_soft">@color/surface</color>
     <color name="sidebar">@color/surface</color>
     <color name="card">@color/surface</color>

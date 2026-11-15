@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnQuickNewProfile.setOnClickListener {
             ProfileEditorActivity.launch(this, null)
         }
-        binding.versionLabel.text = getString(R.string.app_name)
+        binding.versionLabel.setText(R.string.nav_home)
 
         binding.bottomNav.setOnItemSelectedListener { item ->
             showTab(item.itemId)
@@ -170,6 +170,15 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_tools -> tagTools
                 else -> tagHome
             }
+            binding.versionLabel.setText(
+                when (itemId) {
+                    R.id.nav_profiles -> R.string.nav_profiles
+                    R.id.nav_proxies -> R.string.nav_proxies
+                    R.id.nav_browsers -> R.string.nav_browsers
+                    R.id.nav_tools -> R.string.nav_tools
+                    else -> R.string.nav_home
+                }
+            )
             val target = manager.findFragmentByTag(tag) ?: when (itemId) {
                 R.id.nav_profiles -> ProfilesFragment()
                 R.id.nav_proxies -> ProxiesFragment()

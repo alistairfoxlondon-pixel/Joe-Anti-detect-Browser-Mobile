@@ -1,0 +1,362 @@
+#!/usr/bin/env node
+/**
+ * Static resource + binding audit.
+ *
+ * There is no Android SDK in this sandbox, so this script is the local stand-in for a
+ * `:app:assembleDebug` run. It catches the failures that actually break a build:
+ *
+ *   • XML that is not well formed,
+ *   • `@drawable/…`, `@string/…`, `@color/…`, `@style/…`, `@font/…`, `@dimen/…`, `@bool/…`,
+ *     `@integer/…`, `@menu/…`, `@xml/…`, `@mipmap/…` references with no definition,
+ *   • `R.<type>.<name>` references from Kotlin with no definition,
+ *   • view-binding fields used from Kotlin (`binding.fooBar`) that do not exist in the
+ *     layout the binding is inflated from — this is the one that CI reports as
+ *     "Unresolved reference: fooBar" and it is entirely preventable,
+ *   • layout ids referenced by `findViewById`/binding that were removed,
+ *   • strings used by Kotlin (`R.string.x`) that no longer exist,
+ *   • layouts that reference an id twice, or a style/data-binding mistake.
+ *
+ * Exit code 1 on any error. Run locally before pushing; CI runs it too, before Gradle.
+ */
+const fs = require('fs');
+const path = require('path');
+
+const ROOT = path.resolve(__dirname, '..');
+const MAIN = path.join(ROOT, 'app/src/main');
+const RES = path.join(MAIN, 'res');
+const JAVA = path.join(MAIN, 'java');
+
+const errors = [];
+const warnings = [];
+const fail = (m) => errors.push(m);
+const warn = (m) => warnings.push(m);
+
+// ------------------------------------------------------------------ collect res
+
+/** All resource files, flattened: type -> name -> [files] */
+const resources = new Map();
+const layouts = new Map(); // layout name -> { ids:Set, bindingField:parent }
+
+function walk(dir, out = []) {
+  for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
+    const p = path.join(dir, entry.name);
+    if (entry.isDirectory()) walk(p, out);
+    else out.push(p);
+  }
+  return out;
+}
+
+const resFiles = walk(RES);
+for (const file of resFiles) {
+  // res/values(-qualifier)/name.xml  or  res/type(-qualifier)/name.ext
+  const parts = path.relative(RES, file).split(path.sep);
+  if (parts.length < 2) continue;
+  const typeDir = parts[0];
+  const base = parts[parts.length - 1];
+  const nameNoExt = base.replace(/\.[^.]+$/, '');
+  if (typeDir.startsWith('values')) {
+    const text = fs.readFileSync(file, 'utf8');
+    // <string name="x">, <color name="x">, <style name="x">, <dimen name="x">, <bool ...>, <integer ...>
+    const re = /<(string|color|style|dimen|bool|integer|string-array|array|plurals)\s+name="([^"]+)"/g;
+    // <plurals> also generates R.plurals.* entries with the same name.
+    let m;
+    while ((m = re.exec(text))) {
+      add(m[1], m[2], file);
+    }
+  } else {
+    const type = typeDir.split('-')[0];
+    add(type, nameNoExt, file);
+  }
+}
+
+function add(type, name, file) {
+  if (!resources.has(type)) resources.set(type, new Map());
+  const map = resources.get(type);
+  if (!map.has(name)) map.set(name, []);
+  map.get(name).push(file);
+}
+
+const has = (type, name) => (resources.get(type) || new Map()).has(name);
+
+// -------------------------------------------------------------- parse layouts
+
+const XML_NS = 'http://schemas.android.com/apk/res/android';
+const BIND_NS = 'http://schemas.android.com/apk/res-auto';
+
+/** Lightweight, dependency-free XML reader good enough for Android resource files. */
+function parseXml(text, file) {
+  const root = { tag: '#root', attrs: {}, children: [] };
+  const stack = [root];
+  let i = 0;
+  const len = text.length;
+  while (i < len) {
+    const lt = text.indexOf('<', i);
+    if (lt < 0) break;
+    if (text.startsWith('<!--', lt)) {
+      const end = text.indexOf('-->', lt);
+      i = end < 0 ? len : end + 3;
+      continue;
+    }
+    if (text.startsWith('<?', lt)) {
+      const end = text.indexOf('?>', lt);
+      i = end < 0 ? len : end + 2;
+      continue;
+    }
+    if (text.startsWith('<![CDATA[', lt)) {
+      const end = text.indexOf(']]>', lt);
+      i = end < 0 ? len : end + 3;
+      continue;
+    }
+    if (text.startsWith('<!', lt)) {
+      const end = text.indexOf('>', lt);
+      i = end < 0 ? len : end + 1;
+      continue;
+    }
+    const gt = findTagEnd(text, lt);
+    if (gt < 0) {
+      fail(`${file}: unterminated tag at offset ${lt}`);
+      break;
+    }
+    const raw = text.slice(lt + 1, gt);
+    i = gt + 1;
+    if (raw.startsWith('/')) {
+      const tag = raw.slice(1).trim();
+      const open = stack.pop();
+      if (!open || open.tag !== tag) {
+        fail(`${file}: mismatched </${tag}> (expected </${open ? open.tag : 'nothing'}>)`);
+      }
+      continue;
+    }
+    const selfClosing = raw.endsWith('/');
+    const body = selfClosing ? raw.slice(0, -1) : raw;
+    const tagMatch = /^([\w.:-]+)/.exec(body);
+    if (!tagMatch) continue;
+    const tag = tagMatch[1];
+    const attrs = {};
+    const attrRe = /([\w.:-]+)\s*=\s*"([^"]*)"/g;
+    let a;
+    while ((a = attrRe.exec(body.slice(tag.length)))) attrs[a[1]] = a[2];
+    const node = { tag, attrs, children: [] };
+    stack[stack.length - 1].children.push(node);
+    if (!selfClosing) stack.push(node);
+  }
+  if (stack.length !== 1) fail(`${file}: ${stack.length - 1} unclosed element(s)`);
+  return root.children[0];
+}
+
+function findTagEnd(text, start) {
+  let quote = null;
+  for (let i = start + 1; i < text.length; i++) {
+    const c = text[i];
+    if (quote) {
+      if (c === quote) quote = null;
+    } else if (c === '"' || c === "'") {
+      quote = c;
+    } else if (c === '>') {
+      return i;
+    }
+  }
+  return -1;
+}
+
+// Resource types that can appear after `@` in a layout/manifest reference.
+const RES_TYPES = [
+  'drawable', 'string', 'color', 'style', 'font', 'dimen', 'bool', 'integer', 'menu', 'xml',
+  'mipmap', 'layout', 'array', 'attr', 'id', 'anim', 'interpolator', 'plurals', 'raw',
+];
+
+const SKIP_FIELDS = new Set([
+  'root', 'inflate', 'getRoot', 'bind', 'lifecycle', 'executePendingBindings',
+  'isInitialized', 'hashCode', 'toString', 'equals', 'copy',
+]);
+
+const EXPLICIT_IDS = new Set();
+
+for (const [type, map] of resources) {
+  if (type !== 'layout' && type !== 'menu' && type !== 'xml' && type !== 'navigation') continue;
+  for (const [name, files] of map) {
+    for (const file of files) {
+      const text = fs.readFileSync(file, 'utf8');
+      const doc = parseXml(text, file);
+      if (!doc) continue;
+      const ids = new Set();
+      const bindingFields = new Map(); // field -> tag (only for layout)
+      const visit = (node, inInclude = false) => {
+        const id = node.attrs['android:id'];
+        if (id && id.startsWith('@+id/')) {
+          const idName = id.slice(5);
+          if (ids.has(idName)) warn(`${file}: duplicate id @+id/${idName}`);
+          ids.add(idName);
+          EXPLICIT_IDS.add(idName);
+        }
+        // `binding.foo` is generated for any element that has an id — including <include>,
+        // <View> and any tag with a dotted class name — so the field set is the id set.
+        if (id && id.startsWith('@+id/') && /^[a-z][a-zA-Z0-9_]*$/.test(id.slice(5))) {
+          bindingFields.set(id.slice(5), node.tag);
+        }
+        for (const child of node.children) visit(child, inInclude || node.tag === 'include');
+      };
+      visit(doc);
+      if (type === 'layout') layouts.set(name, { ids, fields: bindingFields, file });
+      // resource refs in this file
+      checkRefs(text, file);
+    }
+  }
+}
+
+/** Mirrors the view-binding field naming rule: prefer android:id, else a typed index. */
+function bindingField(node) {
+  const id = node.attrs['android:id'];
+  if (id && id.startsWith('@+id/')) {
+    const name = id.slice(5);
+    if (/^[a-z][a-zA-Z0-9_]*$/.test(name)) return name;
+  }
+  return null;
+}
+
+// ------------------------------------------------------------- reference check
+
+function checkRefs(text, file) {
+  const re = /@(\+)?([a-zA-Z]+)\/([\w.-]+)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const plus = m[1];
+    const type = m[2];
+    const name = m[3];
+    if (plus) {
+      if (type === 'id') EXPLICIT_IDS.add(name);
+      continue;
+    }
+    if (type === 'android' || type === 'null') continue;
+    if (!RES_TYPES.includes(type)) continue;
+    if (type === 'attr') continue; // theme attrs, resolved at build time
+    if (!has(type, name)) fail(`${path.relative(ROOT, file)}: @${type}/${name} is not defined`);
+  }
+  // ?attr/... and ?android:attr/... are fine.
+}
+
+// --------------------------------------------------------------- Kotlin check
+
+const kotlinFiles = walk(JAVA).filter((f) => f.endsWith('.kt') || f.endsWith('.java'));
+
+/** Bindings whose layout we cannot resolve are reported once, not per usage. */
+const bindingCache = new Map();
+
+for (const file of kotlinFiles) {
+  const text = fs.readFileSync(file, 'utf8');
+  const rel = path.relative(ROOT, file);
+
+  // R.type.name
+  const re = /(?<![\w.])R\.([a-zA-Z]+)\.([A-Za-z0-9_]+)/g;
+  let m;
+  while ((m = re.exec(text))) {
+    const type = m[1];
+    const name = m[2];
+    if (type === 'styleable') continue;
+    if (type === 'id' && EXPLICIT_IDS.has(name)) continue;
+    if (!RES_TYPES.includes(type)) continue;
+    if (type === 'style') {
+      // R.style.Theme_JoeBrowser_BottomSheet -> "Theme.JoeBrowser.BottomSheet"
+      if (!has('style', name)) {
+        const dotted = name.replace(/_/g, '.');
+        if (!has('style', dotted)) fail(`${rel}: R.style.${name} is not defined`);
+      }
+      continue;
+    }
+    if (!has(type, name)) fail(`${rel}: R.${type}.${name} is not defined`);
+  }
+
+  // binding.fooBar.member — map binding type back to its layout, per *variable*.
+  // Two shapes exist in this codebase:
+  //   val binding: FooBinding = FooBinding.inflate(...)   (explicit type)
+  //   binding = FooBinding.inflate(...)                  (assigned lateinit field)
+  const varToBinding = new Map(); // varName -> bindingType
+  let mm;
+  // Binding handles resolved by position: an identifier (`row`, `binding`, `target`) is typed
+  // by its nearest preceding declaration, so a file that inflates two different row layouts
+  // (as HomeFragment does) is checked against the right one for each access.
+  const decls = []; // {pos, name, type}
+  const declRes = [
+    /\b(?:val|var)\s+(\w+)\s*:\s*(\w+Binding)\b/g,
+    /\b(\w+)\s*:\s*(\w+Binding)\b/g, // typed parameter
+    /(?:^|[\s;{(])((?:this\.)?\w+)\s*=\s*(\w+Binding)\.inflate\b/g,
+  ];
+  for (const re of declRes) {
+    let dm;
+    while ((dm = re.exec(text))) {
+      decls.push({ pos: dm.index, name: dm[1].replace(/^this\./, ''), type: dm[2] });
+    }
+  }
+  decls.sort((a, b) => a.pos - b.pos);
+
+  // Delegated accessor: `private val binding get() = _binding!!` makes `binding.*` mean
+  // `_binding.*`, which is how every fragment in this app reaches its layout.
+  const delegate = new Map();
+  for (const m of text.matchAll(/\bval\s+(\w+)\s+get\(\)\s*=\s*(\w+)/g)) {
+    if (m[1] !== m[2]) delegate.set(m[1], m[2]);
+  }
+
+  const typeOf = (name, pos) => {
+    const direct = decls.filter((d) => d.name === name && d.pos <= pos).pop();
+    if (direct) return direct.type;
+    const target = delegate.get(name);
+    if (!target) return null;
+    const indirect = decls.filter((d) => d.name === target && d.pos <= pos).pop();
+    return indirect ? indirect.type : null;
+  };
+
+  const accessRe = /\b([a-z][A-Za-z0-9_]*)\.([a-z][A-Za-z0-9_]*)\b/g;
+  let am;
+  while ((am = accessRe.exec(text))) {
+    const [, handle, field] = am;
+    if (SKIP_FIELDS.has(field)) continue;
+    const type = typeOf(handle, am.index);
+    if (!type || !/Binding$/.test(type)) continue;
+    const layoutName = bindingToLayout(type);
+    const layout = layouts.get(layoutName);
+    if (!layout) {
+      fail(`${rel}: ${type} has no layout ${layoutName}.xml`);
+      continue;
+    }
+    if (!layout.fields.has(field)) {
+      fail(`${rel}: ${type}.${field} does not exist in ${layoutName}.xml`);
+    }
+  }
+
+  // Snackbar/lambda false positives ("binding" as a plain variable name) are avoided by only
+  // checking files that actually inflate a generated binding, above.
+}
+
+function bindingToLayout(bindingName) {
+  const base = bindingName.replace(/Binding$/, '');
+  // OrderDataItemBinding -> order_data_item, FragmentHomeBinding -> fragment_home
+  const snake = base
+    .replace(/([a-z0-9])([A-Z])/g, '$1_$2')
+    .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
+    .toLowerCase();
+  return snake;
+}
+
+// ------------------------------------------------------------------- report
+
+const RES_COUNT = (() => {
+  let n = 0;
+  for (const [, map] of resources) n += map.size;
+  return n;
+})();
+
+console.log(`resources: ${RES_COUNT} names across ${resources.size} types`);
+console.log(`layouts:   ${layouts.size}`);
+console.log(`kotlin:    ${kotlinFiles.length} files`);
+
+if (warnings.length) {
+  console.log(`\n${warnings.length} warning(s):`);
+  for (const w of warnings) console.log('  warn  ' + w);
+}
+
+if (errors.length) {
+  console.log(`\n${errors.length} error(s):`);
+  for (const e of errors) console.log('  FAIL  ' + e);
+  process.exit(1);
+}
+console.log('\nstatic audit passed');

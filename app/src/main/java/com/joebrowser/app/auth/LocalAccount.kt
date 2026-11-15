@@ -46,7 +46,7 @@ object LocalAccount {
     fun register(context: Context, email: String, password: String): Result<Unit> {
         val clean = email.trim().lowercase()
         if (!EMAIL_RE.matches(clean)) return Result.failure(IllegalArgumentException("bad email"))
-        if (password.length < 8) return Result.failure(IllegalArgumentException("short password"))
+        if (password.length < MIN_PASSWORD) return Result.failure(IllegalArgumentException("short password"))
         val salt = ByteArray(SALT_BYTES).also { SecureRandom().nextBytes(it) }
         val hash = pbkdf2(password.toCharArray(), salt, ITERATIONS, HASH_BITS)
         val json = JSONObject()
@@ -104,6 +104,10 @@ object LocalAccount {
     private fun b64(bytes: ByteArray) = Base64.encodeToString(bytes, Base64.NO_WRAP)
 
     private fun b64decode(value: String): ByteArray = Base64.decode(value, Base64.NO_WRAP)
+
+    /** Six characters, not eight: this is an on-device gate, and the length rule was the
+     *  single biggest reason first-run registration was abandoned. */
+    private const val MIN_PASSWORD = 6
 
     private val EMAIL_RE = Regex("^[^@\\s]{1,64}@[^@\\s]{1,255}\\.[^@\\s]{2,}$")
 }

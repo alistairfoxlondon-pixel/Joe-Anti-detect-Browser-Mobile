@@ -65,6 +65,11 @@
             android:label="@string/history_title" />
 
         <activity
+            android:name=".ui.FingerprintLabActivity"
+            android:exported="false"
+            android:label="@string/lab_title" />
+
+        <activity
             android:name=".ui.LicensesActivity"
             android:exported="false"
             android:label="@string/licenses_title" />

@@ -21,6 +21,7 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_delete">Delete</string>
     <string name="action_edit">Edit</string>
+    <string name="action_more">More actions</string>
     <string name="action_close">Close</string>
     <string name="action_retry">Retry</string>
     <string name="action_back">Back</string>
@@ -43,6 +44,11 @@
 
     <!-- Dashboard -->
     <string name="home_greeting">Joe Browser</string>
+    <string name="home_hero_over">This device</string>
+    <string name="home_hero_last">Last profile</string>
+    <string name="home_hero_idle">Ready</string>
+    <string name="home_hero_first_run">Create a profile to start</string>
+    <string name="home_hero_profiles">%1$d profiles on this device</string>
     <string name="home_metric_profiles">Profiles</string>
     <string name="home_metric_proxies">Proxies</string>
     <string name="home_metric_running">Windows</string>
@@ -78,6 +84,7 @@
     <string name="profiles_count_filtered">%1$d of %2$d</string>
     <string name="profiles_quick_proxy">Switch proxy</string>
     <string name="profiles_new_fingerprint">New fingerprint</string>
+    <string name="profiles_test_fp">Test fingerprint</string>
     <string name="profiles_fingerprint_regenerated">New fingerprint</string>
     <string name="profiles_batch_select">Select for batch action</string>
     <string name="profiles_select_toggle">Select</string>
@@ -197,16 +204,23 @@
     <string name="proxies_alert_rotated">Rotated</string>
 
     <!-- Engines -->
-    <string name="engines_title">Browser engines</string>
-
+    <string name="engines_title">Engines</string>
+    <string name="engines_subtitle_count">%1$d profiles · five engine families</string>
+    <string name="engines_subtitle">Engine families</string>
+    <string name="engines_new_short">New</string>
     <string name="engines_used_by">%1$d in use</string>
-    <string name="engines_unused">Not used</string>
+    <string name="engines_unused">—</string>
 
     
 
     
 
-    <string name="engines_firefox_note">UA only; WebView renders</string>
+    <string name="engines_firefox_note">User-agent only</string>
+
+    <plurals name="engines_profile_count">
+        <item quantity="one">%1$d profile</item>
+        <item quantity="other">%1$d profiles</item>
+    </plurals>
 
     <!-- Tools -->
     <string name="tools_section_proxy_monitor">Proxy monitor</string>
@@ -246,6 +260,14 @@
     <string name="tools_reset">Reset all data</string>
     <string name="tools_reset_title">Reset all data?</string>
     <string name="tools_reset_body">Delete all profiles, proxies and history?</string>
+    <string name="tools_account">Account</string>
+    <string name="tools_account_hint">On this device only</string>
+    <string name="tools_sign_out">Sign out</string>
+    <string name="tools_sign_out_title">Sign out?</string>
+    <string name="tools_sign_out_body">You will need your email and password to get back in.</string>
+    <string name="tools_theme">Theme</string>
+    <string name="tools_export_safe_hint">No passwords</string>
+    <string name="tools_footer">Joe Browser · local only, no telemetry</string>
     <string name="tools_section_about">About</string>
     <string name="tools_version">Version %1$s (%2$s)</string>
     <string name="tools_licenses">Open source licenses</string>
@@ -350,25 +372,43 @@
     <string name="error_no_handler">No app can open this</string>
     <string name="direct">Direct</string>
 
+    <!-- Fingerprint lab -->
+    <string name="lab_title">Fingerprint lab</string>
+    <string name="lab_switch">Switch</string>
+    <string name="lab_no_profile">No profile yet</string>
+    <string name="lab_no_profile_body">Create a profile to test its fingerprint.</string>
+    <string name="lab_local_title">On-device check</string>
+    <string name="lab_score_value">%1$d%%</string>
+    <string name="lab_sites_title">Test on a real site</string>
+    <string name="lab_open_scan">Open BrowserScan</string>
+    <string name="lab_fact_ua">User agent build</string>
+    <string name="lab_fact_screen">Screen</string>
+    <string name="lab_fact_gpu">GPU</string>
+    <string name="lab_fact_tz">Timezone</string>
+    <string name="lab_fact_lang">Language</string>
+    <string name="lab_fact_cores">CPU / RAM</string>
+
     <!-- Account (local only) -->
     <string name="account_title_create">Create account</string>
     <string name="account_title_signin">Welcome back</string>
-    <string name="account_subtitle">Local only — stays on device</string>
+    <string name="account_subtitle">Stored on this device only</string>
     <string name="account_email">Email</string>
     <string name="account_password">Password</string>
     <string name="account_confirm">Confirm password</string>
     <string name="account_create">Create account</string>
     <string name="account_signin">Sign in</string>
     <string name="account_to_signin">Have an account? Sign in</string>
-    <string name="account_to_create">New here? Create one</string>
+    <string name="account_to_create">New here? Create account</string>
     <string name="account_forgot">Forgot password?</string>
     <string name="account_reset_title">Reset local account?</string>
     <string name="account_reset_body">Account only; data stays</string>
     <string name="account_reset">Reset</string>
     <string name="account_error_email">Enter a valid email</string>
-    <string name="account_error_password_short">At least 8 characters</string>
+    <string name="account_error_password_short">At least 6 characters</string>
     <string name="account_error_mismatch">Passwords do not match</string>
     <string name="account_error_credentials">Email or password is wrong</string>
+    <string name="account_error_password_empty">Enter your password</string>
+    <string name="account_error_none">No account yet — create one</string>
     <string name="account_signed_in">Signed in</string>
     <string name="tools_lock_app">Lock app</string>
     <string name="editor_template_applied">Template applied</string>

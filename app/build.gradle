@@ -26,8 +26,8 @@ android {
         applicationId 'com.joebrowser.app'
         minSdk 26
         targetSdk 34
-        versionCode 5
-        versionName '1.4.0'
+        versionCode 6
+        versionName '1.5.0'
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
         vectorDrawables.useSupportLibrary = true
     }
@@ -40,6 +40,13 @@ android {
                 keyAlias releaseKeyAlias
                 keyPassword releaseKeyPass
                 storeType 'PKCS12'
+                // Sign with every scheme the platform will accept. v1 (JAR) matters because
+                // some file managers and older scanners only look at it; v2/v3 are what
+                // Android 7+ actually verifies. An APK missing v1 is a common trigger for
+                // "this file looks unsafe" prompts on Windows transfer tools.
+                enableV1Signing true
+                enableV2Signing true
+                enableV3Signing true
             }
         }
     }
@@ -73,6 +80,16 @@ android {
     lint {
         abortOnError false
         checkReleaseBuilds false
+    }
+
+    applicationVariants.all { variant ->
+        // Deterministic artefact names: what a user downloads should say what it is, and a
+        // signed build should never be called "app-release-unsigned".
+        variant.outputs.all { output ->
+            def version = variant.versionName
+            def suffix = variant.buildType.name == 'debug' ? 'debug' : 'release'
+            outputFileName = "joe-browser-${version}-${suffix}.apk"
+        }
     }
 }
 

@@ -479,6 +479,18 @@ object FingerprintFactory {
         return out
     }
 
+    /**
+     * One-call consistency report for the fingerprint lab: the same checker the editor uses,
+     * packaged with its score and the human-readable findings, so no screen has to re-derive
+     * the penalty rules.
+     */
+    data class Coherence(val score: Int, val issues: List<String>)
+
+    fun coherence(fp: FingerprintConfig, engine: BrowserEngine): Coherence {
+        val warnings = warnings(fp, engine)
+        return Coherence(coherenceScore(warnings), warnings.map { it.message })
+    }
+
     /** 0–100 coherence score for the editor badge (100 = no findings). */
     fun coherenceScore(warnings: List<FingerprintWarning>): Int {
         var penalty = 0
