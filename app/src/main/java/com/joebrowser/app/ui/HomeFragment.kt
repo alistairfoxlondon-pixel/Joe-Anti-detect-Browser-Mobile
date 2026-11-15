@@ -242,7 +242,9 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
     private fun bindAlerts(target: FragmentHomeBinding, alerts: List<MonitorAlert>) {
         val container = target.alertContainer
         container.removeAllViews()
-        target.alertEmpty.visibility = if (alerts.isEmpty()) View.VISIBLE else View.GONE
+        // No alerts: the whole section collapses. Showing an empty card with "No alerts" made
+        // the calm state the loudest thing on the dashboard.
+        target.alertsSection.visibility = if (alerts.isEmpty()) View.GONE else View.VISIBLE
 
         alerts.forEachIndexed { index, alert ->
             val row = ItemAlertBinding.inflate(layoutInflater, container, false)

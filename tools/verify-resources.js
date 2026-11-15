@@ -363,6 +363,38 @@ function bindingToLayout(bindingName) {
   return snake;
 }
 
+// --------------------------------------------------------------- dead copy check
+
+/**
+ * Every declared string must be used somewhere. Dead keys were what made the copy "diet" in 1.4.0
+ * unverifiable — the numbers went down only because nobody could tell which keys were live.
+ * This runs as a warning, not an error: a string added for a screen still in progress is legal,
+ * but the count is printed so it cannot grow silently.
+ */
+{
+  const declared = [];
+  for (const file of walk(path.join(RES, 'values')).filter((f) => f.endsWith('.xml'))) {
+    for (const m of fs.readFileSync(file, 'utf8')
+      .matchAll(/<string\s+name="([\w.]+)"/g)) declared.push(m[1]);
+  }
+  const used = new Set();
+  const sources = [
+    ...walk(path.join(RES)).filter((f) => f.endsWith('.xml')),
+    ...walk(JAVA).filter((f) => f.endsWith('.kt') || f.endsWith('.java')),
+    path.join(MAIN, 'AndroidManifest.xml'),
+  ].filter((f) => !f.includes('/values/'));
+  for (const file of sources) {
+    const text = fs.readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/@string\/([\w.]+)/g)) used.add(m[1]);
+    for (const m of text.matchAll(/R\.string\.([\w.]+)/g)) used.add(m[1]);
+  }
+  const dead = declared.filter((k) => !used.has(k));
+  if (dead.length) {
+    warn(`${dead.length} unused string(s): ${dead.slice(0, 8).join(', ')}${dead.length > 8 ? '…' : ''}`);
+  }
+  console.log(`strings:   ${declared.length} declared, ${dead.length} unused`);
+}
+
 // --------------------------------------------------------- single-colour policy
 
 /**

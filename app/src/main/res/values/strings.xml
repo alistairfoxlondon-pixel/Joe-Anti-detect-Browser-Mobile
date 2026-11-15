@@ -47,10 +47,10 @@
     <string name="home_hero_first_run">Create your first profile</string>
     <string name="home_metric_alerts">Alerts</string>
     <string name="home_metric_proxies">Proxies</string>
+    <string name="home_empty_recent_action">Create your first profile</string>
     <string name="home_section_recent">Recent</string>
     <string name="home_section_alerts">Alerts</string>
 
-    <string name="home_empty_alerts">No alerts</string>
     <string name="home_kernel_isolated">Isolated</string>
     <string name="home_kernel_shared">Shared storage</string>
     <string name="home_kernel_docstart">Early injection</string>

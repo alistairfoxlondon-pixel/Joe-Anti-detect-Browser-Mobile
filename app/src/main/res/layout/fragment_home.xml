@@ -215,19 +215,24 @@
                     android:layout_height="wrap_content"
                     android:background="?attr/selectableItemBackground"
                     android:clickable="true"
+                    android:drawablePadding="8dp"
                     android:focusable="true"
                     android:padding="18dp"
-                    android:text="@string/profiles_empty_title" />
+                    android:text="@string/home_empty_recent_action"
+                    android:textColor="@color/accent"
+                    app:drawableStartCompat="@drawable/ic_plus" />
             </LinearLayout>
         </LinearLayout>
 
-        <!-- ============================================================ alerts -->
+        <!-- Hidden entirely when there are no alerts: an empty card that only says "No alerts"
+             costs a scroll and tells the user nothing. -->
         <LinearLayout
             android:id="@+id/alertsSection"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/gap_m"
-            android:orientation="vertical">
+            android:orientation="vertical"
+            android:visibility="gone">
 
             <include
                 android:id="@+id/alertsHeader"
@@ -239,14 +244,7 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
 
-            <TextView
-                android:id="@+id/alertEmpty"
-                style="@style/Text.Jb.Caption"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:background="@drawable/bg_card"
-                android:padding="16dp"
-                android:text="@string/home_empty_alerts" />
+
         </LinearLayout>
 
     </LinearLayout>
