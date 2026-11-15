@@ -326,6 +326,37 @@ check('languages array is frozen', Object.isFrozen(nav.languages), true);
 
 // ------------------------------------------------------- identity coherence
 // ----------------------------------------------------------- geolocation
+// ------------------------------------------------------------- time zone
+console.log('\ntimezone spoofing');
+
+function tzHarness(zone) {
+  const c = sampleConfig({ timezone: zone });
+  const e = run(build(c), makeEnvironment(c));
+  const probe = (iso) => {
+    const d = new Date(iso);
+    return { offset: d.getTimezoneOffset(), string: d.toString(), iso: d.toISOString() };
+  };
+  return { env: e, probe };
+}
+
+const berlin = tzHarness('Europe/Berlin');
+const winter = berlin.probe('2024-01-15T12:00:00Z');
+const summer = berlin.probe('2024-07-15T12:00:00Z');
+// getTimezoneOffset returns minutes BEHIND UTC, so Berlin is -60 in winter and -120 in summer.
+check('winter offset matches Europe/Berlin', winter.offset, -60);
+check('summer offset follows daylight saving', summer.offset, -120);
+check('offsets are not a frozen constant', winter.offset !== summer.offset, true);
+check('resolvedOptions reports the profile zone',
+  berlin.env.Intl.DateTimeFormat().resolvedOptions().timeZone, 'Europe/Berlin');
+
+const tokyo = tzHarness('Asia/Tokyo');
+check('Tokyo has no daylight saving', tokyo.probe('2024-01-15T12:00:00Z').offset, -540);
+check('Tokyo offset is the same in summer', tokyo.probe('2024-07-15T12:00:00Z').offset, -540);
+
+const ny = tzHarness('America/New_York');
+check('New York winter offset', ny.probe('2024-01-15T12:00:00Z').offset, 300);
+check('New York summer offset (EDT)', ny.probe('2024-07-15T12:00:00Z').offset, 240);
+
 console.log('\ngeolocation');
 
 function geoResult(overrides) {

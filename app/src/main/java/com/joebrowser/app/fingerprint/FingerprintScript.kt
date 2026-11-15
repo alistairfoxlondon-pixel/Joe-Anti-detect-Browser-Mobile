@@ -689,7 +689,14 @@ __PATCH_HELPERS__
         var asUTC = tzParts(this);
         if (asUTC == null) { return originalOffset.apply(this, arguments); }
         var utc = Math.floor(t / 1000) * 1000;
-        return Math.round((asUTC - utc) / 60000);
+        /*
+         * getTimezoneOffset() is defined as (UTC - local) in minutes, so a zone ahead of UTC
+         * reports a negative number: Europe/Berlin is -60 in winter and -120 in summer.
+         * Returning (local - UTC) inverted the sign for every positive-offset zone - the spoof
+         * said a Berlin profile was 60 minutes *behind* UTC, which no browser ever reports and
+         * any timezone probe flags immediately.
+         */
+        return Math.round((utc - asUTC) / 60000);
       };
     });
     if (window.Intl && Intl.DateTimeFormat) {
