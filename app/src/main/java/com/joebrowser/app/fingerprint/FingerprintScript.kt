@@ -110,10 +110,16 @@ object FingerprintScript {
 
     fun build(fp: FingerprintConfig, engine: BrowserEngine, unlockSelection: Boolean): String {
         val brand = engine.id
-        val chromeLike = engine != BrowserEngine.FIREFOX &&
+        val isIos = fp.os == "iPhone" || fp.os == "iPad"
+        val chromeLike = engine != BrowserEngine.FIREFOX && !isIos &&
             (fp.os == "Android" || fp.os == "Windows 11" || fp.os == "Windows 10" ||
                 fp.os == "macOS" || fp.os == "Linux")
-        val isIos = fp.os == "iPhone" || fp.os == "iPad"
+        // An iOS identity means Safari's engine (WebKit), never Chrome/Firefox: iOS browsers are
+        // all WebKit shells, and WebKit exposes neither navigator.userAgentData nor
+        // navigator.deviceMemory. Treating iOS as Chrome-like was a self-contradiction that any
+        // half-decent probe could read straight off the page.
+        val safariLike = isIos
+        
         val vendor = when {
             engine == BrowserEngine.FIREFOX -> ""
             isIos -> "Apple Computer, Inc."
@@ -184,9 +190,23 @@ object FingerprintScript {
             put("isDesktop", fp.deviceType == "desktop")
             put("chromeLike", chromeLike)
             put("isFirefox", engine == BrowserEngine.FIREFOX)
+            put("isIos", isIos)
+            put("safariLike", safariLike)
             put("pdfViewer", chromeLike)
             put("unlockSelection", unlockSelection)
             put("brands", brands)
+            // Model/platform-version tokens for getHighEntropyValues: they must describe the
+            // identity's platform, not this device. An Android identity reporting 'Pixel 9' on a
+            // Mac profile (or a fixed 15.0.0 on macOS) is a contradiction a probe can read.
+            put("androidModel", if (fp.os == "Android") fp.deviceModel else "")
+            put("platformVersion", when (fp.os) {
+                "Windows 11" -> "15.0.0"
+                "Windows 10" -> "10.0.0"
+                "macOS" -> "14.5.0"
+                "Linux" -> ""
+                "Android" -> fp.androidVersion.takeIf { it.isNotBlank() && it != "auto" } ?: ""
+                else -> ""
+            })
             put("isMobile", fp.deviceType == "mobile")
         }
 
@@ -475,7 +495,13 @@ __PATCH_HELPERS__
     } catch (e) {}
     patchGetter(nav, 'cookieEnabled', function () { return true; });
     patchGetter(nav, 'doNotTrack', function () { return JB.doNotTrack ? '1' : null; });
-    patchGetter(nav, 'pdfViewerEnabled', function () { return !!JB.pdfViewer; });
+    // WebKit (Safari/iOS) does expose this flag and it is true there; Chromium exposes it too.
+    // Only Firefox lacks it, which is handled by the hide-it block below.
+    patchGetter(nav, 'pdfViewerEnabled', function () {
+      if (JB.isFirefox) return undefined;
+      if (JB.safariLike) return true;
+      return !!JB.pdfViewer;
+    });
     patchGetter(nav, 'appCodeName', function () { return 'Mozilla'; });
     patchGetter(nav, 'appName', function () { return 'Netscape'; });
     patchGetter(nav, 'product', function () { return 'Gecko'; });
@@ -489,7 +515,7 @@ __PATCH_HELPERS__
           platform: JB.platform === 'Win32' ? 'Windows' :
                     JB.platform === 'MacIntel' ? 'macOS' :
                     JB.platform === 'iPhone' || JB.platform === 'iPad' ? 'iOS' :
-                    JB.platform === 'Linux armv81' ? 'Android' : 'Linux',
+                    JB.isMobile ? 'Android' : 'Linux',
           getHighEntropyValues: function (hints) {
             return Promise.resolve({
               architecture: JB.platform === 'Linux armv81' ? 'arm' : 'x86',
@@ -499,9 +525,9 @@ __PATCH_HELPERS__
                 return { brand: b.brand, version: b.version + '.0.0.0' };
               }),
               mobile: this.mobile,
-              model: JB.isMobile ? 'Pixel 9' : '',
+              model: JB.androidModel || '',
               platform: this.platform,
-              platformVersion: JB.isMobile ? '15.0.0' : '10.0.0',
+              platformVersion: JB.platformVersion || '',
               uaFullVersion: JB.ua.indexOf('Firefox') >= 0 ? '' : majorVersion(),
               wow64: false
             });
@@ -559,6 +585,37 @@ __PATCH_HELPERS__
         var emptyPlugins = { length: 0, item: function () { return null; }, namedItem: function () { return null; }, refresh: function () {} };
         patchGetter(nav, 'plugins', function () { return emptyPlugins; });
         patchGetter(nav, 'mimeTypes', function () { return emptyPlugins; });
+      } catch (e) {}
+    }
+
+    /*
+     * Surfaces a WebKit browser does not have.
+     *
+     * A page can check for these in one line, so leaving them present under an iPhone/iPad
+     * identity (or under a Firefox identity) contradicts the user agent the page was served.
+     * Hiding them is not "emulating Safari" — the app never claims to render with WebKit — but it
+     * does stop the identity from refuting itself.
+     */
+    if (JB.safariLike || JB.isFirefox) {
+      ['userAgentData', 'deviceMemory', 'connection'].forEach(function (prop) {
+        try {
+          if (prop in navigator || Object.getOwnPropertyDescriptor(window.Navigator.prototype, prop)) {
+            Object.defineProperty(window.Navigator.prototype, prop, {
+              get: function () { return undefined; }, configurable: true, enumerable: false
+            });
+            Object.defineProperty(navigator, prop, {
+              get: function () { return undefined; }, configurable: true, enumerable: false
+            });
+          }
+        } catch (e) {}
+      });
+    }
+    // Firefox exposes neither the Chromium UA-Data API nor WebKit's pdfViewerEnabled flag.
+    if (JB.isFirefox) {
+      try {
+        Object.defineProperty(navigator, 'pdfViewerEnabled', {
+          get: function () { return undefined; }, configurable: true, enumerable: false
+        });
       } catch (e) {}
     }
 

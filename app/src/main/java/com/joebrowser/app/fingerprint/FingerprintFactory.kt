@@ -222,7 +222,8 @@ object FingerprintFactory {
         "Windows 11", "Windows 10" -> "Win32"
         "macOS" -> "MacIntel"
         "Linux" -> "Linux x86_64"
-        "Android" -> "Linux armv81"
+        // What Blink actually reports on Android. 'armv81' is not a value any browser emits.
+        "Android" -> "Linux armv8l"
         "iPhone" -> "iPhone"
         "iPad" -> "iPad"
         else -> "Win32"

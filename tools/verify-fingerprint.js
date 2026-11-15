@@ -302,6 +302,59 @@ console.log('\nstability');
 check('userAgent stable on repeat read', nav.userAgent === cfg.ua, true);
 check('languages array is frozen', Object.isFrozen(nav.languages), true);
 
+// ------------------------------------------------------- identity coherence
+console.log('\nidentity coherence');
+
+function identity(overrides) {
+  const c = sampleConfig(overrides);
+  const e = run(build(c), makeEnvironment(c));
+  return { cfg: c, env: e, nav: e.navigator };
+}
+
+// An iPhone profile: Safari's engine, so no Chromium surfaces.
+const ios = identity({
+  os: 'iPhone', deviceType: 'mobile', platform: 'iPhone', vendor: 'Apple Computer, Inc.',
+  ua: 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_3 like Mac OS X) AppleWebKit/605.1.15 ' +
+      '(KHTML, like Gecko) Version/18.3 Mobile/15E148 Safari/604.1',
+  chromeLike: false, safariLike: true, isIos: true, isFirefox: false, pdfViewer: false,
+  brands: [], language: 'en-US', languages: ['en-US', 'en']
+});
+check('iOS: UA says iPhone', /iPhone/.test(ios.nav.userAgent), true);
+check('iOS: platform', ios.nav.platform, 'iPhone');
+check('iOS: vendor', ios.nav.vendor, 'Apple Computer, Inc.');
+check('iOS: no navigator.userAgentData', ios.nav.userAgentData, 'undefined');
+check('iOS: no navigator.deviceMemory', ios.nav.deviceMemory, 'undefined');
+check('iOS: no navigator.connection', ios.nav.connection, 'undefined');
+check('iOS: pdfViewerEnabled is true (WebKit has it)', ios.nav.pdfViewerEnabled, 'true');
+
+// A Firefox profile: Gecko has no UA-Data, no deviceMemory, no WebKit pdf flag.
+const ff = identity({
+  os: 'Windows 11', deviceType: 'desktop', platform: 'Win32', vendor: '',
+  ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:134.0) Gecko/20100101 Firefox/134.0',
+  chromeLike: false, safariLike: false, isIos: false, isFirefox: true, pdfViewer: false,
+  brands: [], language: 'en-US', languages: ['en-US', 'en']
+});
+check('Firefox: UA says Firefox', /Firefox\/134/.test(ff.nav.userAgent), true);
+check('Firefox: no navigator.userAgentData', ff.nav.userAgentData, 'undefined');
+check('Firefox: no navigator.deviceMemory', ff.nav.deviceMemory, 'undefined');
+check('Firefox: no pdfViewerEnabled', ff.nav.pdfViewerEnabled, 'undefined');
+
+// A Windows Chrome profile: Chromium surfaces stay and describe the desktop.
+const win = identity({
+  os: 'Windows 11', deviceType: 'desktop', platform: 'Win32', vendor: 'Google Inc.',
+  ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
+      'Chrome/134.0.6998.89 Safari/537.36',
+  chromeLike: true, safariLike: false, isIos: false, isFirefox: false, pdfViewer: true,
+  language: 'en-US', languages: ['en-US', 'en']
+});
+check('Chrome/Windows: deviceMemory present', win.nav.deviceMemory, 8);
+check('Chrome/Windows: pdfViewerEnabled true', win.nav.pdfViewerEnabled, 'true');
+
+// An Android profile: the platform token Blink really reports.
+const android = identity({ platform: 'Linux armv8l' });
+check('Android: platform is the Blink value', android.nav.platform, 'Linux armv8l');
+check('Android: not the bogus armv81', android.nav.platform === 'Linux armv81', false);
+
 console.log('\nper-profile separation');
 check('cores differ per profile', otherEnv.navigator.hardwareConcurrency, otherCfg.cores);
 check('locale differs per profile', otherEnv.navigator.language, otherCfg.language);
