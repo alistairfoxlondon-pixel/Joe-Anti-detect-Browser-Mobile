@@ -1,5 +1,7 @@
 package com.joebrowser.app.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Bundle
@@ -10,6 +12,7 @@ import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.HumanPaste
 import com.joebrowser.app.core.Async
@@ -86,6 +89,17 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
     private var _binding: FragmentToolsBinding? = null
     private val binding get() = _binding!!
 
+    /**
+     * The monitor status line, the trash figure and the storage totals are live values. Without
+     * this the status line only moved when the tab was reopened or a setting was toggled here.
+     */
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            val action = intent?.action ?: return
+            if (action in TRACKED_ACTIONS) refresh()
+        }
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentToolsBinding.inflate(inflater, container, false)
         return binding.root
@@ -99,6 +113,16 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         bindData()
         bindAbout()
         refresh()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppEvents.register(requireContext().applicationContext, receiver, TRACKED_ACTIONS)
+    }
+
+    override fun onStop() {
+        AppEvents.unregister(requireContext().applicationContext, receiver)
+        super.onStop()
     }
 
     override fun onResume() {
@@ -377,5 +401,13 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         persistStartUrl()
         _binding = null
         super.onDestroyView()
+    }
+
+    companion object {
+        private val TRACKED_ACTIONS = listOf(
+            AppEvents.ACTION_DATA_CHANGED,
+            AppEvents.ACTION_PROXY_STATE,
+            AppEvents.ACTION_MONITOR_ALERT
+        )
     }
 }

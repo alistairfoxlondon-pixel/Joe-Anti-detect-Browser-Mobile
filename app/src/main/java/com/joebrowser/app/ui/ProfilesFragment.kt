@@ -56,7 +56,9 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
-            if (intent?.action == AppEvents.ACTION_DATA_CHANGED) refresh()
+            // Each row carries a live proxy dot, so proxy-state changes belong here too.
+            val action = intent?.action ?: return
+            if (action in TRACKED_ACTIONS) refresh()
         }
     }
 
@@ -87,7 +89,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
     override fun onStart() {
         super.onStart()
-        AppEvents.register(requireContext().applicationContext, receiver, listOf(AppEvents.ACTION_DATA_CHANGED))
+        AppEvents.register(requireContext().applicationContext, receiver, TRACKED_ACTIONS)
     }
 
     override fun onStop() {
@@ -379,6 +381,12 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     }
 
     companion object {
+        private val TRACKED_ACTIONS = listOf(
+            AppEvents.ACTION_DATA_CHANGED,
+            AppEvents.ACTION_PROXY_STATE,
+            AppEvents.ACTION_MONITOR_ALERT
+        )
+
         private const val ACTION_EDIT = 101
         private const val ACTION_DUPLICATE = 102
         private const val ACTION_CLEAR = 103

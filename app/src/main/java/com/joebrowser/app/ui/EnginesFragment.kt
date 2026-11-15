@@ -1,5 +1,8 @@
 package com.joebrowser.app.ui
 
+import android.content.BroadcastReceiver
+import android.content.Context
+import android.content.Intent
 import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.os.Bundle
@@ -12,6 +15,7 @@ import android.widget.TextView
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.button.MaterialButton
+import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
 import com.joebrowser.app.data.BrowserEngine
 import com.joebrowser.app.data.ProfileRepository
@@ -31,6 +35,17 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
     private val binding get() = _binding!!
     private var usage: Map<BrowserEngine, Int> = emptyMap()
 
+    /**
+     * The usage badges say how many profiles run each engine, so this screen has to react when
+     * a profile is created, edited or deleted elsewhere — otherwise it kept the count it read
+     * when the tab was first opened.
+     */
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            if (intent?.action == AppEvents.ACTION_DATA_CHANGED) refresh()
+        }
+    }
+
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentEnginesBinding.inflate(inflater, container, false)
         return binding.root
@@ -38,14 +53,16 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         render()
+    }
 
-        ProfileRepository.profiles(requireContext().applicationContext) { profiles ->
-            if (_binding == null) return@profiles
-            usage = BrowserEngine.entries.associateWith { engine ->
-                profiles.count { it.engine == engine }
-            }
-            render()
-        }
+    override fun onStart() {
+        super.onStart()
+        AppEvents.register(requireContext().applicationContext, receiver, listOf(AppEvents.ACTION_DATA_CHANGED))
+    }
+
+    override fun onStop() {
+        AppEvents.unregister(requireContext().applicationContext, receiver)
+        super.onStop()
     }
 
     override fun onResume() {
