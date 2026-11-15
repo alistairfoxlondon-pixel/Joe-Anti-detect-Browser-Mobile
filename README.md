@@ -24,7 +24,8 @@ No account. No cloud. No telemetry. Everything lives on the device.
 | **Proxy library** | Paste-import (`host:port`, `scheme://user:pass@host:port`, `host:port:user:pass`, etc.), live checks (exit IP, latency, geo), watchlists with **offline / recovered / exit-IP-rotated** notifications (special-use foreground service, stops itself when nothing is watched). |
 | **Paste as Human** | Types clipboard content with human timing (Relaxed/Natural/Fast/Instant) into any focused field — no extension needed. |
 | **Session wipe** | Optional per profile: cookies, site data and cache are erased when the session ends, so the next launch starts signed out. History is kept — the History screen has its own per-profile clear. |
-| **HTTP Tracker** | Native request counter + known-tracker-host heuristic; badge + per-session report sheet (a real `RecyclerView`, so a 3000-request page scrolls), copyable as text. |
+| **HTTP Tracker** | Native request counter + known-tracker-host heuristic. The chrome badge shows the live `N req · M trk` total and opens the per-session report sheet (a real `RecyclerView`, so a 3000-request page scrolls). The sheet's summary uses the monitor's true totals, not the 150 rows it can display, and the copied text report says when the list was truncated. |
+| **Live identity** | Editing a saved profile's identity refreshes the open tab on return: the kernel swaps the document-start script (the WebView has no replace, so the old rule is removed first) and reloads only when the rebuilt payload actually differs. |
 | **Engines tab** | Catalogue of the five identity families (Chrome, Chromium, Brave, Edge, Firefox) with the pinned build list each profile can take, how many profiles already use it, and a one-tap "create profile with this engine" action. |
 | **Tools tab** | Every real setting in one place: background monitor on/off + cadence, human-typing defaults and rhythm, default start page, history/tracker/selection switches, theme, trash, storage use, JSON backup (with or without passwords) and a full reset. |
 | **History & trash** | Per-profile history (capped), soft-delete "trash" for profiles with empty-trash in the Tools tab. |
@@ -103,13 +104,13 @@ Being straight about what was and wasn't tested:
   every push; the workflow is the gate, not a local run.
 - ✅ **Resource linking** — every layout, drawable, string, dimen and theme referenced from XML or
   `R.*` resolves (the build fails otherwise).
-- ✅ **Static audit** — view-binding ids cross-checked against their layouts, internal imports and
-  cross-class member calls verified, no `TODO`/stub paths left in `app/src/main`.
 - ✅ **Fingerprint layer executed, not just compiled** — `node tools/verify-fingerprint.js` runs in
   CI on every push: it extracts the real script from `FingerprintScript.kt`, injects it into a
   Blink-shaped mock (values as prototype getters, `webdriver` as an own property) and asserts
   the resulting `navigator`, `screen`, timezone and canvas output, plus that two profiles never
-  collide.
+  collide. 66 assertions, including the timezone-offset sign (Berlin is −60 in winter, −120 in
+  summer), the `Intl` zone name, and geolocation permission modes (custom coordinates, the
+  `0,0`/out-of-range rejection, and `block`).
 - ✅ **Human-typing engine executed** — `node tools/test-human-paste.js` runs the real injected
   script against a DOM mock: caret insertion, selection replacement, keydown/input/keyup per
   character, real timers, the busy guard, `no-target`, and newline handling in inputs vs textareas.
@@ -117,13 +118,20 @@ Being straight about what was and wasn't tested:
   (7 OSes × 5 engines × their builds) and checks for the tells that have actually shipped here:
   no desktop Chromium build on an iOS identity, no Gecko token in a WebKit UA, no iOS token on a
   Windows profile, and platform strings that match the UA (`Linux armv8l`, not the invented `armv81`).
-- ✅ **Tracker classifier executed** — `node tools/test-trackers.js` reads the blocklist out of
-  `TrackerMonitor.kt` and checks both directions (12 tracker hosts flagged, 11 non-trackers left
-  alone, including the `notdoubleclick.net` lookalike).
+- ✅ **Tracker classifier and counters executed** — `node tools/test-trackers.js` reads the
+  blocklist out of `TrackerMonitor.kt` and checks both directions (12 tracker hosts flagged, 11
+  non-trackers left alone, including the `notdoubleclick.net` lookalike). It also ports
+  `record`/`snapshot`/`totals`, feeds 210 requests across 200 hosts through them, and asserts the
+  row list stays capped at 150 while the summary and badge read the true totals — the bug that
+  once made the sheet disagree with the badge on the same screen. 48 checks.
 - ✅ **Proxy relay exercised end to end** — `node tools/test-relay.js` runs a faithful port of
   `LocalProxyRelay` against real loopback sockets: plain HTTP must reach the proxy in absolute
   form with credentials, CONNECT tunnels must deliver a 512 KB body byte-exact, bad credentials
   must fail with 502 (never a direct fallback), and host/port parsing must reject nonsense.
+- ✅ **Static audit (re-run after every change)** — view-binding ids cross-checked against their
+  layouts, internal imports and cross-class member calls verified, every menu item handled, and
+  unreferenced members removed rather than left looking like an API. The five harnesses above
+  are the executable part; anything they do not cover is listed honestly below.
 - ❌ **Not run on a device/emulator yet** — no instrumented UI test has been executed. First-run
   flows (WebView `MULTI_PROFILE` bucket binding, document-start injection, proxy relay CONNECT,
   tracker sheet, downloads, file chooser, fullscreen video) are implemented but untested at

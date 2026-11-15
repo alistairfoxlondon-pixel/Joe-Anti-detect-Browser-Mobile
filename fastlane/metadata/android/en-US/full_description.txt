@@ -13,7 +13,7 @@ PROXY LIBRARY
 
 EVERYDAY TOOLS
 • Paste as Human: types clipboard text with human timing into any field
-• Built-in tracker counter: see which requests and known trackers each page fires
+• Built-in tracker counter: the toolbar shows how many requests each page fires and how many reach known tracker hosts, and taps through to the full per-host list
 • History with search, per-profile filters and soft-delete trash; JSON backup export and restore (with or without passwords)
 • One-tap fingerprint checks that open BrowserScan, IPHey, PixelScan, IPFighter or Whoer inside the profile, so the site sees the profile's identity and not your device
 • Engines tab to see which identity families and browser builds each profile can use, and Tools tab for every setting in one place
