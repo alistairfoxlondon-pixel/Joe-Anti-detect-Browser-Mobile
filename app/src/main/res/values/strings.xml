@@ -384,6 +384,10 @@
     <string name="account_create">Create account</string>
     <string name="account_signin">Sign in</string>
     <string name="account_forgot">Forgot password?</string>
+    <string name="account_change_password">Change password</string>
+    <string name="account_current_password">Current password</string>
+    <string name="account_new_password">New password</string>
+    <string name="account_password_changed">Password changed</string>
     <string name="account_reset_title">Reset local account?</string>
     <string name="account_reset_body">Account only; data stays</string>
     <string name="account_reset">Reset</string>

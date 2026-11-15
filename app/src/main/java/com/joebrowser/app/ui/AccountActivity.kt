@@ -45,13 +45,23 @@ class AccountActivity : AppCompatActivity() {
         binding.modeSignIn.setOnClickListener { switchMode(register = false) }
         binding.modeCreate.setOnClickListener { switchMode(register = true) }
 
-        binding.forgotPassword.setOnClickListener { confirmReset() }
+        binding.forgotPassword.setOnClickListener { showPasswordOptions() }
         binding.submitButton.setOnClickListener { submit() }
 
-        listOf(binding.emailInput, binding.passwordInput, binding.confirmInput).forEach { field ->
+        listOf(binding.emailLayout, binding.passwordLayout, binding.confirmLayout).forEach { fieldLayout ->
+            val field = when (fieldLayout) {
+                binding.emailLayout -> binding.emailInput
+                binding.passwordLayout -> binding.passwordInput
+                else -> binding.confirmInput
+            }
             field.addTextChangedListener(object : TextWatcher {
                 override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
-                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) = clearError()
+                override fun onTextChanged(s: CharSequence?, start: Int, before: Int, count: Int) {
+                    // Clear both the banner and the field error: leaving a red outline on a
+                    // field the user is already fixing reads as a second, stale failure.
+                    fieldLayout.error = null
+                    clearError()
+                }
                 override fun afterTextChanged(s: Editable?) {}
             })
         }
@@ -114,6 +124,13 @@ class AccountActivity : AppCompatActivity() {
         binding.accountError.visibility = View.VISIBLE
     }
 
+    /** Banner + field-level error together, so it is obvious which field needs attention. */
+    private fun showFieldError(messageRes: Int, layout: com.google.android.material.textfield.TextInputLayout) {
+        showError(messageRes)
+        layout.error = getString(messageRes)
+        layout.requestFocus()
+    }
+
     private fun submit() {
         val email = binding.emailInput.text?.toString()?.trim().orEmpty()
         val password = binding.passwordInput.text?.toString().orEmpty()
@@ -121,15 +138,21 @@ class AccountActivity : AppCompatActivity() {
         val outcome = if (registerMode) {
             val confirm = binding.confirmInput.text?.toString().orEmpty()
             when {
-                !isEmail(email) -> { showError(R.string.account_error_email); return }
-                password.length < MIN_PASSWORD -> { showError(R.string.account_error_password_short); return }
-                password != confirm -> { showError(R.string.account_error_mismatch); return }
+                !isEmail(email) -> { showFieldError(R.string.account_error_email, binding.emailLayout); return }
+                password.length < MIN_PASSWORD -> {
+                    showFieldError(R.string.account_error_password_short, binding.passwordLayout); return
+                }
+                password != confirm -> {
+                    showFieldError(R.string.account_error_mismatch, binding.confirmLayout); return
+                }
                 else -> LocalAccount.register(this, email, password)
             }
         } else {
             when {
-                !isEmail(email) -> { showError(R.string.account_error_email); return }
-                password.isEmpty() -> { showError(R.string.account_error_password_empty); return }
+                !isEmail(email) -> { showFieldError(R.string.account_error_email, binding.emailLayout); return }
+                password.isEmpty() -> {
+                    showFieldError(R.string.account_error_password_empty, binding.passwordLayout); return
+                }
                 else -> LocalAccount.signIn(this, email, password)
             }
         }
@@ -149,6 +172,60 @@ class AccountActivity : AppCompatActivity() {
 
     private fun isEmail(value: String): Boolean =
         value.length in 5..254 && EMAIL.matches(value)
+
+    /**
+     * Forgot-password sheet: change the password (keeping the account and every profile) or
+     * reset the account outright. PBKDF2 is one-way, so a forgotten password genuinely cannot be
+     * recovered — the honest choice is between changing it while unlocked and starting over.
+     */
+    private fun showPasswordOptions() {
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.account_forgot)
+            .setItems(
+                arrayOf(
+                    getString(R.string.account_change_password),
+                    getString(R.string.account_reset)
+                )
+            ) { _, which ->
+                if (which == 0) showChangePassword() else confirmReset()
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
+    }
+
+    private fun showChangePassword() {
+        val sheet = com.joebrowser.app.databinding.SheetChangePasswordBinding.inflate(layoutInflater)
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setView(sheet.root)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.action_save, null)
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(android.app.AlertDialog.BUTTON_POSITIVE).setOnClickListener {
+                val current = sheet.currentPasswordInput.text?.toString().orEmpty()
+                val next = sheet.newPasswordInput.text?.toString().orEmpty()
+                val again = sheet.confirmPasswordInput.text?.toString().orEmpty()
+                when {
+                    current.isEmpty() -> {
+                        sheet.currentLayout.error = getString(R.string.account_error_password_empty); return@setOnClickListener
+                    }
+                    next.length < MIN_PASSWORD -> {
+                        sheet.newLayout.error = getString(R.string.account_error_password_short); return@setOnClickListener
+                    }
+                    next != again -> {
+                        sheet.confirmLayout.error = getString(R.string.account_error_mismatch); return@setOnClickListener
+                    }
+                }
+                LocalAccount.changePassword(this, current, next)
+                    .onSuccess {
+                        Toast.makeText(this, R.string.account_password_changed, Toast.LENGTH_SHORT).show()
+                        dialog.dismiss()
+                    }
+                    .onFailure { sheet.currentLayout.error = getString(R.string.account_error_credentials) }
+            }
+        }
+        dialog.show()
+    }
 
     private fun confirmReset() {
         MaterialAlertDialogBuilder(this)

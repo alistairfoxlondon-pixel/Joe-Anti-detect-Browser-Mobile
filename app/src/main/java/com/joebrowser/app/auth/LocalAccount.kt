@@ -80,6 +80,44 @@ object LocalAccount {
         }
     }
 
+    /**
+     * Changes the password of the current local account, keeping the same email and all data.
+     *
+     * PBKDF2 is one-way by design, so "forgot password" cannot recover the old secret — but a
+     * user who is already unlocked and remembers the current password must not have to nuke the
+     * account and re-register. A fresh salt is generated, so a re-used password still hashes
+     * differently and old hashes cannot be replayed against the new record.
+     */
+    fun changePassword(
+        context: Context,
+        currentPassword: String,
+        newPassword: String
+    ): Result<Unit> {
+        val rec = record(context) ?: return Result.failure(IllegalStateException("no account"))
+        if (!unlocked) return Result.failure(IllegalStateException("locked"))
+        if (newPassword.length < MIN_PASSWORD) {
+            return Result.failure(IllegalArgumentException("short password"))
+        }
+        val salt = b64decode(rec.optString("salt"))
+        val iterations = rec.optInt("iterations", ITERATIONS)
+        val expected = b64decode(rec.optString("hash"))
+        val actual = pbkdf2(currentPassword.toCharArray(), salt, iterations, expected.size * 8)
+        if (!MessageDigest.isEqual(expected, actual)) {
+            return Result.failure(IllegalArgumentException("bad credentials"))
+        }
+        val newSalt = ByteArray(SALT_BYTES).also { SecureRandom().nextBytes(it) }
+        val newHash = pbkdf2(newPassword.toCharArray(), newSalt, ITERATIONS, HASH_BITS)
+        val json = JSONObject(rec.toString())
+            .put("v", 1)
+            .put("salt", b64(newSalt))
+            .put("iterations", ITERATIONS)
+            .put("hash", b64(newHash))
+        context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit()
+            .putString(KEY_RECORD, json.toString()).apply()
+        unlocked = true
+        return Result.success(Unit)
+    }
+
     /** Erases ONLY the local account. Profiles, proxies and history stay on the device. */
     fun reset(context: Context) {
         context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).edit().remove(KEY_RECORD).apply()

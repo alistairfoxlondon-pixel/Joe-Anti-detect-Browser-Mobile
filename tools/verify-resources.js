@@ -170,6 +170,9 @@ const SKIP_FIELDS = new Set([
   'isInitialized', 'hashCode', 'toString', 'equals', 'copy',
 ]);
 
+/** Handles that look like bindings but never are (e.g. a list of views named `binding`). */
+const SKIP_BINDING_NAMES = new Set(['it', 'this']);
+
 const EXPLICIT_IDS = new Set();
 
 for (const [type, map] of resources) {
@@ -276,15 +279,35 @@ for (const file of kotlinFiles) {
   // by its nearest preceding declaration, so a file that inflates two different row layouts
   // (as HomeFragment does) is checked against the right one for each access.
   const decls = []; // {pos, name, type}
+  // One pattern for every declaration form; `(?:val|var)\s+` is optional because typed
+  // parameters (`row: ItemRowBinding`) have no keyword and the assignment form has one.
+  // Listing overlapping alternatives double-counted declarations and made the `pos`-sorted
+  // pick unreliable, which silently disabled the check for inferred locals like
+  // `val sheet = SheetXBinding.inflate(...)`.
+  // Fully-qualified form: `com.joebrowser.app.databinding.SheetXBinding.inflate(...)`.
+  const unqualified = text.replace(/\b(?:[a-z][\w]*\.)+databinding\./g, '');
   const declRes = [
+    /(?:\b(?:val|var)\s+)?([A-Za-z_]\w*)(?:\s*:\s*(\w+Binding))?\s*=\s*(\w+Binding)\.inflate\b/g,
     /\b(?:val|var)\s+(\w+)\s*:\s*(\w+Binding)\b/g,
     /\b(\w+)\s*:\s*(\w+Binding)\b/g, // typed parameter
-    /(?:^|[\s;{(])((?:this\.)?\w+)\s*=\s*(\w+Binding)\.inflate\b/g,
   ];
   for (const re of declRes) {
     let dm;
-    while ((dm = re.exec(text))) {
-      decls.push({ pos: dm.index, name: dm[1].replace(/^this\./, ''), type: dm[2] });
+    while ((dm = re.exec(unqualified))) {
+      // Inflate form: the capture that matched a binding type is the right one.
+      const type = (dm[3] && /Binding$/.test(dm[3])) ? dm[3] : dm[2];
+      if (!type || !/Binding$/.test(type)) continue;
+      const name = dm[1].replace(/^this\./, '');
+      if (!name || SKIP_BINDING_NAMES.has(name)) continue;
+      decls.push({ pos: dm.index, name, type });
+    }
+  }
+  // De-duplicate identical (pos,name,type) records produced by overlapping patterns.
+  {
+    const seen = new Set();
+    for (let i = decls.length - 1; i >= 0; i--) {
+      const k = `${decls[i].pos}|${decls[i].name}|${decls[i].type}`;
+      if (seen.has(k)) decls.splice(i, 1); else seen.add(k);
     }
   }
   decls.sort((a, b) => a.pos - b.pos);
@@ -335,6 +358,40 @@ function bindingToLayout(bindingName) {
     .replace(/([A-Z]+)([A-Z][a-z])/g, '$1_$2')
     .toLowerCase();
   return snake;
+}
+
+// ------------------------------------------------- non-public Material attributes
+
+/**
+ * `com.google.android.material.R.attr.*` is obfuscated/private in the Material Components
+ * artifacts: referencing one compiles in some configurations and fails in others (this broke
+ * `UiKit.textButton` once already, on both debug and release). Any such reference is a bug —
+ * the fix is to style the widget by hand or use a public `Widget.Material3.*` style.
+ */
+for (const file of kotlinFiles) {
+  const text = fs.readFileSync(file, 'utf8');
+  if (/com\.google\.android\.material\.R\.(attr|styleable|id)/.test(text)) {
+    fail(`${path.relative(ROOT, file)}: references a non-public Material R symbol — style the widget by hand`);
+  }
+}
+
+// Material widgets must not be told to use a style that the app does not define itself.
+{
+  const THEMES = [
+    path.join(RES, 'values/themes.xml'),
+    path.join(RES, 'values/styles.xml'),
+    path.join(RES, 'values-night/themes.xml'),
+  ].filter((f) => fs.existsSync(f));
+  const declared = new Set();
+  for (const f of THEMES) {
+    for (const m of fs.readFileSync(f, 'utf8').matchAll(/<style\s+name="([^"]+)"/g)) declared.add(m[1]);
+  }
+  for (const file of kotlinFiles) {
+    for (const m of fs.readFileSync(file, 'utf8').matchAll(/setStyle\(\s*(R\.style\.\w+)/g)) {
+      const name = m[1].replace('R.style.', '').replace(/_/g, '.');
+      if (!declared.has(name)) fail(`${path.relative(ROOT, file)}: setStyle(${name}) — style is not declared`);
+    }
+  }
 }
 
 // ------------------------------------------------------------------- report
