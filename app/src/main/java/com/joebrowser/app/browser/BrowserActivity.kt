@@ -43,6 +43,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.joebrowser.app.R
 import com.joebrowser.app.core.Async
 import com.joebrowser.app.data.Prefs
+import com.joebrowser.app.data.ProfileStorage
 import com.joebrowser.app.data.Profile
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.databinding.ActivityBrowserBinding
@@ -88,6 +89,7 @@ class BrowserActivity : AppCompatActivity() {
     /** Loopback relay that injects proxy credentials the WebView cannot send. */
     private var relay: LocalProxyRelay? = null
     private var proxyApplied = false
+    private var sessionClosed = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -134,7 +136,23 @@ class BrowserActivity : AppCompatActivity() {
             binding.browserKernelChip.setTextColor(ContextCompat.getColor(this, R.color.warning))
         }
 
+        // Chrome is wired before the WebView exists so the error state is still navigable
+        // (back arrow, retry button) on a device with no usable provider.
+        wireToolbar()
+        wireFindBar()
+        wireBackHandling()
+
         val web = createWebView()
+        if (web == null) {
+            binding.browserStateAction.visibility = View.GONE
+            showState(R.drawable.ic_warning, R.string.browser_error_title, R.string.browser_no_webview)
+            binding.browserUrlField.isEnabled = false
+            binding.btnNavReload.isEnabled = false
+            binding.btnNavBack.isEnabled = false
+            binding.btnNavForward.isEnabled = false
+            binding.btnBrowserMenu.visibility = View.GONE
+            return
+        }
         webView = web
         binding.browserWebViewFrame.addView(
             web, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
@@ -146,9 +164,16 @@ class BrowserActivity : AppCompatActivity() {
             if (trackers > 0 && ::binding.isInitialized) showTrackerHint()
         }
 
-        wireToolbar()
-        wireFindBar()
-        wireBackHandling()
+        // Session bookkeeping happens at launch, not at exit: a window the user swipes away
+        // must still count as opened, and Home sorts by last-opened.
+        Prefs.setLastProfileId(this, loaded.id)
+        if (savedState == null) {
+            ProfileRepository.updateProfile(this, loaded.id) {
+                it.lastOpened = System.currentTimeMillis()
+                it.openCount += 1
+                it.everLaunched = true
+            }
+        }
 
         pendingUrl = intent.getStringExtra(EXTRA_URL)?.takeIf { it.isNotBlank() }
             ?: savedState?.getString(STATE_URL)
@@ -177,14 +202,16 @@ class BrowserActivity : AppCompatActivity() {
     // ---------------------------------------------------------------- web view
 
     @SuppressLint("SetJavaScriptEnabled")
-    private fun createWebView(): WebView {
+    /**
+     * Builds the session WebView. Returns null when this device has no usable WebView
+     * provider — the caller degrades to an error card instead of crashing on first touch.
+     */
+    private fun createWebView(): WebView? {
         val web = try {
             WebView(this)
         } catch (t: Throwable) {
-            // A device without a usable WebView provider would otherwise crash on touch.
-            Async.toast(this, getString(R.string.browser_error_body))
-            finish()
-            return WebView(this.applicationContext) // never reached in practice
+            android.util.Log.e(Async.TAG, "WebView provider unavailable", t)
+            return null
         }
         web.setBackgroundColor(ContextCompat.getColor(this, R.color.bg))
 
@@ -204,9 +231,10 @@ class BrowserActivity : AppCompatActivity() {
             settings.setSupportMultipleWindows(false)
             settings.cacheMode = WebSettings.LOAD_DEFAULT
             settings.mixedContentMode = WebSettings.MIXED_CONTENT_COMPATIBILITY_MODE
-            settings.userAgentString = profile?.fp?.let { fp ->
-                com.joebrowser.app.fingerprint.FingerprintFactory.userAgent(fp, profile!!.engine)
-            } ?: settings.userAgentString
+            profile?.let { loaded ->
+                settings.userAgentString =
+                    com.joebrowser.app.fingerprint.FingerprintFactory.userAgent(loaded.fp, loaded.engine)
+            }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.safeBrowsingEnabled = true
         }.onFailure { android.util.Log.w(Async.TAG, "WebSettings partially applied", it) }
 
@@ -617,15 +645,16 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun clearBrowsingData(loaded: Profile) {
         val web = webView
+        val app = applicationContext
         binding.browserLoading.visibility = View.VISIBLE
         Async.bg {
+            // Wipe order matters: the WebKit bucket first (it owns cookies + site data),
+            // then the materialised directories, then the history rows.
             runCatching { kernel?.wipeData(web) }
             runCatching { CookieManager.getInstance().flush() }
-            runCatching {
-                com.joebrowser.app.data.ProfileStorage.sessionDirs(this, loaded.id)
-                    .forEach { dir -> runCatching { dir.deleteRecursively() } }
-            }
-            ProfileRepository.clearHistory(this, loaded.id)
+            ProfileStorage.sessionDirs(app, loaded.id)
+                .forEach { dir -> runCatching { dir.deleteRecursively() } }
+            ProfileRepository.clearHistory(app, loaded.id)
             Async.onMain {
                 if (isFinishing || isDestroyed) return@onMain
                 binding.browserLoading.visibility = View.GONE
@@ -726,21 +755,18 @@ class BrowserActivity : AppCompatActivity() {
      * "clear data on close" contract.
      */
     private fun closeSession() {
+        if (sessionClosed) return
+        sessionClosed = true
         val loaded = profile ?: return
         val web = webView
+        val app = applicationContext
+        // Always flush the cookie jar so a killed process cannot lose a login the user made.
         runCatching { CookieManager.getInstance().flush() }
-        if (loaded.freshSession) {
-            Async.bg {
-                runCatching { kernel?.wipeData(web) }
-                com.joebrowser.app.data.ProfileStorage.sessionDirs(this, loaded.id)
-                    .forEach { dir -> runCatching { dir.deleteRecursively() } }
-            }
-        }
-        Prefs.setLastProfileId(this, loaded.id)
-        ProfileRepository.updateProfile(this, loaded.id) {
-            it.lastOpened = System.currentTimeMillis()
-            it.openCount += 1
-            it.everLaunched = true
+        if (!loaded.freshSession) return
+        Async.bg {
+            runCatching { kernel?.wipeData(web) }
+            ProfileStorage.sessionDirs(app, loaded.id)
+                .forEach { dir -> runCatching { dir.deleteRecursively() } }
         }
     }
 
@@ -863,7 +889,10 @@ class BrowserActivity : AppCompatActivity() {
                 return true
             }
             Async.toast(this@BrowserActivity, getString(R.string.browser_error_body))
-            val replacement = createWebView()
+            val replacement = createWebView() ?: run {
+                finish()
+                return true
+            }
             webView = replacement
             binding.browserWebViewFrame.addView(
                 replacement,
@@ -953,7 +982,7 @@ class BrowserActivity : AppCompatActivity() {
             // Pop-ups are routed into the same session rather than a second window we cannot
             // fingerprint: this keeps the identity guarantee intact.
             val transport = resultMsg?.obj as? WebView.WebViewTransport ?: return false
-            val popup = createWebView()
+            val popup = createWebView() ?: return false
             popup.webViewClient = object : WebViewClient() {
                 override fun shouldOverrideUrlLoading(v: WebView?, request: WebResourceRequest?): Boolean {
                     val url = request?.url?.toString() ?: return false
@@ -1023,6 +1052,7 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
+        if (isFinishing) closeSession()
         runCatching { relay?.close() }
         relay = null
         proxyApplied = false

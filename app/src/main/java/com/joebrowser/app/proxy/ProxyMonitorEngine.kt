@@ -166,18 +166,22 @@ object ProxyMonitorEngine {
 
                 if (result.ok) {
                     online++
+                    // Reflect the measurement in the record the user actually sees, so the
+                    // Proxies screen and the editor never show a stale IP or latency.
+                    persistMeasurement(context, target, result)
                     val newIp = result.ip
                     val changed = previousIp.isNotBlank() && newIp.isNotBlank() && previousIp != newIp
                     database.setWatchState(target.key, newIp, 0, false, result.latencyMs)
 
                     if (changed) {
                         rotated++
+                        val localeNote = applyRotation(context, target, result)
                         raise(
                             context, MonitorAlert.KIND_ROTATED,
                             target.label,
-                            "Exit IP " + previousIp + " -> " + newIp
+                            "Exit IP " + previousIp + " -> " + newIp +
+                                if (localeNote.isNullOrBlank()) "" else " · " + localeNote
                         )
-                        applyRotation(context, target, result)
                     } else if (wasNotifiedOffline) {
                         recovered++
                         raise(
@@ -188,6 +192,7 @@ object ProxyMonitorEngine {
                     }
                 } else {
                     offline++
+                    persistFailure(context, target, result)
                     val fails = (state?.fails ?: 0) + 1
                     if (fails >= FAIL_THRESHOLD && !wasNotifiedOffline) {
                         raise(
@@ -219,34 +224,101 @@ object ProxyMonitorEngine {
      * Re-aligns a profile's fingerprint locale to the new exit country after a rotation.
      * This is what stops "IP says Germany, browser says Asia/Dhaka" from happening.
      */
-    private fun applyRotation(context: Context, target: Target, result: ProxyTestResult) {
-        if (target.profileId == null) return
-        if (!result.countryCode.isNotBlank()) return
+    private fun applyRotation(context: Context, target: Target, result: ProxyTestResult): String? {
+        if (target.profileId == null) return null
+        if (result.countryCode.isBlank()) return null
         val database = Database.get(context)
-        val profile: Profile = database.getProfile(target.profileId) ?: return
-        if (!profile.fp.autoMatchProxy || !profile.tools.autoSyncLocale) return
+        val profile: Profile = runCatching { database.getProfile(target.profileId) }.getOrNull() ?: return null
+        if (!profile.fp.autoMatchProxy || !profile.tools.autoSyncLocale) return null
 
         val before = profile.fp.timezone + "/" + profile.fp.language
         FingerprintFactory.applyProxyLocale(profile.fp, result.countryCode)
+        val after = profile.fp.timezone + "/" + profile.fp.language
         profile.proxy = profile.proxy.duplicate().apply {
             lastCountry = result.country
             lastCountryCode = result.countryCode
             lastCity = result.city
             lastTimezone = result.timezone
             rotations += 1
-            lastCheckedAt = System.currentTimeMillis()
-            latencyMs = result.latencyMs
         }
-        val after = profile.fp.timezone + "/" + profile.fp.language
-        database.saveProfile(profile)
+        runCatching { database.saveProfile(profile) }
+        return if (before == after) null else "locale " + profile.fp.language + " · " + profile.fp.timezone
+    }
 
-        if (before != after) {
-            raise(
-                context, MonitorAlert.KIND_ROTATED,
-                profile.displayName(),
-                "Locale re-aligned to " + profile.fp.language + " · " + profile.fp.timezone
-            )
+    /**
+     * Writes a successful probe into the saved proxy or profile that owns the target.
+     * Runs off the main thread (the whole cycle does); failures are contained per target.
+     */
+    private fun persistMeasurement(context: Context, target: Target, result: ProxyTestResult) {
+        val database = Database.get(context)
+        val savedId = target.savedProxyId
+        if (savedId != null) {
+            runCatching {
+                val saved = database.getProxy(savedId) ?: return@runCatching
+                val before = saved.config.lastIp
+                val updated = saved.config.duplicate().apply {
+                    lastCheckedAt = System.currentTimeMillis()
+                    latencyMs = result.latencyMs
+                    lastError = ""
+                    failStreak = 0
+                    if (before.isNotBlank() && result.ip.isNotBlank() && before != result.ip) rotations += 1
+                    lastIp = result.ip
+                    lastCountry = result.country
+                    lastCountryCode = result.countryCode
+                    lastCity = result.city
+                    lastTimezone = result.timezone
+                }
+                database.saveProxy(SavedProxy(id = saved.id, name = saved.name, note = saved.note, config = updated))
+            }.onFailure { android.util.Log.w(TAG, "Could not persist proxy measurement", it) }
+            return
         }
+        val profileId = target.profileId ?: return
+        runCatching {
+            val profile = database.getProfile(profileId) ?: return@runCatching
+            profile.proxy = profile.proxy.duplicate().apply {
+                lastCheckedAt = System.currentTimeMillis()
+                latencyMs = result.latencyMs
+                lastError = ""
+                failStreak = 0
+                lastIp = result.ip
+                lastCountry = result.country
+                lastCountryCode = result.countryCode
+                lastCity = result.city
+                lastTimezone = result.timezone
+            }
+            database.saveProfile(profile)
+        }.onFailure { android.util.Log.w(TAG, "Could not persist profile measurement", it) }
+    }
+
+    /** Records an unsuccessful probe on the owning record (same path as a success). */
+    private fun persistFailure(context: Context, target: Target, result: ProxyTestResult) {
+        val database = Database.get(context)
+        val message = result.error.ifBlank { "no response" }
+        val savedId = target.savedProxyId
+        if (savedId != null) {
+            runCatching {
+                val saved = database.getProxy(savedId) ?: return@runCatching
+                val updated = saved.config.duplicate().apply {
+                    lastCheckedAt = System.currentTimeMillis()
+                    latencyMs = result.latencyMs
+                    lastError = message
+                    failStreak += 1
+                }
+                database.saveProxy(SavedProxy(id = saved.id, name = saved.name, note = saved.note, config = updated))
+            }.onFailure { android.util.Log.w(TAG, "Could not persist proxy failure", it) }
+            return
+        }
+        val profileId = target.profileId ?: return
+        runCatching {
+            val profile = database.getProfile(profileId) ?: return@runCatching
+            profile.proxy = profile.proxy.duplicate().apply {
+                lastCheckedAt = System.currentTimeMillis()
+                latencyMs = result.latencyMs
+                lastError = message
+                failStreak += 1
+            }
+            database.saveProfile(profile)
+        }.onFailure { android.util.Log.w(TAG, "Could not persist profile failure", it) }
     }
 
     private fun raise(context: Context, kind: String, target: String, detail: String) {
@@ -275,7 +347,13 @@ object ProxyMonitorEngine {
         return "Monitoring " + targets + " proxy" + (if (targets == 1) "" else "ies") + " · last sweep " + age
     }
 
-    /** Convenience for the browser activity: check one profile's proxy right before launch. */
+    /**
+     * One-shot check for a profile's proxy right before the browser opens.
+     *
+     * The same persistence rules as the scheduled monitor apply (IP, latency, country, failure
+     * streak and — when auto-match is on — the locale), so a launch-time probe and a background
+     * probe can never leave the profile in two different states.
+     */
     fun verifyBeforeLaunch(context: Context, profile: Profile, onResult: (ProxyTestResult) -> Unit) {
         if (!profile.proxy.enabled) {
             onResult(ProxyTestResult(ok = true, error = ""))
@@ -285,26 +363,18 @@ object ProxyMonitorEngine {
         Async.bg {
             val result = runCatching { ProxyTester.test(profile.proxy) }
                 .getOrElse { ProxyTestResult(ok = false, error = it.message ?: "Unreachable") }
+            val target = Target(
+                key = "profile:" + profile.id,
+                label = profile.displayName(),
+                config = profile.proxy,
+                intervalSec = profile.tools.proxyWatchIntervalSec.coerceAtLeast(MIN_INTERVAL_SEC),
+                profileId = profile.id
+            )
             if (result.ok) {
-                runCatching {
-                    val database = Database.get(app)
-                    val source = database.getProfile(profile.id) ?: profile
-                    source.proxy = source.proxy.duplicate().apply {
-                        lastCheckedAt = System.currentTimeMillis()
-                        latencyMs = result.latencyMs
-                        lastIp = result.ip
-                        lastCountry = result.country
-                        lastCountryCode = result.countryCode
-                        lastCity = result.city
-                        lastTimezone = result.timezone
-                        lastError = ""
-                        failStreak = 0
-                    }
-                    if (source.fp.autoMatchProxy && source.tools.autoSyncLocale && result.countryCode.isNotBlank()) {
-                        FingerprintFactory.applyProxyLocale(source.fp, result.countryCode)
-                    }
-                    database.saveProfile(source)
-                }
+                persistMeasurement(app, target, result)
+                applyRotation(app, target, result)
+            } else {
+                persistFailure(app, target, result)
             }
             Async.onMain { onResult(result) }
         }

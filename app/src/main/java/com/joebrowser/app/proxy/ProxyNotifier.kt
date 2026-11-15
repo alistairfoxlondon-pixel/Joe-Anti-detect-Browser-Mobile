@@ -103,6 +103,15 @@ object ProxyNotifier {
             .setContentIntent(contentIntent(context))
             .build()
 
+    /** Refreshes the ongoing notification in place (watch count changes as proxies are edited). */
+    fun updateMonitor(context: Context, watched: Int) {
+        runCatching {
+            if (!canNotify(context)) return
+            val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            manager.notify(NOTIF_MONITOR, monitorNotification(context, watched))
+        }
+    }
+
     fun cancelMonitor(context: Context) {
         runCatching {
             val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager

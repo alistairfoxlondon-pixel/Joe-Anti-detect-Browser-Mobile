@@ -49,6 +49,11 @@ class ProxyMonitorService : Service() {
         return START_STICKY
     }
 
+    /**
+     * Promotes to the foreground. This must succeed even when POST_NOTIFICATIONS was denied —
+     * Android still requires a notification for a foreground service, and it is the FGS that
+     * keeps the monitor alive; only *alert* notifications need the runtime permission.
+     */
     private fun promoteToForeground(watched: Int): Boolean = try {
         val notification = ProxyNotifier.monitorNotification(this, watched)
         if (Build.VERSION.SDK_INT >= 34) {
@@ -69,28 +74,30 @@ class ProxyMonitorService : Service() {
         handler.postDelayed(cycleRunnable, initialDelayMs)
     }
 
+    /**
+     * One tick: refresh the notification, run a pass (the engine already skips targets whose
+     * own interval has not elapsed) and re-arm. Any failure is swallowed so the timer survives
+     * a bad network, a corrupt row or a database lock.
+     */
     private val cycleRunnable = Runnable {
+        var keepGoing = true
         try {
             val watched = ProxyMonitorEngine.watchedCount(this)
-            if (watched == 0) {
-                stopSelf()
-                return@Runnable
+            if (watched == 0 || !Prefs.monitorEnabled(this)) {
+                keepGoing = false
+            } else {
+                runCatching { ProxyNotifier.updateMonitor(this, watched) }
+                ProxyMonitorEngine.runCycle(this, force = false)
             }
-            ProxyMonitorEngine.runCycle(this, force = false)
         } catch (t: Throwable) {
-            // A failed cycle must not kill the timer.
+            android.util.Log.w("JoeMonitor", "monitor tick failed", t)
         }
-        handler.postDelayed(this::scheduleNextNext, tickDelayMs())
+        if (keepGoing) handler.postDelayed(cycleRunnable, tickDelayMs()) else stopSelf()
     }
 
     /** Re-reads the user's chosen cadence each tick so a settings change applies immediately. */
     private fun tickDelayMs(): Long =
         (Prefs.monitorIntervalSec(this).coerceIn(30, 3600) * 1000L).coerceAtLeast(30_000L)
-
-    private fun scheduleNextNext() {
-        handler.removeCallbacks(cycleRunnable)
-        handler.postDelayed(cycleRunnable, tickDelayMs())
-    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 

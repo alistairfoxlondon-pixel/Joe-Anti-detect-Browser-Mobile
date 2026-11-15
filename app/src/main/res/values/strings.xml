@@ -274,6 +274,7 @@
     <string name="browser_kernel_shared">Profile storage is shared on this WebView build. Update Android System WebView.</string>
     <string name="browser_external_failed">No app can open that link</string>
     <string name="browser_profile_missing">Profile not found</string>
+    <string name="browser_no_webview">This device has no usable WebView provider. Install or update Android System WebView and try again.</string>
     <string name="browser_find_hint">Find in page</string>
     <string name="browser_find_prev">Previous match</string>
     <string name="browser_find_next">Next match</string>
