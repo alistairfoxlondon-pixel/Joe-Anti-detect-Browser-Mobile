@@ -89,7 +89,7 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
     override fun onStart() {
         super.onStart()
         AppEvents.register(
-            this, receiver,
+            requireContext().applicationContext, receiver,
             listOf(AppEvents.ACTION_DATA_CHANGED, AppEvents.ACTION_PROXY_STATE, AppEvents.ACTION_MONITOR_ALERT)
         )
     }
@@ -386,8 +386,8 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
                     isChecking -> context.getString(R.string.status_checking)
                     config.online -> buildString {
                         append(config.lastIp)
-                        if (config.countryCode.isNotBlank()) {
-                            val flag = UiKit.flagEmoji(config.countryCode)
+                        if (config.lastCountryCode.isNotBlank()) {
+                            val flag = UiKit.flagEmoji(config.lastCountryCode)
                             if (flag.isNotEmpty()) append(" ").append(flag)
                         }
                         append(" · ").append(config.latencyMs).append(" ms")

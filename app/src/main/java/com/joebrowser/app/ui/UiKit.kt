@@ -76,7 +76,7 @@ object UiKit {
     }
 
     fun digitsOnlyFilter(): InputFilter = InputFilter { source, _, _, dest, dstart, dend ->
-        val candidate = String(source)
+        val candidate = source.toString()
         if (candidate.all { it.isDigit() }) {
             // Keep ports inside 1..65535 while typing.
             val text = (dest.subSequence(0, dstart).toString() + candidate + dest.subSequence(dend, dest.length))
@@ -87,7 +87,7 @@ object UiKit {
     }
 
     fun rangeFilter(min: Int, max: Int): InputFilter = InputFilter { source, _, _, dest, dstart, dend ->
-        val candidate = String(source)
+        val candidate = source.toString()
         if (candidate.isEmpty()) return@InputFilter null
         if (!candidate.all { it.isDigit() }) return@InputFilter ""
         val text = (dest.subSequence(0, dstart).toString() + candidate + dest.subSequence(dend, dest.length))

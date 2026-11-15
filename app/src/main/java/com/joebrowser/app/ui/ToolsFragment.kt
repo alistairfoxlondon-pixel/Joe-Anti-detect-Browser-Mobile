@@ -309,7 +309,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         ProfileRepository.trashCount(context) { count ->
             _binding?.valueTrashCount?.text = getString(R.string.tools_trash_count, count)
         }
-        Async.compute { ProfileStorage.totalSizeBytes(context) } { bytes ->
+        Async.compute({ ProfileStorage.totalSizeBytes(context) }) { bytes ->
             _binding?.valueStorageUsed?.text = ProfileStorage.humanSize(bytes ?: 0L)
         }
     }
