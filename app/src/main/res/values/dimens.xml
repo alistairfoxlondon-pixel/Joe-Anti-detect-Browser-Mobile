@@ -15,7 +15,6 @@
     <dimen name="card_pad">14dp</dimen>
     <dimen name="card_pad_wide">16dp</dimen>
     <dimen name="toolbar_height">56dp</dimen>
-    <dimen name="browser_toolbar_height">54dp</dimen>
     <dimen name="touch_target">48dp</dimen>
     <dimen name="icon_sm">16dp</dimen>
     <dimen name="icon_md">20dp</dimen>
@@ -32,5 +31,6 @@
     <dimen name="fab_margin">16dp</dimen>
     <dimen name="list_bottom_inset">96dp</dimen>
     <dimen name="pill_height">38dp</dimen>
+    <dimen name="browser_url_bar_height">56dp</dimen>
     <dimen name="button_height">48dp</dimen>
 </resources>

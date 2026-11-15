@@ -27,6 +27,7 @@ import android.webkit.WebResourceRequest
 import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
+import android.content.res.ColorStateList
 import android.webkit.WebViewClient
 import android.widget.PopupMenu
 import android.widget.Toast
@@ -76,9 +77,11 @@ class BrowserActivity : AppCompatActivity() {
     private lateinit var binding: ActivityBrowserBinding
     private var profile: Profile? = null
 
-    /** Returns the tracker badge to the live request readout once a paste message settles. */
+    /** Hides the transient paste-progress pill once a typing run settles. */
     private val badgeReset = Runnable {
-        if (!isFinishing && !isDestroyed && ::binding.isInitialized) refreshTrackerChip()
+        if (!isFinishing && !isDestroyed && ::binding.isInitialized) {
+            binding.browserPastePill.visibility = View.GONE
+        }
     }
     private var kernel: BrowserKernel? = null
     private var webView: WebView? = null
@@ -138,9 +141,7 @@ class BrowserActivity : AppCompatActivity() {
         binding.browserAvatar.text = loaded.initials()
         binding.browserAvatar.background = UiKit.avatarBackground(loaded.id)
         binding.browserProfileName.text = loaded.displayName()
-        binding.browserEngineChip.text = loaded.engine.title
-        binding.browserKernelChip.text = getString(R.string.browser_kernel_ok)
-        binding.browserKernelChip.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        binding.browserCaption.text = engineCaption(loaded)
 
         // ---- 1. kernel FIRST: prepare() must run before the WebView exists
         // prepare() builds the spoofing payload and resolves the profile's storage token.
@@ -148,9 +149,10 @@ class BrowserActivity : AppCompatActivity() {
         kernel = BrowserKernel(this, loaded, ::onKernelStatus)
         kernel?.prepare()
         if (!prepared) {
-            // Missing WebView provider or unusable identity: say so on the chip, never crash.
-            binding.browserKernelChip.text = getString(R.string.browser_kernel_shared)
-            binding.browserKernelChip.setTextColor(ContextCompat.getColor(this, R.color.warning))
+            // Missing WebView provider or unusable identity: flag the dot, never crash.
+            binding.browserKernelDot.visibility = View.VISIBLE
+            binding.browserKernelDot.setBackgroundResource(R.drawable.bg_dot_warn)
+            binding.browserKernelDot.contentDescription = getString(R.string.browser_kernel_shared)
         }
 
         // Chrome is wired before the WebView exists so the error state is still navigable
@@ -169,6 +171,8 @@ class BrowserActivity : AppCompatActivity() {
             binding.btnNavForward.isEnabled = false
             binding.btnTabs.visibility = View.GONE
             binding.btnBrowserMenu.visibility = View.GONE
+            binding.browserProxyButton.visibility = View.GONE
+            binding.browserTrackerButton.visibility = View.GONE
             return
         }
         val initialUrl = intent.getStringExtra(EXTRA_URL)?.takeIf { it.isNotBlank() }
@@ -185,8 +189,7 @@ class BrowserActivity : AppCompatActivity() {
         )
         updateTabBadge()
 
-        binding.browserTrackerBadge.setOnClickListener { showTrackerSheet() }
-        binding.browserTrackerBadge.isClickable = true
+        binding.browserTrackerButton.setOnClickListener { showTrackerSheet() }
         tracker = TrackerMonitor { total, trackers ->
             if (::binding.isInitialized) updateTrackerBadge(total, trackers)
         }
@@ -314,12 +317,12 @@ class BrowserActivity : AppCompatActivity() {
     private fun onKernelStatus(status: BrowserKernel.KernelStatus) {
         if (!::binding.isInitialized) return
         val isolated = status.isolation == BrowserKernel.IsolationMode.ISOLATED
-        binding.browserKernelChip.text = getString(
-            if (isolated) R.string.browser_kernel_ok else R.string.browser_kernel_shared
+        binding.browserKernelDot.visibility = View.VISIBLE
+        binding.browserKernelDot.setBackgroundResource(
+            if (isolated) R.drawable.bg_dot_good else R.drawable.bg_dot_warn
         )
-        binding.browserKernelChip.setTextColor(
-            ContextCompat.getColor(this, if (isolated) R.color.success else R.color.warning)
-        )
+        binding.browserKernelDot.contentDescription =
+            getString(if (isolated) R.string.browser_kernel_ok else R.string.browser_kernel_shared)
         if (!isolated) {
             Async.toast(this, getString(R.string.browser_kernel_shared_toast))
         } else if (status.warning != null && status.injection == BrowserKernel.InjectionMode.EARLY_FALLBACK) {
@@ -366,6 +369,7 @@ class BrowserActivity : AppCompatActivity() {
             profile?.let { loaded ->
                 settings.userAgentString =
                     com.joebrowser.app.fingerprint.FingerprintFactory.userAgent(loaded.fp, loaded.engine)
+                applyAcceptLanguage(settings, loaded)
             }
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) settings.safeBrowsingEnabled = true
         }.onFailure { android.util.Log.w(Async.TAG, "WebSettings partially applied", it) }
@@ -376,6 +380,45 @@ class BrowserActivity : AppCompatActivity() {
             download(url, userAgent, contentDisposition, mimeType)
         }
         return web
+    }
+
+    /**
+     * Aligns the HTTP `Accept-Language` header with the identity's `navigator.languages`.
+     *
+     * The fingerprint layer owns the JS-visible locale; the header comes from the WebView
+     * itself, so without this step the two can disagree (the device is set to one language,
+     * the profile to another) — a mismatch detector services read straight off the request.
+     * The WebView surface for overriding this header is implementation- and version-dependent,
+     * so all attempts go through reflection: first the androidx.webkit compat hook (if this
+     * build of the WebView exposes one), then the framework LocaleList setter (API 24+), then
+     * a framework setAcceptLanguage when present. Every failure is swallowed — if the WebView
+     * in use exposes none of these, the device-locale header stands, exactly as before.
+     */
+    private fun applyAcceptLanguage(settings: WebSettings, loaded: Profile) {
+        val fp = loaded.fp
+        val acceptLanguage = fp.acceptLanguage.takeIf { it.isNotBlank() }
+            ?: com.joebrowser.app.fingerprint.FingerprintFactory.acceptLanguageFor(fp.language)
+        runCatching {
+            val compat = runCatching { Class.forName("androidx.webkit.WebSettingsCompat") }.getOrNull()
+            val method = compat?.getMethod(
+                "setAcceptLanguage", WebSettings::class.java, String::class.java
+            )
+            if (method != null) {
+                method.invoke(null, settings, acceptLanguage)
+                return
+            }
+        }
+        runCatching {
+            val locale = android.os.Locale.forLanguageTag(fp.language)
+            val list = android.os.LocaleList(locale)
+            settings.javaClass.getMethod("setLocaleList", android.os.LocaleList::class.java)
+                .invoke(settings, list)
+            return
+        }
+        runCatching {
+            settings.javaClass.getMethod("setAcceptLanguage", String::class.java)
+                .invoke(settings, acceptLanguage)
+        }
     }
 
     /**
@@ -392,9 +435,7 @@ class BrowserActivity : AppCompatActivity() {
             clearProxyOverride { load(pendingUrl) }
             return
         }
-        binding.browserProxyBadge.visibility = View.VISIBLE
-        binding.browserProxyBadge.text = getString(R.string.browser_proxy_checking)
-        binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        showProxyButton(R.color.text_muted)
         // 1. route the WebView through the relay
         applyProxyOverride(loaded) {
             if (isFinishing || isDestroyed) return@applyProxyOverride
@@ -410,18 +451,14 @@ class BrowserActivity : AppCompatActivity() {
     private fun applyProxyOverride(loaded: Profile, onReady: () -> Unit) {
         val config = loaded.proxy
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.PROXY_OVERRIDE)) {
-            binding.browserProxyBadge.visibility = View.VISIBLE
-            binding.browserProxyBadge.text = getString(R.string.browser_proxy_unsupported)
-            binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.warning))
+            showProxyButton(R.color.warning)
             Async.toast(this, getString(R.string.browser_proxy_unsupported_toast))
             onReady()
             return
         }
         val started = runCatching { LocalProxyRelay.start(config) }.getOrNull()
         if (started == null) {
-            binding.browserProxyBadge.visibility = View.VISIBLE
-            binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
-            binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.danger))
+            showProxyButton(R.color.danger)
             onReady()
             return
         }
@@ -437,8 +474,7 @@ class BrowserActivity : AppCompatActivity() {
                 Async.onMain(onReady)
             }
         }.onFailure {
-            binding.browserProxyBadge.visibility = View.VISIBLE
-            binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
+            showProxyButton(R.color.danger)
             onReady()
         }
     }
@@ -458,14 +494,10 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     private fun bindProxyResult(result: ProxyTestResult) {
-        binding.browserProxyBadge.visibility = View.VISIBLE
-        binding.browserProxyBadge.isClickable = true
+        showProxyButton(if (result.ok) R.color.success else R.color.danger)
         if (result.ok) {
             val loc = result.countryCode.ifBlank { result.country.ifBlank { result.ip } }
-            binding.browserProxyBadge.text =
-                getString(R.string.browser_proxy_ok, loc, result.latencyMs)
-            binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
-            binding.browserProxyBadge.setOnClickListener {
+            binding.browserProxyButton.setOnClickListener {
                 val detail = listOfNotNull(
                     result.ip.takeIf { it.isNotBlank() }?.let { "Exit IP: $it" },
                     listOf(result.city, result.country).filter { it.isNotBlank() }.joinToString(", ").takeIf { it.isNotBlank() }?.let { "Location: $it" },
@@ -481,9 +513,7 @@ class BrowserActivity : AppCompatActivity() {
                     .show()
             }
         } else {
-            binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
-            binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.danger))
-            binding.browserProxyBadge.setOnClickListener {
+            binding.browserProxyButton.setOnClickListener {
                 MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.browser_proxy_failed_detail)
                     .setMessage(result.error.ifBlank { getString(R.string.browser_error_body) })
@@ -496,8 +526,7 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun retryProxy() {
         val loaded = profile ?: return
-        binding.browserProxyBadge.text = getString(R.string.browser_proxy_checking)
-        binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+        showProxyButton(R.color.text_muted)
         ProxyMonitorEngine.verifyBeforeLaunch(this, loaded) { result ->
             if (isFinishing || isDestroyed) return@verifyBeforeLaunch
             bindProxyResult(result)
@@ -515,39 +544,31 @@ class BrowserActivity : AppCompatActivity() {
             hideProxyBadge()
             return
         }
-        binding.browserProxyBadge.visibility = View.VISIBLE
-        binding.browserProxyBadge.setOnClickListener { retryProxy() }
-        binding.browserProxyBadge.isClickable = true
+        binding.browserProxyButton.visibility = View.VISIBLE
+        binding.browserProxyButton.setOnClickListener { retryProxy() }
         when {
-            config.lastIp.isNotBlank() && config.latencyMs >= 0 -> {
-                val loc = config.lastCountryCode.ifBlank { config.lastCountry.ifBlank { config.lastIp } }
-                binding.browserProxyBadge.text =
-                    getString(R.string.browser_proxy_ok, loc, config.latencyMs)
-                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
-            }
-            config.lastError.isNotBlank() -> {
-                binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
-                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.danger))
-            }
-            else -> {
-                binding.browserProxyBadge.text = getString(R.string.browser_proxy_checking)
-                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
-            }
+            config.lastIp.isNotBlank() && config.latencyMs >= 0 -> tintProxyButton(R.color.success)
+            config.lastError.isNotBlank() -> tintProxyButton(R.color.danger)
+            else -> tintProxyButton(R.color.text_muted)
         }
     }
 
-    private fun refreshTrackerChip() {
-        val (total, trackers) = tracker?.totals() ?: (0 to 0)
-        if (total > 0 && (profile?.tools?.httpTracker != false) && Prefs.trackerEnabled(this)) {
-            updateTrackerBadge(total, trackers)
-        } else {
-            binding.browserTrackerBadge.visibility = View.GONE
-        }
-    }
 
     private fun hideProxyBadge() {
-        binding.browserProxyBadge.visibility = View.GONE
+        binding.browserProxyButton.visibility = View.GONE
     }
+
+    private fun tintProxyButton(colorRes: Int) {
+        binding.browserProxyButton.imageTintList =
+            ColorStateList.valueOf(ContextCompat.getColor(this, colorRes))
+    }
+
+    private fun showProxyButton(colorRes: Int) {
+        binding.browserProxyButton.visibility = View.VISIBLE
+        tintProxyButton(colorRes)
+    }
+
+    private fun engineCaption(p: Profile): String = "${p.engine.title} · ${p.fp.os}"
 
     // ---------------------------------------------------------------- toolbar
 
@@ -732,19 +753,16 @@ class BrowserActivity : AppCompatActivity() {
         val total = parts[2].toIntOrNull() ?: return
         if (total <= 0) return
         when (parts[0]) {
-            "progress" -> {
-                binding.browserTrackerBadge.visibility = View.VISIBLE
-                binding.browserTrackerBadge.text = getString(R.string.browser_paste_progress, typed, total)
-                binding.browserTrackerBadge.setTextColor(ContextCompat.getColor(this, R.color.accent))
-            }
-            "done" -> {
-                binding.browserTrackerBadge.visibility = View.VISIBLE
-                binding.browserTrackerBadge.text = getString(R.string.browser_paste_done, typed)
-                binding.browserTrackerBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
-                binding.browserTrackerBadge.removeCallbacks(badgeReset)
-                binding.browserTrackerBadge.postDelayed(badgeReset, 2500L)
-            }
+            "progress" -> showPastePill(getString(R.string.browser_paste_progress, typed, total), autoHide = false)
+            "done" -> showPastePill(getString(R.string.browser_paste_done, typed), autoHide = true)
         }
+    }
+
+    private fun showPastePill(text: String, autoHide: Boolean) {
+        binding.browserPastePill.text = text
+        binding.browserPastePill.visibility = View.VISIBLE
+        binding.browserPastePill.removeCallbacks(badgeReset)
+        if (autoHide) binding.browserPastePill.postDelayed(badgeReset, 2500L)
     }
 
     private fun pasteAsHuman() {
@@ -764,9 +782,7 @@ class BrowserActivity : AppCompatActivity() {
         Async.toast(this, getString(R.string.browser_paste_started, HumanPaste.describe(clipboard, speed)))
         HumanPaste.setProgressSink { typed, total ->
             if (!isFinishing && !isDestroyed && ::binding.isInitialized) {
-                binding.browserTrackerBadge.visibility = View.VISIBLE
-                binding.browserTrackerBadge.text = getString(R.string.browser_paste_progress, typed, total)
-                binding.browserTrackerBadge.setTextColor(ContextCompat.getColor(this, R.color.accent))
+                showPastePill(getString(R.string.browser_paste_progress, typed, total), autoHide = false)
             }
         }
         HumanPaste.type(
@@ -841,12 +857,12 @@ class BrowserActivity : AppCompatActivity() {
      */
     private fun updateTrackerBadge(total: Int, trackers: Int) {
         if (total <= 0 || (profile?.tools?.httpTracker == false) || !Prefs.trackerEnabled(this)) return
-        binding.browserTrackerBadge.visibility = View.VISIBLE
-        binding.browserTrackerBadge.text =
-            getString(R.string.browser_tracker_badge, total, trackers)
-        binding.browserTrackerBadge.setTextColor(
+        binding.browserTrackerButton.visibility = View.VISIBLE
+        binding.browserTrackerButton.imageTintList = ColorStateList.valueOf(
             ContextCompat.getColor(this, if (trackers > 0) R.color.warning else R.color.text_muted)
         )
+        binding.browserTrackerButton.contentDescription =
+            getString(R.string.browser_tracker_badge, total, trackers)
     }
 
     private fun toggleDesktopViewport() {
@@ -1500,7 +1516,7 @@ class BrowserActivity : AppCompatActivity() {
             if (latest == null || isFinishing || isDestroyed) return@profile
             val previousProxy = current.proxy
             profile = latest
-            binding.browserEngineChip.text = latest.engine.title
+            binding.browserCaption.text = engineCaption(latest)
             binding.browserProfileName.text = latest.displayName()
             binding.browserAvatar.text = latest.initials()
             val updatedUa =
@@ -1549,7 +1565,7 @@ class BrowserActivity : AppCompatActivity() {
         trackerSheet = null
         HumanPaste.clearProgressSink()
         if (::binding.isInitialized) {
-            binding.browserTrackerBadge.removeCallbacks(badgeReset)
+            binding.browserPastePill.removeCallbacks(badgeReset)
             runCatching { binding.browserWebViewFrame.removeAllViews() }
         }
         tabs.forEach { tab ->

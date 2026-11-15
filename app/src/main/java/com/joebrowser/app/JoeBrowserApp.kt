@@ -24,6 +24,7 @@ class JoeBrowserApp : Application() {
     override fun onCreate() {
         super.onCreate()
         instance = this
+        installCrashHandler()
 
         // Theme first: AppCompat reads this when the first activity is created.
         runCatching { Prefs.applyTheme(Prefs.themeMode(this)) }
@@ -43,6 +44,33 @@ class JoeBrowserApp : Application() {
         // Re-arm the monitor if proxies are watched (no-op otherwise, and safe if restricted).
         runCatching { ProxyMonitorService.startIfNeeded(this) }
             .onFailure { Log.w(Async.TAG, "Monitor start deferred", it) }
+    }
+
+    /**
+     * Last-resort crash reporter: an uncaught exception is written to a private log file
+     * (`crash-last.txt`) before the default handler runs, so a field crash can be diagnosed
+     * from the device without any analytics SDK and without the network. Nothing leaves the
+     * device; the file is overwritten on the next crash; it is app-private and never uploaded.
+     */
+    private fun installCrashHandler() {
+        val previous = Thread.getDefaultUncaughtExceptionHandler()
+        Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
+            runCatching {
+                val stamp = java.text.SimpleDateFormat("yyyy-MM-dd HH:mm:ss", java.util.Locale.US)
+                    .format(java.util.Date())
+                filesDir.resolve("crash-last.txt").writeText(
+                    buildString {
+                        append("time=").append(stamp).append('\n')
+                        append("thread=").append(thread.name).append(" (id=").append(thread.id).append(")\n")
+                        append("appVersion=").append(runCatching {
+                            packageManager.getPackageInfo(packageName, 0).versionName
+                        }.getOrDefault("unknown")).append('\n\n')
+                        append(android.util.Log.getStackTraceString(throwable))
+                    }
+                )
+            }.onFailure { Log.w(Async.TAG, "Could not persist crash log", it) }
+            previous?.uncaughtException(thread, throwable)
+        }
     }
 
     override fun onTerminate() {

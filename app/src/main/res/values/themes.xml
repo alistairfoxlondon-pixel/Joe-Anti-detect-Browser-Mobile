@@ -90,26 +90,31 @@
 
     <style name="Shape.Jb.Small" parent="ShapeAppearance.Material3.Corner.Small">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">8dp</item>
+        <item name="cornerSize">10dp</item>
     </style>
 
     <style name="Shape.Jb.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">12dp</item>
+        <item name="cornerSize">14dp</item>
     </style>
 
     <style name="Shape.Jb.Large" parent="ShapeAppearance.Material3.Corner.Large">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">16dp</item>
+        <item name="cornerSize">20dp</item>
+    </style>
+
+    <style name="Shape.Jb.XLarge" parent="ShapeAppearance.Material3.Corner.ExtraLarge">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">26dp</item>
     </style>
 
     <!-- ========================================================== typography -->
 
     <style name="Text.Jb.ScreenTitle" parent="TextAppearance.Material3.TitleLarge">
         <item name="android:fontFamily">@font/inter</item>
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">21sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:letterSpacing">-0.015</item>
         <item name="android:textColor">@color/text</item>
     </style>
 
@@ -180,7 +185,7 @@
     <style name="Widget.Jb.Card" parent="Widget.Material3.CardView.Filled">
         <item name="cardBackgroundColor">@color/surface</item>
         <item name="cardElevation">0dp</item>
-        <item name="cardCornerRadius">12dp</item>
+        <item name="cardCornerRadius">16dp</item>
         <item name="strokeColor">@color/line_soft</item>
         <item name="strokeWidth">1dp</item>
         <item name="android:stateListAnimator">@null</item>
@@ -203,7 +208,7 @@
         <item name="iconTint">@color/on_accent</item>
         <item name="iconPadding">8dp</item>
         <item name="iconGravity">textStart</item>
-        <item name="cornerRadius">10dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
     <style name="Widget.Jb.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
@@ -216,7 +221,7 @@
         <item name="android:textColor">@color/text</item>
         <item name="iconTint">@color/text_dim</item>
         <item name="android:textAllCaps">false</item>
-        <item name="cornerRadius">10dp</item>
+        <item name="cornerRadius">12dp</item>
     </style>
 
     <style name="Widget.Jb.Button.Text" parent="Widget.Material3.Button.TextButton">
@@ -287,6 +292,7 @@
         <item name="itemTextColor">@color/nav_item_color</item>
         <item name="itemActiveIndicatorStyle">@style/Widget.Jb.NavIndicator</item>
         <item name="labelVisibilityMode">labeled</item>
+        <item name="itemIconSize">22dp</item>
         <item name="android:background">@color/surface</item>
         <item name="android:elevation">0dp</item>
     </style>
@@ -297,20 +303,20 @@
         <item name="hintTextColor">@color/text_muted</item>
         <item name="android:textColorHint">@color/text_muted</item>
         <item name="boxBackgroundColor">@color/surface</item>
-        <item name="boxCornerRadiusTopStart">10dp</item>
-        <item name="boxCornerRadiusTopEnd">10dp</item>
-        <item name="boxCornerRadiusBottomStart">10dp</item>
-        <item name="boxCornerRadiusBottomEnd">10dp</item>
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
     </style>
 
     <style name="Widget.Jb.TextInput.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
         <item name="boxStrokeColor">@color/line</item>
         <item name="hintTextColor">@color/text_muted</item>
         <item name="boxBackgroundColor">@color/surface</item>
-        <item name="boxCornerRadiusTopStart">10dp</item>
-        <item name="boxCornerRadiusTopEnd">10dp</item>
-        <item name="boxCornerRadiusBottomStart">10dp</item>
-        <item name="boxCornerRadiusBottomEnd">10dp</item>
+        <item name="boxCornerRadiusTopStart">12dp</item>
+        <item name="boxCornerRadiusTopEnd">12dp</item>
+        <item name="boxCornerRadiusBottomStart">12dp</item>
+        <item name="boxCornerRadiusBottomEnd">12dp</item>
     </style>
 
     <style name="Widget.Jb.Progress" parent="Widget.AppCompat.ProgressBar.Horizontal">
@@ -336,7 +342,7 @@
     </style>
 
     <style name="ThemeOverlay.Jb.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
-        <item name="shapeAppearanceLargeComponent">@style/Shape.Jb.Large</item>
+        <item name="shapeAppearanceLargeComponent">@style/Shape.Jb.XLarge</item>
         <item name="colorSurface">@color/surface</item>
     </style>
 

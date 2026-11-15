@@ -6,6 +6,35 @@ be managed from one device without cross-contamination.
 
 No account. No cloud. No telemetry. Everything lives on the device.
 
+## New in 1.3.0
+
+**Premium emerald design** — the whole app was reworked around a deeper jade palette
+(light and dark), roundier cards/inputs/sheets, a consistent Material icon set instead of
+mixed line weights, and redrawn launcher/store assets. The browser chrome was rebuilt:
+one compact identity row (avatar with an isolation-health dot + profile name + engine
+caption, ellipsed), icon-only proxy and tracker actions, and a floating paste-progress
+pill — eliminating the tiny overlapping chips and clipped labels.
+
+**Fingerprint layer hardening** — the signals detector sites read first are now coherent:
+
+- `navigator.webdriver` reads `false` (it never lies as `undefined`)
+- UA-CH brand lists are derived from the pinned build with the rotating GREASE token
+  (`Not?A_Brand;v=99` for Chrome 131+) including a `Chromium` entry and a correct
+  `fullVersionList` (`99.0.0.0` / full build), per engine
+- `plugins`/`mimeTypes` carry real `PluginArray`/`MimeTypeArray`/`Plugin`/`MimeType`
+  `Symbol.toStringTag`s with cross-linked references, exactly as Blink exposes them
+- `permissions.query({name:'notifications'})` agrees with `Notification.permission`
+- `Intl.DateTimeFormat().resolvedOptions()` reports the profile locale **and** timezone
+- the HTTP `Accept-Language` header is aligned with `navigator.languages` where the
+  installed WebView exposes that switch
+- the node verifier grew from 66 to **94 assertions** covering all of the above
+
+**Trust & stability** — cleartext traffic is denied app-wide (loopback excepted) with an
+explicit `network_security_config`, the APK declares itself a browser app, the last
+uncaught stack trace is persisted to a private `crash-last.txt` (no analytics, never
+leaves the device), launcher long-press shortcuts (New profile / Profiles / Proxies),
+and a batch of overflow/crash fixes across the UI.
+
 ## Get the app
 
 - **GitHub Releases**: tagged releases attach the APKs (`app-debug.apk` is signed with the
@@ -19,7 +48,7 @@ No account. No cloud. No telemetry. Everything lives on the device.
 | Area | What's implemented |
 |---|---|
 | **Isolated profiles** | Per-profile in-memory jar/database partitioning via AndroidX WebKit (`MULTI_PROFILE`, one `ProfileStore` per profile). Falls back to shared WebView storage with an explicit user-facing warning when the installed WebView lacks support. |
-| **Fingerprint engine** | Seeded, internally-consistent identities: OS, screen + DPR, WebGL vendor/renderer, cores, memory, touch points, timezone, locale/accept-language, browser build pin. Canvas/audio/hardware noise injected at document-start. |
+| **Fingerprint engine** | Seeded, internally-consistent identities: OS, screen + DPR, WebGL vendor/renderer, cores, memory, touch points, timezone, locale/accept-language (and the matching HTTP header), browser build pin with rotating GREASE UA-CH brands, tagged `PluginArray`/`MimeTypeArray`, permission states coherent with `Notification.permission`. Canvas/audio/hardware noise injected at document-start. |
 | **Proxy support** | HTTP, HTTPS and SOCKS5 with username/password auth. WebView can't carry proxy credentials, so the app runs a loopback CONNECT/SOCKS5 relay (`LocalProxyRelay`) that injects them upstream — the same path the proxy tester uses, so what you test is what you get. |
 | **Proxy library** | Paste-import (`host:port`, `scheme://user:pass@host:port`, `host:port:user:pass`, etc.), live checks (exit IP, latency, geo), watchlists with **offline / recovered / exit-IP-rotated** notifications (special-use foreground service, stops itself when nothing is watched). |
 | **Paste as Human** | Types clipboard content with human timing (Relaxed/Natural/Fast/Instant) into any focused field — no extension needed. |
@@ -108,9 +137,11 @@ Being straight about what was and wasn't tested:
   CI on every push: it extracts the real script from `FingerprintScript.kt`, injects it into a
   Blink-shaped mock (values as prototype getters, `webdriver` as an own property) and asserts
   the resulting `navigator`, `screen`, timezone and canvas output, plus that two profiles never
-  collide. 66 assertions, including the timezone-offset sign (Berlin is −60 in winter, −120 in
-  summer), the `Intl` zone name, and geolocation permission modes (custom coordinates, the
-  `0,0`/out-of-range rejection, and `block`).
+  collide. 94 assertions, including the timezone-offset sign (Berlin is −60 in winter, −120 in
+  summer), the `Intl` zone name and locale, the `webdriver=false` read, UA-CH brand derivation
+  and fullVersionList for the pinned build, `PluginArray`/`MimeTypeArray` toStringTags and
+  MimeType→Plugin back-links, `permissions.query` vs `Notification.permission` agreement, and
+  geolocation permission modes (custom coordinates, the `0,0`/out-of-range rejection, and `block`).
 - ✅ **Human-typing engine executed** — `node tools/test-human-paste.js` runs the real injected
   script against a DOM mock: caret insertion, selection replacement, keydown/input/keyup per
   character, real timers, the busy guard, `no-target`, and newline handling in inputs vs textareas.
@@ -139,9 +170,18 @@ Being straight about what was and wasn't tested:
 - ⚠️ **Downloads do not use the profile proxy.** Android's `DownloadManager` cannot be pointed at
   a proxy, so a file downloaded from a proxied profile is fetched over the device's own
   connection. The app says so at the moment you download. Page loads are unaffected.
-- ❌ **Fingerprint coherence vs. live detector services** (BrowserScan, IPHey, PixelScan, …) —
-  not validated end-to-end; the editor shows the consistency warnings it computes locally and
-  the in-browser *Fingerprint check* menu opens those services inside the profile.
+- ❌ **Fingerprint coherence vs. live detector services** (IPHey, PixelScan, BrowserScan, Whoer, …) —
+  not validated end-to-end in CI; there is no device in the build pipeline. What is true: every
+  *locally controllable* signal those services read is now internally consistent (UA, UA-CH brands
+  + fullVersionList, GREASE, plugins/mimeTypes, permissions, locale, timezone + offset, WebGL,
+  canvas/audio noise, automation markers, `webdriver`). What is **not** under app control: the TLS
+  (JA3/JA4) and HTTP/2 fingerprint — those belong to the installed Android System WebView and match
+  real Chrome on Android, which is the best an app can ship; the exit proxy's IP reputation, which
+  detector sites score separately from the browser fingerprint; and WebRTC host candidates, which
+  require `webrtcMode=proxy` plus a reachable TURN relay to suppress. A proxy on a blacklisted exit
+  node will cost points no matter how clean the browser is — check the proxy's exit with the same
+  sites before blaming the fingerprint. Use the in-browser *Fingerprint check* menu (BrowserScan,
+  IPHey, PixelScan, IPFighter, Whoer) to verify inside a real session.
 
 ## Privacy
 

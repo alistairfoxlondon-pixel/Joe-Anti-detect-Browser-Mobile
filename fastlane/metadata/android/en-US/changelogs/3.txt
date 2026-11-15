@@ -1,0 +1,6 @@
+1.2.0 — multi-tab fingerprinted browsing.
+
+• Multi-tab fingerprinted browsing; cookie import/export (JSON + Netscape).
+• Batch profile actions: proxy switch, group move, fingerprint reroll, delete.
+• Trash Manager with restore / permanent delete; quick proxy and fingerprint actions on profile cards.
+• Dashboard 2×2 grid; MaterialSwitch and bottom-sheet overflow fixes; editor proxy-field preserved.

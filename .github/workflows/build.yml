@@ -140,6 +140,8 @@ jobs:
 
           What's in this build: isolated per-profile storage (AndroidX WebKit MULTI_PROFILE where supported), proxy authentication via loopback relay (HTTP/HTTPS/SOCKS5), per-profile fingerprint engine (canvas/audio/hardware noise, screen/GPU/cores/memory/locale consistency, Android UA-CH architecture fixes), paste-as-human typing, built-in HTTP tracker counter, proxy library with parallel checks and offline/rotation alerts, history, backups via JSON export.
 
-          New in v1.2.0: multi-tab fingerprinted browsing, cookie import/export (JSON + Netscape), batch profile actions (proxy switch, group move, fingerprint reroll, delete), quick proxy/fingerprint actions on profile cards, Trash Manager with restore/permanent delete, MaterialSwitch fixes, dashboard 2x2 grid, bottom-sheet overflow fixes, and profile editor proxy-field preservation.
+          New in v1.3.0: premium emerald design across every screen (launcher and store art redrawn), rebuilt browser chrome — one identity row, icon-only proxy/tracker actions, floating paste pill, no text overflow — fingerprint hardening for the detector sites (webdriver=false, rotating UA-CH GREASE brand with correct fullVersionList, tagged PluginArray/MimeTypeArray with linked references, permissions.query coherent with Notification.permission, profile locale in resolvedOptions, Accept-Language aligned with navigator.languages), cleartext traffic denied, private crash log, launcher shortcuts, overflow and crash fixes throughout.
+
+          Previously in v1.2.0: multi-tab fingerprinted browsing, cookie import/export (JSON + Netscape), batch profile actions, quick proxy/fingerprint actions on profile cards, Trash Manager, dashboard 2x2 grid, MaterialSwitch and bottom-sheet overflow fixes.
 
           All data stays on the device. See README for honest limitations (Android WebView cannot run Chrome extensions or its own sandboxed profile engine; Firefox identities are UA-level only)."

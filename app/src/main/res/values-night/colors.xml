@@ -9,41 +9,41 @@
 <resources>
 
     <!-- Layered surfaces -->
-    <color name="bg">#0C1016</color>
-    <color name="surface">#141A21</color>
-    <color name="surface_muted">#1C242E</color>
-    <color name="surface_raised">#1A222C</color>
+    <color name="bg">#0B120E</color>
+    <color name="surface">#131B16</color>
+    <color name="surface_muted">#1B251F</color>
+    <color name="surface_raised">#18211B</color>
     <color name="scrim">#99000000</color>
 
     <!-- Lines -->
-    <color name="line">#26303B</color>
-    <color name="line_soft">#1E262F</color>
+    <color name="line">#243129</color>
+    <color name="line_soft">#1E2A23</color>
 
     <!-- Type -->
-    <color name="text">#F1F4F8</color>
-    <color name="text_dim">#BCC4CF</color>
-    <color name="text_muted">#8B95A2</color>
-    <color name="text_on_accent">#0B1220</color>
+    <color name="text">#EDF3EE</color>
+    <color name="text_dim">#B9C8BD</color>
+    <color name="text_muted">#8B9B8F</color>
+    <color name="text_on_accent">#052E1F</color>
 
     <!-- Accents -->
-    <color name="accent">#6FA0FF</color>
-    <color name="accent_pressed">#4E83EE</color>
-    <color name="accent_soft">#266FA0FF</color>
-    <color name="on_accent">#08111F</color>
+    <color name="accent">#34D399</color>
+    <color name="accent_pressed">#10B981</color>
+    <color name="accent_soft">#2634D399</color>
+    <color name="on_accent">#052E1F</color>
 
-    <color name="success">#48C79A</color>
-    <color name="success_soft">#2648C79A</color>
+    <color name="success">#4ADE80</color>
+    <color name="success_soft">#264ADE80</color>
     <color name="warning">#E7B455</color>
     <color name="warning_soft">#26E7B455</color>
     <color name="danger">#FF7B72</color>
     <color name="danger_soft">#26FF7B72</color>
-    <color name="neutral">#8B95A2</color>
+    <color name="neutral">#8B9B8F</color>
 
     <!-- Hero gradient stops -->
-    <color name="hero_start">#1B3F9E</color>
-    <color name="hero_end">#0E1F52</color>
+    <color name="hero_start">#0C6B47</color>
+    <color name="hero_end">#04281A</color>
     <color name="hero_text">#FFFFFF</color>
-    <color name="hero_text_dim">#C6D6F5</color>
+    <color name="hero_text_dim">#A8D8BE</color>
 
     <!-- Legacy aliases -->
     <color name="bg_soft">@color/surface</color>

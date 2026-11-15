@@ -66,9 +66,13 @@ class MainActivity : AppCompatActivity() {
         }
 
         if (savedInstanceState == null) {
-            val initial = tabFromExtra(intent?.getStringExtra(EXTRA_OPEN_TAB))
-            binding.bottomNav.selectedItemId = initial
-            showTab(initial)
+            if (handleDeepLink(intent)) {
+                // A joe:// route decides the landing tab; see shortcuts.xml.
+            } else {
+                val initial = tabFromExtra(intent?.getStringExtra(EXTRA_OPEN_TAB))
+                binding.bottomNav.selectedItemId = initial
+                showTab(initial)
+            }
         }
 
         ProxyMonitorService.startIfNeeded(this)
@@ -77,9 +81,32 @@ class MainActivity : AppCompatActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
+        if (handleDeepLink(intent)) return
         val tab = tabFromExtra(intent.getStringExtra(EXTRA_OPEN_TAB))
         binding.bottomNav.selectedItemId = tab
         showTab(tab)
+    }
+
+    /**
+     * Launcher shortcuts route here as `joe://<route>` VIEW intents. Returns true when the
+     * intent was consumed so the caller can skip the default tab logic.
+     */
+    private fun handleDeepLink(intent: Intent?): Boolean {
+        val route = intent?.data?.takeIf { it.scheme == "joe" }?.host?.lowercase() ?: return false
+        when (route) {
+            "new" -> openProfileEditor()
+            "profiles" -> selectTab(R.id.nav_profiles)
+            "proxies" -> selectTab(R.id.nav_proxies)
+            "engines" -> selectTab(R.id.nav_browsers)
+            "tools" -> selectTab(R.id.nav_tools)
+            else -> return false
+        }
+        return true
+    }
+
+    private fun selectTab(itemId: Int) {
+        binding.bottomNav.selectedItemId = itemId
+        showTab(itemId)
     }
 
     override fun onStart() {
