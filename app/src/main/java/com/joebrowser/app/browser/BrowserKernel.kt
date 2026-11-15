@@ -7,6 +7,7 @@ import android.webkit.CookieManager
 import android.webkit.WebView
 import androidx.webkit.Profile as WebKitProfile
 import androidx.webkit.ProfileStore
+import androidx.webkit.ScriptHandler
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
 import com.joebrowser.app.core.Async
@@ -63,11 +64,11 @@ class BrowserKernel(
     /**
      * Handle to the document-start rule currently attached to the WebView.
      *
-     * Kept so a refresh can `removeDocumentStartJavaScript` it: the WebKit API has no
-     * replace, and stacking a second rule would leave the old identity's script running
-     * first, which defeats the point of the update.
+     * Kept so a refresh can remove it: `addDocumentStartJavaScript` has no replace semantics,
+     * and stacking a second rule would leave the old identity's script running first, which
+     * defeats the point of the update. `ScriptHandler.remove()` is the documented undo.
      */
-    private var startHandle: String? = null
+    private var startHandle: ScriptHandler? = null
 
     private var injectionMode: InjectionMode = InjectionMode.EARLY_FALLBACK
     private var isolationMode: IsolationMode = IsolationMode.SHARED
@@ -193,10 +194,8 @@ class BrowserKernel(
         if (injectionMode == InjectionMode.DOCUMENT_START &&
             WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         ) {
-            startHandle?.let { handle ->
-                runCatching { WebViewCompat.removeDocumentStartJavaScript(webView, handle) }
-                startHandle = null
-            }
+            runCatching { startHandle?.remove() }
+            startHandle = null
             runCatching {
                 startHandle = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
             }.onFailure {
