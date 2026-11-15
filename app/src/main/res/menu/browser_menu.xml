@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@+id/menuPasteHuman"
+        android:icon="@drawable/ic_keyboard"
+        android:title="Paste as Human"
+        android:showAsAction="never" />
+    <item android:id="@+id/menuPasteSpeed"
+        android:title="Typing speed"
+        android:showAsAction="never">
+        <menu>
+            <group android:checkableBehavior="single">
+                <item android:id="@+id/speedRelaxed" android:title="Relaxed (60–135 ms)" android:checkable="true" />
+                <item android:id="@+id/speedNatural" android:title="Natural (35–105 ms)" android:checkable="true" android:checked="true" />
+                <item android:id="@+id/speedFast" android:title="Fast (15–45 ms)" android:checkable="true" />
+                <item android:id="@+id/speedInstant" android:title="Instant" android:checkable="true" />
+            </group>
+        </menu>
+    </item>
+    <item android:id="@+id/menuFingerprint"
+        android:title="Fingerprint check"
+        android:showAsAction="never">
+        <menu>
+            <item android:id="@+id/fpBrowserScan" android:title="BrowserScan.net" />
+            <item android:id="@+id/fpIpHey" android:title="IPHey.com" />
+            <item android:id="@+id/fpPixelScan" android:title="PixelScan.com" />
+            <item android:id="@+id/fpIpFighter" android:title="IPFighter.com" />
+            <item android:id="@+id/fpWhoer" android:title="Whoer.net" />
+        </menu>
+    </item>
+    <item android:id="@+id/menuHttpTracker"
+        android:icon="@drawable/ic_shield_check"
+        android:title="HTTP Tracker"
+        android:showAsAction="never" />
+    <item android:id="@+id/menuClearData"
+        android:icon="@drawable/ic_delete"
+        android:title="Clear browsing data"
+        android:showAsAction="never" />
+</menu>

@@ -1,0 +1,1 @@
+Anti-detect browser: isolated browser profiles with per-profile proxies and fingerprints, stored locally.

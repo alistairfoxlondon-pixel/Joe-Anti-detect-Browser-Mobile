@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Joe Browser dark palette (mirrors the desktop build) -->
+    <color name="bg">#17181B</color>
+    <color name="bg_soft">#1C1D21</color>
+    <color name="sidebar">#141518</color>
+    <color name="card">#232529</color>
+    <color name="panel">#2A2C31</color>
+    <color name="panel_hover">#313339</color>
+    <color name="panel2">#2D2F34</color>
+    <color name="input">#1B1C20</color>
+    <color name="line">#33353B</color>
+    <color name="line_soft">#282A2F</color>
+    <color name="text">#F2F3F5</color>
+    <color name="text_dim">#C3C6CC</color>
+    <color name="text_faint">#9A9EA6</color>
+    <color name="accent">#5B9BF7</color>
+    <color name="accent_hover">#74ADFF</color>
+    <color name="accent_pressed">#4485E0</color>
+    <color name="on_accent">#FFFFFF</color>
+    <color name="success">#4EC38A</color>
+    <color name="danger">#F26D76</color>
+    <color name="warning">#E8B34B</color>
+    <color name="accent_soft">#265B9BF7</color>
+    <color name="success_soft">#264EC38A</color>
+    <color name="danger_soft">#26F26D76</color>
+    <color name="warning_soft">#26E8B34B</color>
+    <color name="scrim">#8C000000</color>
+</resources>

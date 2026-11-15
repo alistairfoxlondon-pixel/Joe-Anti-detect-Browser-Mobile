@@ -1,0 +1,27 @@
+Joe Browser gives every browser profile its own isolated identity on your Android device — its own cookies, storage, proxy and fingerprint — so you can manage multiple accounts side by side without them bleeding into each other. Everything stays on your phone. There is no account, no sync service and no telemetry.
+
+WHAT EACH PROFILE GETS
+• Isolated web storage — per-profile cookie jar and site data (AndroidX WebKit MULTI_PROFILE where supported)
+• A unique, internally consistent fingerprint — OS, screen and DPR, WebGL vendor/renderer, CPU cores, memory, touch points, timezone and locale always agree with each other
+• Canvas, audio and hardware noise injected at document start
+• Its own proxy: HTTP, HTTPS and SOCKS5, including username/password authentication via an on-device CONNECT relay
+
+PROXY LIBRARY
+• Paste a whole proxy list and Joe Browser parses it, checks every endpoint (exit IP, latency, country) and keeps it healthy
+• Watch any proxy: get notified the moment it drops offline, recovers, or its exit IP rotates
+• System WebView can't carry proxy credentials, so Joe Browser bridges them through a local relay — the exact path its checker uses, so what you test is what you get
+
+EVERYDAY TOOLS
+• Paste as Human: types clipboard text with human timing into any field
+• Built-in tracker counter: see which requests and known trackers each page fires
+• History with soft-delete trash, JSON backup export, one-tap fingerprint checks (BrowserScan, IPHey, PixelScan, IPFighter, Whoer)
+
+PRIVATE BY DESIGN
+• All data local to the device; backups and device transfer excluded by default
+• Proxy passwords encrypted with the Android Keystore (AES-256-GCM)
+• No ads, no analytics, no account required
+
+HONEST LIMITATIONS
+Joe Browser is not an anonymity cloak. Sites can still correlate accounts by IP address, logins and behavior. Firefox identities are UA-level only (rendering is the system WebView). Some very old WebViews share storage between profiles and the app says so on screen when that happens. The Extensions tab keeps store links for your profiles — Android WebViews cannot execute browser extensions.
+
+For power users managing multiple client accounts, social profiles, QA personas and scraping identities — without renting a cloud anti-detect subscription.
