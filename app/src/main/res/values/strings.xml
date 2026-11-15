@@ -144,6 +144,7 @@
     <string name="editor_created">Profile created</string>
     <string name="editor_interval_value">every %1$d s</string>
     <string name="editor_custom_ua">Custom user agent</string>
+    <string name="editor_custom_ua_hint">Uses the generated identity when empty</string>
     <string name="editor_lat">Latitude</string>
     <string name="editor_lng">Longitude</string>
     <string name="editor_human_jitter">Keystroke rhythm</string>

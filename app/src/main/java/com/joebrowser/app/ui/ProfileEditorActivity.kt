@@ -269,6 +269,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         binding.editorCores.setText(fp.cores.toString(), false)
         binding.editorMemory.setText(fp.memory.toString() + " GB", false)
         binding.gpuVendorText.text = fp.webglVendor
+        binding.editorUserAgent.setText(fp.userAgentOverride)
         binding.editorTimezone.setText(fp.timezone, false)
         binding.editorLanguage.setText(fp.language, false)
         binding.switchAutoMatch.isChecked = fp.autoMatchProxy
@@ -319,6 +320,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         listOf(
             binding.editorName, binding.editorGroup, binding.editorTags, binding.editorNotes,
             binding.editorStartUrl, binding.editorScreenW, binding.editorScreenH, binding.editorDpr,
+            binding.editorUserAgent,
             binding.editorProxyHost, binding.editorProxyPort, binding.editorProxyUser,
             binding.editorProxyPass, binding.editorLat, binding.editorLng
         ).forEach { field ->
@@ -657,6 +659,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         profile.group = binding.editorGroup.text?.toString()?.trim().orEmpty()
         profile.tags = binding.editorTags.text?.toString()?.trim().orEmpty()
         profile.notes = binding.editorNotes.text?.toString()?.trim().orEmpty()
+        fp.userAgentOverride = binding.editorUserAgent.text?.toString()?.trim().orEmpty()
         profile.startUrl = binding.editorStartUrl.text?.toString()?.trim().orEmpty()
             .ifBlank { Prefs.defaultStartUrl(this) }
         val proxyEnabled = binding.switchProxy.isChecked

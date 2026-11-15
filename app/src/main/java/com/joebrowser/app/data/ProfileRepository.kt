@@ -72,6 +72,9 @@ object ProfileRepository {
         Async.serialize {
             val saved = runCatching {
                 db(app).saveProfile(profile)
+                // Materialise the profile's private directory tree on first save so the very
+                // first launch already has isolated storage to write into.
+                ProfileStorage.ensure(app, profile.id)
                 profile
             }.getOrNull()
             if (saved != null) {
@@ -117,6 +120,9 @@ object ProfileRepository {
         Async.serialize {
             val copy = profile.duplicate()
             val saved = runCatching { db(app).saveProfile(copy); copy }.getOrNull()
+            // The copy gets its own isolated storage tree and its own WebKit bucket token,
+            // so the clone never shares cookies with the original.
+            saved?.let { ProfileStorage.ensure(app, it.id) }
             Async.onMain { onDone(saved) }
             notifyChanged()
         }
