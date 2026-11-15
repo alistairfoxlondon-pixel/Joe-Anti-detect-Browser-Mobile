@@ -394,7 +394,12 @@ class ProfileEditorActivity : AppCompatActivity() {
         if (profile.engine == engine) return
         profile.browserKind = engine.id
         // Build numbers are engine-specific (Gecko 134.0.2 vs Blink 134.0.6998.89).
-        profile.fp.browserVersion = FingerprintFactory.latestBuildFor(engine)
+        // On iOS the browser version tracks the iOS release, not a desktop Chromium build.
+        profile.fp.browserVersion = if (profile.fp.os == "iPhone" || profile.fp.os == "iPad") {
+            FingerprintFactory.buildForIos(engine, profile.fp.iosVersion)
+        } else {
+            FingerprintFactory.latestBuildFor(engine)
+        }
         profile.browserVersion = profile.fp.browserVersion
         markDirty()
         updateFingerprintSummary()

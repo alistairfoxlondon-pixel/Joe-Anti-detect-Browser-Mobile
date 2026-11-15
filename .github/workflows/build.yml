@@ -47,6 +47,10 @@ jobs:
         shell: bash
         run: node tools/test-human-paste.js
 
+      - name: Verify user-agent matrix
+        shell: bash
+        run: node tools/test-user-agent.js
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 

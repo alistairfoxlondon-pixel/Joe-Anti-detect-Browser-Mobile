@@ -289,7 +289,12 @@ object FingerprintFactory {
         osAndroidVersion(resolvedOs, screen)?.let { fp.androidVersion = it }
         iosVersionOf(resolvedOs, screen)?.let { fp.iosVersion = it }
 
-        fp.browserVersion = buildFor(engine, random)
+        // iOS identities report an iOS release; every other OS reports an engine build.
+        fp.browserVersion = if (resolvedOs == "iPhone" || resolvedOs == "iPad") {
+            buildForIos(engine, fp.iosVersion)
+        } else {
+            buildFor(engine, random)
+        }
     }
 
     fun acceptLanguageFor(language: String): String {
@@ -323,6 +328,23 @@ object FingerprintFactory {
 
     /** Picks the newest known build for an engine (used when only the brand changes). */
     fun latestBuildFor(engine: BrowserEngine): String = buildsFor(engine).first()
+
+    /**
+     * The version token a browser reports *on iOS*.
+     *
+     * Every iOS browser is a WebKit shell and reports its own iOS release, not a desktop
+     * Chromium build: Chrome on iOS says `CriOS/134.0.6998.89` only in fiction — real CriOS,
+     * EdgiOS and FxiOS builds track the iOS release. Returning the Chromium build number here
+     * produced a string no iPhone has ever sent.
+     */
+    fun buildForIos(engine: BrowserEngine, iosVersion: String?): String {
+        val release = iosVersion?.takeIf { it.isNotBlank() && it != "auto" } ?: "18.3"
+        return when (engine) {
+            // Firefox on iOS reports its own app version, which is close to the engine number.
+            BrowserEngine.FIREFOX -> "134.0"
+            else -> release
+        }
+    }
 
     // ------------------------------------------------------------------- UA
 
@@ -365,10 +387,13 @@ object FingerprintFactory {
                 val device = if (fp.os == "iPhone") "iPhone" else "iPad"
                 val cpu = if (fp.os == "iPhone") "CPU iPhone OS $token" else "CPU OS $token"
                 val safari = fp.iosVersion.takeIf { it.isNotBlank() && it != "auto" } ?: "18.3"
+                // Firefox on iOS is a WebKit wrapper (FxiOS): it reports the iOS release in its
+                // platform token and its own app version, never a Gecko build string.
+                val iosApp = if (fp.browserVersion.contains(".")) fp.browserVersion else "$safari"
                 when (engine) {
-                    BrowserEngine.FIREFOX -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/$firefox.0 Mobile/15E148 Safari/605.1.15"
-                    BrowserEngine.EDGE -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/$chromium.0.0.0 Mobile/15E148 Safari/605.1.15"
-                    BrowserEngine.CHROME -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/$chromium.0.0.0 Mobile/15E148 Safari/605.1.15"
+                    BrowserEngine.FIREFOX -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) FxiOS/$iosApp Mobile/15E148 Safari/605.1.15"
+                    BrowserEngine.EDGE -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) EdgiOS/$iosApp Mobile/15E148 Safari/605.1.15"
+                    BrowserEngine.CHROME -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/$iosApp Mobile/15E148 Safari/605.1.15"
                     else -> "Mozilla/5.0 ($device; $cpu like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/$safari Mobile/15E148 Safari/604.1"
                 }
             }
@@ -416,6 +441,19 @@ object FingerprintFactory {
             if (!fp.webglRenderer.contains("Apple GPU")) {
                 out += FingerprintWarning("iOS always reports the bare Apple GPU renderer", "high")
             }
+        }
+        if ((fp.os == "iPhone" || fp.os == "iPad") && engine != BrowserEngine.FIREFOX &&
+            engine != BrowserEngine.CHROME && engine != BrowserEngine.EDGE
+        ) {
+            // On iOS the only browsers are WebKit shells: Safari, Chrome (CriOS), Edge (EdgiOS)
+            // and Firefox (FxiOS). A 'Brave' or 'Chromium' identity there has no counterpart.
+            out += FingerprintWarning(
+                engine.title + " does not exist as a separate browser on iOS — pages will see a Safari-family client",
+                "medium"
+            )
+        }
+        if ((fp.os == "iPhone" || fp.os == "iPad") && !fp.browserVersion.contains(".")) {
+            out += FingerprintWarning("iOS browser version is not an iOS release number", "high")
         }
         if (fp.os == "Android" && fp.webglRenderer.contains("Direct3D")) {
             out += FingerprintWarning("Android with a Direct3D renderer — impossible", "high")
