@@ -1,6 +1,11 @@
 package com.joebrowser.app.browser
 
+import android.net.Uri
 import android.webkit.WebView
+import androidx.webkit.JavaScriptReplyProxy
+import androidx.webkit.WebMessageCompat
+import androidx.webkit.WebViewCompat
+import androidx.webkit.WebViewFeature
 import org.json.JSONObject
 
 /**
@@ -75,14 +80,22 @@ object HumanPaste {
                 }
             }
         }.onFailure { onResult(Result(false, "The page is not ready")) }
-        // Progress reporting is optional; the injected loop calls back through a JS bridge
-        // hook that the activity registers on the WebView (see BrowserActivity).
-        onProgress?.let { callback -> progressSink = callback }
+        // Progress arrives asynchronously through the WebMessageListener channel; the caller
+        // may also pass a callback here for one-shot use.
+        progressSink = onProgress
     }
+
+    /** Name of the injected-object that receives progress messages from the page. */
+    const val BRIDGE_NAME = "JoePaste"
 
     /** Last progress callback registered; cleared after completion. */
     @Volatile
     private var progressSink: ((Int, Int) -> Unit)? = null
+
+    /** Screens register their progress UI here; the browser forwards page messages to it. */
+    fun setProgressSink(callback: ((Int, Int) -> Unit)?) {
+        progressSink = callback
+    }
 
     fun reportProgress(typed: Int, total: Int) {
         progressSink?.invoke(typed, total)
@@ -90,6 +103,36 @@ object HumanPaste {
 
     fun clearProgressSink() {
         progressSink = null
+    }
+
+    /**
+     * Registers the message channel on a WebView.
+     *
+     * Uses `WebViewCompat.addWebMessageListener`, which is origin-scoped and only exposes the
+     * object to the main frame — unlike `addJavascriptInterface`, which would hand every ad
+     * iframe a native object to poke at.
+     */
+    fun attachBridge(webView: WebView, onMessage: (String) -> Unit) {
+        if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return
+        runCatching {
+            WebViewCompat.addWebMessageListener(
+                webView,
+                BRIDGE_NAME,
+                setOf("*"),
+                object : WebViewCompat.WebMessageListener {
+                    override fun onPostMessage(
+                        view: WebView,
+                        message: WebMessageCompat,
+                        sourceOrigin: Uri,
+                        isMainFrame: Boolean,
+                        replyProxy: JavaScriptReplyProxy
+                    ) {
+                        if (!isMainFrame) return
+                        onMessage(message.data.orEmpty())
+                    }
+                }
+            )
+        }.onFailure { android.util.Log.w("JoePaste", "WebMessageListener unavailable", it) }
     }
 
     /** Normalises clipboard text so pages receive what a person would actually type. */
@@ -139,6 +182,21 @@ object HumanPaste {
   var CFG = __CFG__;
   if (window.__jbTyping) return 'busy';
   window.__jbTyping = true;
+
+  /*
+   * Progress transport. The app registers an AndroidX WebMessageListener object named
+   * 'JoePaste' on the WebView only (never a JavascriptInterface, which would be reachable from
+   * any frame). Every call is wrapped: a page that removes the object simply loses progress
+   * reporting, not the typing itself.
+   */
+  function postToApp(payload) {
+    try {
+      var bridge = window.JoePaste;
+      if (bridge && bridge.postMessage) {
+        bridge.postMessage(payload);
+      }
+    } catch (e) {}
+  }
 
   function isEditable(node) {
     if (!node || node.nodeType !== 1) return false;
@@ -252,7 +310,7 @@ object HumanPaste {
       try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}
       try { el.dispatchEvent(new Event('blur', { bubbles: false })); } catch (e) {}
       window.__jbTyping = false;
-      try { if (window.JoeBridge && window.JoeBridge.onTypingDone) window.JoeBridge.onTypingDone(); } catch (e) {}
+      try { postToApp('done|' + index + '|' + total); } catch (e) {}
       return;
     }
     var ch = CFG.text.charAt(index);
@@ -265,7 +323,7 @@ object HumanPaste {
     }
     fireKey(el, 'keyup', ch === '\n' ? 'Enter' : ch);
     index++;
-    try { if (window.JoeBridge && window.JoeBridge.onTypingProgress) window.JoeBridge.onTypingProgress(index, total); } catch (e) {}
+    try { postToApp('progress|' + index + '|' + total); } catch (e) {}
     setTimeout(step, nextDelay(ch));
   }
 

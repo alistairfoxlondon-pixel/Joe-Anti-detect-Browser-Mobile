@@ -261,6 +261,7 @@
     <string name="browser_paste_empty">Clipboard is empty</string>
     <string name="browser_paste_started">Typing %1$s</string>
     <string name="browser_paste_progress">Typing %1$d of %2$d</string>
+    <string name="browser_paste_done">Typed %1$d characters</string>
     <string name="browser_tracker_title">HTTP tracker</string>
     <string name="browser_tracker_empty">No requests recorded yet</string>
     <string name="browser_tracker_summary">%1$d requests · %2$d trackers</string>

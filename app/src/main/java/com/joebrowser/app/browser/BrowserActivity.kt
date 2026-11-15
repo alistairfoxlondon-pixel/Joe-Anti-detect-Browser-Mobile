@@ -75,6 +75,11 @@ class BrowserActivity : AppCompatActivity() {
 
     private lateinit var binding: ActivityBrowserBinding
     private var profile: Profile? = null
+
+    /** Returns the badge to the live proxy state once a transient message has been read. */
+    private val badgeReset = Runnable {
+        if (!isFinishing && !isDestroyed && ::binding.isInitialized) bindProxyBadge()
+    }
     private var kernel: BrowserKernel? = null
     private var webView: WebView? = null
 
@@ -158,6 +163,7 @@ class BrowserActivity : AppCompatActivity() {
             web, ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT)
         )
         kernel?.install(web)
+        HumanPaste.attachBridge(web) { message -> onPasteMessage(message) }
 
         tracker = TrackerMonitor { _, trackers ->
             // Counts feed the tracker sheet; the chip only nudges once, never per request.
@@ -327,6 +333,10 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun bindProxyResult(result: ProxyTestResult) {
         binding.browserProxyBadge.visibility = View.VISIBLE
+        // The badge is only actionable when the probe failed; a healthy badge must not look
+        // tappable, or a tap that does nothing reads as a broken control.
+        binding.browserProxyBadge.setOnClickListener(null)
+        binding.browserProxyBadge.isClickable = false
         if (result.ok) {
             binding.browserProxyBadge.text =
                 getString(R.string.browser_proxy_ok, result.country.ifBlank { result.ip }, result.latencyMs)
@@ -334,6 +344,7 @@ class BrowserActivity : AppCompatActivity() {
         } else {
             binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
             binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.danger))
+            binding.browserProxyBadge.isClickable = true
             binding.browserProxyBadge.setOnClickListener {
                 MaterialAlertDialogBuilder(this)
                     .setTitle(R.string.browser_proxy_failed)
@@ -352,6 +363,37 @@ class BrowserActivity : AppCompatActivity() {
         ProxyMonitorEngine.verifyBeforeLaunch(this, loaded) { result ->
             if (isFinishing || isDestroyed) return@verifyBeforeLaunch
             bindProxyResult(result)
+        }
+    }
+
+    /**
+     * Puts the badge back to whatever the live session state is: hidden for a direct profile,
+     * the last measurement for a routed one, or "checking" while a fresh probe is in flight.
+     */
+    private fun bindProxyBadge() {
+        val loaded = profile
+        val config = loaded?.proxy
+        if (config == null || !config.enabled) {
+            hideProxyBadge()
+            return
+        }
+        binding.browserProxyBadge.visibility = View.VISIBLE
+        binding.browserProxyBadge.setOnClickListener(null)
+        binding.browserProxyBadge.isClickable = false
+        when {
+            config.lastIp.isNotBlank() && config.latencyMs >= 0 -> {
+                binding.browserProxyBadge.text =
+                    getString(R.string.browser_proxy_ok, config.lastCountry.ifBlank { config.lastIp }, config.latencyMs)
+                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
+            }
+            config.lastError.isNotBlank() -> {
+                binding.browserProxyBadge.text = getString(R.string.browser_proxy_failed)
+                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.danger))
+            }
+            else -> {
+                binding.browserProxyBadge.text = getString(R.string.browser_proxy_checking)
+                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.text_muted))
+            }
         }
     }
 
@@ -515,6 +557,33 @@ class BrowserActivity : AppCompatActivity() {
     }
 
     /** Types the clipboard into the focused field using the real timing engine. */
+    /**
+     * Receives `progress|typed|total` and `done|typed|total` from the typing loop.
+     * The badge doubles as the progress label so no extra chrome is needed.
+     */
+    private fun onPasteMessage(raw: String) {
+        if (!::binding.isInitialized) return
+        val parts = raw.split('|')
+        if (parts.size < 3) return
+        val typed = parts[1].toIntOrNull() ?: return
+        val total = parts[2].toIntOrNull() ?: return
+        if (total <= 0) return
+        when (parts[0]) {
+            "progress" -> {
+                binding.browserProxyBadge.visibility = View.VISIBLE
+                binding.browserProxyBadge.text = getString(R.string.browser_paste_progress, typed, total)
+                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.accent))
+            }
+            "done" -> {
+                binding.browserProxyBadge.text = getString(R.string.browser_paste_done, typed)
+                binding.browserProxyBadge.setTextColor(ContextCompat.getColor(this, R.color.success))
+                // Let the proxy badge reclaim the slot shortly after typing finishes.
+                binding.browserProxyBadge.removeCallbacks(badgeReset)
+                binding.browserProxyBadge.postDelayed(badgeReset, 2500L)
+            }
+        }
+    }
+
     private fun pasteAsHuman() {
         val web = webView ?: return
         val clipboard = runCatching {
@@ -529,7 +598,12 @@ class BrowserActivity : AppCompatActivity() {
         val speed = Prefs.humanPasteSpeed(this)
         val jitter = profile?.tools?.humanPasteJitter ?: true
         Async.toast(this, getString(R.string.browser_paste_started, HumanPaste.describe(clipboard, speed)))
-        HumanPaste.clearProgressSink()
+        HumanPaste.setProgressSink { typed, total ->
+            if (!isFinishing && !isDestroyed && ::binding.isInitialized) {
+                binding.browserProxyBadge.visibility = View.VISIBLE
+                binding.browserProxyBadge.text = getString(R.string.browser_paste_progress, typed, total)
+            }
+        }
         HumanPaste.type(
             webView = web,
             text = clipboard,
@@ -1059,6 +1133,7 @@ class BrowserActivity : AppCompatActivity() {
         trackerSheet?.dismiss()
         trackerSheet = null
         HumanPaste.clearProgressSink()
+        binding.browserProxyBadge.removeCallbacks(badgeReset)
         runCatching { binding.browserWebViewFrame.removeAllViews() }
         runCatching { webView?.stopLoading() }
         runCatching { webView?.webChromeClient = null }
