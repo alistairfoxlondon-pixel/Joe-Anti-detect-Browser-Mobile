@@ -31,6 +31,10 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Verify fingerprint layer
+        shell: bash
+        run: node tools/verify-fingerprint.js
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 

@@ -67,6 +67,12 @@ Google Maven + Maven Central.
 
 `gradle/wrapper/gradle-wrapper.jar` is committed; the wrapper downloads Gradle 8.10.2.
 
+The fingerprint layer can be checked without Android at all:
+
+```bash
+node tools/verify-fingerprint.js
+```
+
 ## Signing (for maintainers)
 
 Release builds are signed only when keystore material is present:
@@ -92,6 +98,11 @@ Being straight about what was and wasn't tested:
   `R.*` resolves (the build fails otherwise).
 - ✅ **Static audit** — view-binding ids cross-checked against their layouts, internal imports and
   cross-class member calls verified, no `TODO`/stub paths left in `app/src/main`.
+- ✅ **Fingerprint layer executed, not just compiled** — `node tools/verify-fingerprint.js` runs in
+  CI on every push: it extracts the real script from `FingerprintScript.kt`, injects it into a
+  Blink-shaped mock (values as prototype getters, `webdriver` as an own property) and asserts
+  the resulting `navigator`, `screen`, timezone and canvas output, plus that two profiles never
+  collide.
 - ❌ **Not run on a device/emulator yet** — no instrumented UI test has been executed. First-run
   flows (WebView `MULTI_PROFILE` bucket binding, document-start injection, proxy relay CONNECT,
   tracker sheet, downloads, file chooser, fullscreen video) are implemented but untested at

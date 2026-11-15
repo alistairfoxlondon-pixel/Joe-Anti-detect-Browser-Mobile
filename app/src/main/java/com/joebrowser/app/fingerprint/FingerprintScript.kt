@@ -72,6 +72,40 @@ object FingerprintScript {
     if (!proto) return;
     try { Object.defineProperty(proto, prop, { get: getter, configurable: true, enumerable: true }); } catch (e) {}
   }
+  /*
+   * Some properties are own, non-enumerable descriptors on the instance rather than the
+   * prototype (navigator.webdriver is the famous one). The prototype patch above cannot
+   * reach those, so this walks the object first and only falls back to the prototype.
+   */
+  /*
+   * A prototype getter is shadowed by an own property, and vice versa: whichever one the
+   * engine consults first wins. These two helpers therefore always act as a pair — install on
+   * the instance AND on the prototype, and only declare success when reading the property back
+   * returns what we intended.
+   */
+  function installOwn(target, prop, getter) {
+    if (!target) return false;
+    try {
+      var own = Object.getOwnPropertyDescriptor(target, prop);
+      if (own && own.configurable === false) return false;
+      Object.defineProperty(target, prop, { get: getter, configurable: true, enumerable: false });
+      return true;
+    } catch (e) { return false; }
+  }
+  function patchOwn(target, proto, prop, getter) {
+    var onInstance = installOwn(target, prop, getter);
+    patchGetter(proto, prop, getter);
+    // If the instance descriptor is locked, undo the prototype patch so the object does not
+    // end up with two disagreeing definitions.
+    if (!onInstance && proto) {
+      try {
+        var locked = Object.getOwnPropertyDescriptor(target, prop);
+        if (locked && locked.configurable === false) {
+          Object.defineProperty(proto, prop, { get: function () { return target[prop]; }, configurable: true, enumerable: true });
+        }
+      } catch (e) {}
+    }
+  }
 """
 
     fun build(fp: FingerprintConfig, engine: BrowserEngine, unlockSelection: Boolean): String {
@@ -357,8 +391,15 @@ __PATCH_HELPERS__
     patchGetter(nav, 'maxTouchPoints', function () { return JB.touch; });
     patchGetter(nav, 'language', function () { return JB.language; });
     patchGetter(nav, 'languages', function () { return Object.freeze(JB.languages.slice()); });
-    patchGetter(nav, 'webdriver', function () { return undefined; });
+    // navigator.webdriver is an own property in Blink, so the pair helper is required here.
+    patchOwn(window.navigator, nav, 'webdriver', function () { return undefined; });
     patchGetter(nav, 'productSub', function () { return '20030107'; });
+    // Belt and braces: if some WebView keeps a locked own descriptor, remove it entirely.
+    try {
+      if (window.navigator && window.navigator.webdriver !== undefined) {
+        delete window.navigator.webdriver;
+      }
+    } catch (e) {}
     patchGetter(nav, 'cookieEnabled', function () { return true; });
     patchGetter(nav, 'doNotTrack', function () { return JB.doNotTrack ? '1' : null; });
     patchGetter(nav, 'pdfViewerEnabled', function () { return !!JB.pdfViewer; });
