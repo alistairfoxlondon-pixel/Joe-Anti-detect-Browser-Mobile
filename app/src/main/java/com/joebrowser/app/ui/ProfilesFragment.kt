@@ -129,26 +129,26 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         val engines = BrowserEngine.entries
         val engineLabels = engines.map { it.title }
         sheet.bulkEngine.setText(engineLabels[0], false)
-        sheet.bulkEngine.setSimpleItems(engineLabels.toTypedArray())
+        UiKit.bindDropdown(sheet.bulkEngine, engineLabels)
 
         val osLabels = FingerprintFactory.osList
         val defaultOs = osLabels.indexOf("Android").coerceAtLeast(0)
         sheet.bulkOs.setText(osLabels[defaultOs], false)
-        sheet.bulkOs.setSimpleItems(osLabels.toTypedArray())
+        UiKit.bindDropdown(sheet.bulkOs, osLabels)
 
         // Proxy options: Direct + every saved proxy, loaded off the main thread.
+        var proxyIndex = 0
         val proxyIds = mutableListOf<String?>(null)
         val proxyLabels = mutableListOf(getString(R.string.bulk_proxy_none))
         sheet.bulkProxy.setText(proxyLabels.first(), false)
+        UiKit.bindDropdown(sheet.bulkProxy, proxyLabels.toList()) { proxyIndex = it }
         ProfileRepository.proxies(requireContext()) { proxies ->
             proxies.forEach { saved ->
                 proxyIds.add(saved.id)
                 proxyLabels.add(saved.displayName())
             }
-            if (_binding != null) sheet.bulkProxy.setSimpleItems(proxyLabels.toTypedArray())
+            if (_binding != null) UiKit.bindDropdown(sheet.bulkProxy, proxyLabels.toList())
         }
-        var proxyIndex = 0
-        sheet.bulkProxy.setOnItemClickListener { _, _, position, _ -> proxyIndex = position }
 
         sheet.bulkCreateButton.setOnClickListener {
             val base = sheet.bulkNameInput.text?.toString()?.trim().orEmpty()

@@ -305,6 +305,34 @@ object UiKit {
             setOnClickListener { onClick() }
         }
 
+    /**
+     * Dropdown helper for [android.widget.AutoCompleteTextView].
+     *
+     * `setSimpleItems` exists on MaterialAutoCompleteTextView only; this takes the plain
+     * widget and wires an ArrayAdapter, which is what the profile editor already does — one
+     * implementation instead of two subtly different ones.
+     */
+    fun bindDropdown(
+        view: android.widget.AutoCompleteTextView,
+        items: List<String>,
+        onPick: ((Int) -> Unit)? = null
+    ) {
+        view.setAdapter(
+            android.widget.ArrayAdapter(
+                view.context, android.R.layout.simple_dropdown_item_1line, items
+            )
+        )
+        view.threshold = 0
+        if (onPick != null) {
+            view.setOnItemClickListener { _, _, position, _ -> onPick(position) }
+        }
+        view.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) runCatching { view.showDropDown() }
+            else runCatching { view.dismissDropDown() }
+        }
+        view.setOnClickListener { runCatching { view.showDropDown() } }
+    }
+
     /** Grow a view to fill remaining horizontal space in a LinearLayout row. */
     fun View.fillWidth(weight: Float = 1f) {
         val params = layoutParams as? LinearLayout.LayoutParams ?: return

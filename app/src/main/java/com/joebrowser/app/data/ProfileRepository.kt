@@ -190,10 +190,9 @@ object ProfileRepository {
                     FingerprintFactory.regenerate(profile.fp, os, proxy?.config?.lastCountryCode, engine)
                     FingerprintFactory.ensureUnique(profile.fp, existing)
                     existing += FingerprintFactory.signature(profile.fp)
-                    if (proxy != null) {
-                        profile.proxy = proxy.config.duplicate()
-                        profile.proxy.enabled = true
-                    }
+                    // `enabled` is derived from type/host/port, so assigning the config is
+                    // enough — a proxy with a host and port is on by definition.
+                    if (proxy != null) profile.proxy = proxy.config.duplicate()
                     db(app).saveProfile(profile)
                     ProfileStorage.ensure(app, profile.id)
                     created += profile
