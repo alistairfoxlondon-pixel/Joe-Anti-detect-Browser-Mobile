@@ -339,7 +339,6 @@
                 android:selectAllOnFocus="true"
                 android:singleLine="true"
                 android:textColor="@color/text"
-                android:textColorHint="@color:text_muted"
                 android:textSize="13sp" />
 
             <ImageButton
