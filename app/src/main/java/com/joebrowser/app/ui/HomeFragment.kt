@@ -61,6 +61,7 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
         binding.metricProfiles.setOnClickListener { main?.setSelectedTab(R.id.nav_profiles) }
         binding.metricProxies.setOnClickListener { main?.setSelectedTab(R.id.nav_proxies) }
         binding.metricAlerts.setOnClickListener { main?.setSelectedTab(R.id.nav_proxies) }
+        binding.metricRunning.setOnClickListener { main?.setSelectedTab(R.id.nav_profiles) }
         binding.seeAllProfiles.setOnClickListener { main?.setSelectedTab(R.id.nav_profiles) }
         binding.monitorStatus.setOnClickListener { main?.setSelectedTab(R.id.nav_proxies) }
         binding.recentEmpty.setOnClickListener { main?.openProfileEditor() }
@@ -178,9 +179,16 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
             val target = _binding ?: return@alerts
             bindAlerts(target, alerts)
         }
+        // The counters used to be swapped: the Open-windows card showed the alerts tile's frame
+        // and the alerts tile was fed the window count, so "Monitor alerts" read 1 whenever one
+        // browser was open and the window count never appeared anywhere.
         Async.compute({ BrowserActivity.openWindowCount() }) { count ->
             val target = _binding ?: return@compute
-            target.metricAlertsValue.text = (count ?: 0).toString()
+            target.metricRunningValue.text = (count ?: 0).toString()
+        }
+        ProfileRepository.alertCount(app) { count ->
+            val target = _binding ?: return@alertCount
+            target.metricAlertsValue.text = count.toString()
         }
         Async.compute({ ProxyMonitorEngine.statusLine(app) to ProxyMonitorEngine.watchedCount(app) }) { result ->
             val target = _binding ?: return@compute

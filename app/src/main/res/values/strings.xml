@@ -42,7 +42,8 @@
     <string name="home_subtitle">Isolated identities on this device</string>
     <string name="home_metric_profiles">Profiles</string>
     <string name="home_metric_proxies">Proxies online</string>
-    <string name="home_metric_running">Open windows</string>
+    <string name="home_metric_running">Windows open</string>
+    <string name="home_metric_alerts">Monitor alerts</string>
     <string name="home_new_profile">New profile</string>
     <string name="home_section_recent">Recent profiles</string>
     <string name="home_section_alerts">Monitor alerts</string>

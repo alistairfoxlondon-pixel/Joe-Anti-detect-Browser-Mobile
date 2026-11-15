@@ -343,6 +343,16 @@ class Database private constructor(context: Context) :
         -1L
     }
 
+    /** Counts the alert log without materialising rows (Home's metric card). */
+    fun alertCount(): Int = try {
+        readableDatabase.rawQuery("SELECT COUNT(*) FROM alerts", null).use { c ->
+            if (c.moveToFirst()) c.getInt(0) else 0
+        }
+    } catch (t: Throwable) {
+        Log.w(Async.TAG, "alertCount failed", t)
+        0
+    }
+
     fun getAlerts(limit: Int = 40): List<MonitorAlert> = try {
         readableDatabase.query("alerts", null, null, null, null, null, "ts DESC", limit.toString()).use { c ->
             val out = ArrayList<MonitorAlert>()

@@ -226,6 +226,11 @@ object ProfileRepository {
         Async.compute({ db(app).getAlerts(limit) }) { onResult(it ?: emptyList()) }
     }
 
+    fun alertCount(context: Context, onResult: (Int) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).alertCount() }) { onResult(it ?: 0) }
+    }
+
     fun clearAlerts(context: Context, onDone: () -> Unit = {}) {
         val app = context.applicationContext
         Async.serialize {

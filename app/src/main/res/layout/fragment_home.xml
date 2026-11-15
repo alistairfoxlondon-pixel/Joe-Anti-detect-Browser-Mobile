@@ -182,6 +182,36 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
+                    android:text="@string/home_metric_alerts"
+                    android:textAppearance="@style/Text.Jb.Caption" />
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/metricRunning"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="@dimen/gap_s"
+                android:layout_weight="1"
+                android:background="@drawable/bg_card"
+                android:clickable="true"
+                android:focusable="true"
+                android:orientation="vertical"
+                android:padding="14dp">
+
+                <TextView
+                    android:id="@+id/metricRunningValue"
+                    style="@style/Text.Jb.Metric"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="0" />
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
                     android:text="@string/home_metric_running"
                     android:textAppearance="@style/Text.Jb.Caption" />
             </LinearLayout>
