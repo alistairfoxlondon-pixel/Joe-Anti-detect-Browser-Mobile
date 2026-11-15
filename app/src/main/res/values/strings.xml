@@ -34,7 +34,7 @@
     <string name="action_check_all">Check all</string>
     <string name="action_launch">Launch</string>
     <string name="action_duplicate">Duplicate</string>
-    <string name="action_see_all">See all</string>
+    <string name="action_see_all">All</string>
     <string name="shortcut_new_short">New profile</string>
     <string name="shortcut_new_long">New profile</string>
     <string name="shortcut_profiles_short">Profiles</string>
@@ -59,7 +59,7 @@
     <!-- Profiles -->
     <string name="profiles_search_hint">Search…</string>
     <string name="profiles_empty_title">No profiles yet</string>
-    <string name="profiles_empty_body">Isolated storage &amp; fingerprint</string>
+    <string name="profiles_empty_body">Storage &amp; fingerprint isolated</string>
     <string name="profiles_no_match_title">No matches</string>
     <string name="profiles_no_match_body">Try another search</string>
     <string name="profiles_create_first">Create profile</string>
@@ -72,7 +72,7 @@
     <string name="bulk_proxy">Proxy</string>
     <string name="bulk_create">Create</string>
     <string name="bulk_created">%1$d profiles created</string>
-    <string name="bulk_hint">One unique fingerprint each.</string>
+    <string name="bulk_hint">Each profile gets its own fingerprint</string>
     <string name="bulk_default_name">Profile</string>
     <string name="profiles_sort">Sort</string>
     <string name="profiles_filter_all">All</string>
@@ -86,7 +86,7 @@
     <string name="profiles_audit_all">Audit all fingerprints</string>
     <string name="profiles_test_fp">Test fingerprint</string>
     <string name="profiles_fingerprint_regenerated">New fingerprint</string>
-    <string name="profiles_batch_select">Select for batch action</string>
+    <string name="profiles_batch_select">Select</string>
     <string name="profiles_select_toggle">Select</string>
     <string name="profiles_selected_count">%1$d selected</string>
     <string name="profiles_batch_actions">Batch (%1$d)</string>
@@ -219,23 +219,23 @@
     </plurals>
 
     <!-- Tools -->
-    <string name="tools_section_proxy_monitor">Proxy monitor</string>
-    <string name="tools_monitor_enabled">Run in background</string>
+    <string name="tools_section_proxy_monitor">Monitor</string>
+    <string name="tools_monitor_enabled">Background</string>
     <string name="tools_monitor_interval">Check interval</string>
-    <string name="tools_section_typing">Human typing</string>
+    <string name="tools_section_typing">Typing</string>
     <string name="tools_human_enabled">Human typing</string>
     <string name="tools_human_speed">Speed</string>
-    <string name="tools_section_browser">Browser defaults</string>
+    <string name="tools_section_browser">Defaults</string>
     <string name="tools_history">Keep history</string>
     <string name="tools_trash">Keep trash</string>
     <string name="tools_tracker">Count requests</string>
     <string name="tools_unlock">Allow selection and copy</string>
-    <string name="tools_section_appearance">Appearance</string>
+    <string name="tools_section_appearance">Theme</string>
     <string name="tools_start_url">Start page</string>
     <string name="tools_section_data">Data</string>
     <string name="tools_export_full">Full backup</string>
-    <string name="tools_export_safe">Backup without passwords</string>
-    <string name="tools_export_note">Plain-text passwords in this file</string>
+    <string name="tools_export_safe">Backup (no passwords)</string>
+    <string name="tools_export_note">Passwords in plain text</string>
     <string name="tools_empty_trash">Empty trash</string>
     <string name="tools_trash_manage_title">Trash</string>
     <string name="tools_trash_empty_toast">Trash is empty</string>
@@ -245,20 +245,20 @@
     <string name="action_restore">Restore</string>
     <string name="action_delete_forever">Delete forever</string>
     <string name="tools_trash_count">%1$d item(s)</string>
-    <string name="tools_import">Restore backup</string>
+    <string name="tools_import">Restore</string>
     <string name="tools_import_confirm">Restore %1$d profiles, %2$d proxies?</string>
     <string name="tools_import_done">Restored %1$d profiles, %2$d proxies</string>
     <string name="tools_import_skipped">%1$d skipped</string>
     <string name="tools_import_invalid">Not a Joe Browser backup</string>
     <string name="tools_import_empty">Backup is empty</string>
     <string name="tools_import_credentials">Includes proxy passwords</string>
-    <string name="tools_reset">Reset all data</string>
+    <string name="tools_reset">Reset</string>
     <string name="tools_reset_title">Reset all data?</string>
-    <string name="tools_reset_body">Delete every profile, proxy and history entry?</string>
+    <string name="tools_reset_body">Delete all profiles, proxies and history?</string>
     <string name="tools_account">Account</string>
     <string name="tools_sign_out">Sign out</string>
     <string name="tools_sign_out_title">Sign out?</string>
-    <string name="tools_sign_out_body">You will need your password to get back in.</string>
+    <string name="tools_sign_out_body">Your password is needed to return.</string>
     <string name="tools_theme">Theme</string>
     <string name="tools_export_safe_hint">No passwords</string>
     <string name="tools_footer">Local only · no telemetry</string>
@@ -295,15 +295,15 @@
     <string name="browser_tracker_summary">%1$d req · %2$d trackers</string>
     <string name="browser_tracker_badge">%1$d req · %2$d trk</string>
     <string name="browser_proxy_ok">Proxy %1$s · %2$d ms</string>
-    <string name="browser_proxy_failed_detail">Unreachable — pages may fail</string>
+    <string name="browser_proxy_failed_detail">Offline — pages may fail</string>
     <string name="notify_enabled">Proxy alerts on</string>
     <string name="notify_denied">Monitor still runs</string>
     <string name="browser_proxy_unsupported_toast">WebView cannot route</string>
-    <string name="browser_download_description">Downloaded by Joe Browser</string>
+    <string name="browser_download_description">Joe Browser download</string>
     <string name="browser_download_direct_note">%1$s: downloads go direct</string>
-    <string name="browser_download_permission">Allow storage to save downloads</string>
+    <string name="browser_download_permission">Allow storage to download</string>
     <string name="browser_download_started">Download started</string>
-    <string name="browser_download_failed">Could not start the download</string>
+    <string name="browser_download_failed">Download did not start</string>
     <string name="browser_kernel_fallback">Injection at page start</string>
     <string name="browser_kernel_shared_toast">Shared — update WebView</string>
     <string name="browser_external_failed">No app can open that</string>
@@ -417,6 +417,6 @@
     <string name="account_signed_in">Signed in</string>
     <string name="tools_lock_app">Lock app</string>
     <string name="editor_template_applied">Template applied</string>
-    <string name="tools_auto_rotate">Auto-switch on proxy failure</string>
+    <string name="tools_auto_rotate">Auto-switch on failure</string>
     <string name="auto_rotate_notice">Switched to backup proxy</string>
 </resources>

@@ -225,7 +225,6 @@ class ProfileEditorActivity : AppCompatActivity() {
             val renderer = renderers[position]
             profile.fp.webglRenderer = renderer
             profile.fp.webglVendor = FingerprintFactory.vendorForRenderer(renderer)
-            binding.gpuVendorText.text = profile.fp.webglVendor
             markDirty()
             updateFingerprintSummary()
         }
@@ -322,7 +321,6 @@ class ProfileEditorActivity : AppCompatActivity() {
 
             binding.editorCores.setText(fp.cores.toString(), false)
             binding.editorMemory.setText(fp.memory.toString() + " GB", false)
-            binding.gpuVendorText.text = fp.webglVendor
             binding.editorUserAgent.setText(fp.userAgentOverride)
             binding.editorTimezone.setText(fp.timezone, false)
             binding.editorLanguage.setText(fp.language, false)
@@ -384,7 +382,8 @@ class ProfileEditorActivity : AppCompatActivity() {
             val fp = profile.fp
             fp.touchPoints = value.toInt()
             fp.deviceType = if (value.toInt() == 0) "desktop" else OsCatalog.deviceType(fp.os)
-            binding.touchLabel.text = getString(R.string.editor_touch) + " · " + value.toInt()
+            binding.editorTouchSlider.contentDescription =
+                getString(R.string.editor_touch) + " " + value.toInt()
             markDirty()
             updateFingerprintSummary()
         }
@@ -419,12 +418,12 @@ class ProfileEditorActivity : AppCompatActivity() {
                 fp.screenW.toString() + " × " + fp.screenH + " @ " + formatDpr(fp.pixelRatio) + "x", false
             )
             binding.editorTouchSlider.value = fp.touchPoints.coerceIn(0, 10).toFloat()
-            binding.touchLabel.text = getString(R.string.editor_touch) + " · " + fp.touchPoints
+            binding.editorTouchSlider.contentDescription =
+                getString(R.string.editor_touch) + " " + fp.touchPoints
             binding.editorCores.setText(fp.cores.toString(), false)
             binding.editorMemory.setText(fp.memory.toString() + " GB", false)
             rebuildGpuDropdown()
             binding.editorGpuRenderer.setText(fp.webglRenderer, false)
-            binding.gpuVendorText.text = fp.webglVendor
             binding.editorTimezone.setText(fp.timezone, false)
             binding.editorLanguage.setText(fp.language, false)
             updateFingerprintSummary()

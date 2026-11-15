@@ -428,16 +428,9 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/touchLabel"
-                    style="@style/Text.Jb.Caption"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/editor_touch" />
-
                 <com.google.android.material.slider.Slider
                     android:id="@+id/editorTouchSlider"
+                    android:layout_marginTop="8dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:stepSize="1"
@@ -542,14 +535,6 @@
                         android:textSize="11.5sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <TextView
-                    android:id="@+id/gpuVendorText"
-                    style="@style/Text.Jb.Caption"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:ellipsize="end"
-                    android:maxLines="1" />
             </LinearLayout>
 
             <!-- ========================================================== locale -->
