@@ -341,6 +341,9 @@ async function generateArt() {
     fs.writeFileSync(out, png);
   };
 
+  /** Artwork defects collected while composing the feature graphic. */
+  const artProblems = [];
+
   // --- store icon 512 -------------------------------------------------------------------
   const iconSvg = (size) =>
     `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 512 512">` +
@@ -356,11 +359,15 @@ async function generateArt() {
     `<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="500" viewBox="0 0 1024 500">` +
     `<rect width="1024" height="500" fill="${BRAND.deep}"/>` +
     // Two stacked profile cards, right-aligned: the product idea as one visual gesture.
+    // Kept fully inside the canvas — a rotated card clipping the frame edge reads as a
+    // cropping bug, not as depth.
+    // Decorations live in the top-right and bottom-right corners, clear of the text band
+    // (y≈180–390): a shape behind a headline is a legibility bug, not a design.
     `<g opacity="0.13" fill="#FFFFFF">` +
-    `<rect x="916" y="84" width="170" height="130" rx="24" transform="rotate(9 1001 149)"/>` +
+    `<rect x="856" y="34" width="150" height="112" rx="24" transform="rotate(7 931 90)"/>` +
     `</g>` +
     `<g opacity="0.20" fill="#FFFFFF">` +
-    `<rect x="898" y="300" width="180" height="130" rx="24" transform="rotate(-6 988 365)"/>` +
+    `<rect x="852" y="404" width="146" height="96" rx="24" transform="rotate(-6 925 452)"/>` +
     `</g>` +
     `<g transform="translate(88 132) scale(9.4)" stroke-linejoin="round">` +
     `<path d="${MARK.shield}" fill="#FFFFFF"/>` +
@@ -370,12 +377,38 @@ async function generateArt() {
     text('One device. Every identity isolated.', { x: 376, y: 318, size: 36, fill: '#BFE3CF', weight: '500Medium' }) +
     text('PROFILES  ·  FINGERPRINTS  ·  PROXIES', { x: 378, y: 372, size: 22, fill: BRAND.accentBright, weight: '700Bold', tracking: 0.06 }) +
     `</svg>`;
+
+  // Store artwork is checked, not eyeballed: a decoration overlapping the text band or a shape
+  // crossing the canvas edge is a defect the build should refuse, not a screenshot to squint at.
+  const FEATURE_CANVAS = { w: 1024, h: 500 };
+  const TEXT_BAND = { top: 170, bottom: 396 };
+  for (const m of feat.matchAll(/<rect x="([0-9.]+)" y="([0-9.]+)" width="([0-9.]+)" height="([0-9.]+)"[^>]*?(?:transform="rotate\((-?[0-9.]+) ([0-9.]+) ([0-9.]+)\)")?/g)) {
+    const [x, y, w, h] = [m[1], m[2], m[3], m[4]].map(Number);
+    const angle = m[5] ? Number(m[5]) : 0;
+    const cx = m[6] ? Number(m[6]) : x + w / 2;
+    const cy = m[7] ? Number(m[7]) : y + h / 2;
+    // Bounding box of the rotated rect.
+    const rad = (Math.abs(angle) * Math.PI) / 180;
+    const bw = w * Math.cos(rad) + h * Math.sin(rad);
+    const bh = w * Math.sin(rad) + h * Math.cos(rad);
+    const left = cx - bw / 2, top = cy - bh / 2, right = cx + bw / 2, bottom = cy + bh / 2;
+    if (left < 0 || top < 0 || right > FEATURE_CANVAS.w || bottom > FEATURE_CANVAS.h) {
+      artProblems.push(`feature graphic: a decoration leaves the canvas (${left.toFixed(0)},${top.toFixed(0)} → ${right.toFixed(0)},${bottom.toFixed(0)})`);
+    }
+    if (bottom > TEXT_BAND.top && top < TEXT_BAND.bottom && left < FEATURE_CANVAS.w * 0.9) {
+      artProblems.push('feature graphic: a decoration overlaps the headline band');
+    }
+  }
   render(feat, path.join(ROOT, 'store-assets/feature-graphic.png'), 1024);
 
   // --- README/docs preview (kept out of the APK) ----------------------------------------
   render(feat, path.join(ROOT, 'docs/brand-feature-graphic.png'), 1024);
   render(iconSvg(512), path.join(ROOT, 'docs/brand-icon.png'), 256);
 
+  if (artProblems.length) {
+    for (const problem of artProblems) console.error('  FAIL  ' + problem);
+    process.exit(1);
+  }
   console.log('art: store icon, feature graphic, docs previews');
 }
 
