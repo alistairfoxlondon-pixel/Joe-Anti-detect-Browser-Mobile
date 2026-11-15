@@ -77,6 +77,14 @@
                     android:visibility="gone" />
             </LinearLayout>
 
+            <ImageView
+                android:id="@+id/bulkCreate"
+                style="@style/Widget.Jb.IconButton"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="2dp"
+                android:contentDescription="@string/profiles_bulk_new"
+                android:src="@drawable/ic_layers" />
+
             <ImageButton
                 android:id="@+id/sortProfiles"
                 android:layout_width="@dimen/touch_target"

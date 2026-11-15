@@ -19,12 +19,14 @@ import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.BrowserActivity
 import com.joebrowser.app.core.Async
+import com.joebrowser.app.data.BrowserEngine
 import com.joebrowser.app.data.Prefs
 import com.joebrowser.app.data.Profile
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.data.ProfileStorage
 import com.joebrowser.app.databinding.FragmentProfilesBinding
 import com.joebrowser.app.databinding.ItemProfileCardBinding
+import com.joebrowser.app.fingerprint.FingerprintFactory
 
 /**
  * Profiles tab.
@@ -89,6 +91,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         }
         binding.clearSearch.setOnClickListener { binding.profileSearch.setText("") }
         binding.sortProfiles.setOnClickListener { anchor -> showSortMenu(anchor) }
+        binding.bulkCreate.setOnClickListener { showBulkCreate() }
         refresh()
     }
 
@@ -105,6 +108,62 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     override fun onResume() {
         super.onResume()
         refresh()
+    }
+
+
+    // ------------------------------------------------------------- bulk create
+
+    /**
+     * Bulk create sheet: name prefix, count, engine and OS.
+     *
+     * The sheet is a plain BottomSheetDialog rather than a MaterialDatePicker-style wizard
+     * because this is a four-field form; every extra screen is a place to lose a user.
+     */
+    private fun showBulkCreate() {
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(requireContext())
+        val sheet = com.joebrowser.app.databinding.SheetBulkCreateBinding.inflate(layoutInflater)
+        dialog.setContentView(sheet.root)
+
+        sheet.bulkNameInput.setText(getString(R.string.bulk_default_name))
+
+        val engines = BrowserEngine.entries
+        val engineLabels = engines.map { it.title }
+        sheet.bulkEngine.setText(engineLabels[0], false)
+        sheet.bulkEngine.setSimpleItems(engineLabels.toTypedArray())
+
+        val osLabels = FingerprintFactory.osList
+        val defaultOs = osLabels.indexOf("Android").coerceAtLeast(0)
+        sheet.bulkOs.setText(osLabels[defaultOs], false)
+        sheet.bulkOs.setSimpleItems(osLabels.toTypedArray())
+
+        // Proxy options: Direct + every saved proxy, loaded off the main thread.
+        val proxyIds = mutableListOf<String?>(null)
+        val proxyLabels = mutableListOf(getString(R.string.bulk_proxy_none))
+        sheet.bulkProxy.setText(proxyLabels.first(), false)
+        ProfileRepository.proxies(requireContext()) { proxies ->
+            proxies.forEach { saved ->
+                proxyIds.add(saved.id)
+                proxyLabels.add(saved.displayName())
+            }
+            if (_binding != null) sheet.bulkProxy.setSimpleItems(proxyLabels.toTypedArray())
+        }
+        var proxyIndex = 0
+        sheet.bulkProxy.setOnItemClickListener { _, _, position, _ -> proxyIndex = position }
+
+        sheet.bulkCreateButton.setOnClickListener {
+            val base = sheet.bulkNameInput.text?.toString()?.trim().orEmpty()
+                .ifBlank { getString(R.string.bulk_default_name) }
+            val count = (sheet.bulkCountInput.text?.toString()?.toIntOrNull() ?: 1).coerceIn(1, 50)
+            val engine = engines.getOrElse(engineLabels.indexOf(sheet.bulkEngine.text.toString())) { BrowserEngine.CHROME }
+            val os = sheet.bulkOs.text?.toString()?.takeIf { it in osLabels } ?: "Android"
+            val proxyId = proxyIds.getOrNull(proxyIndex)
+            dialog.dismiss()
+            ProfileRepository.createBatch(requireContext(), base, count, engine, os, proxyId) { created ->
+                Async.toast(requireContext(), getString(R.string.bulk_created, created.size))
+                refresh()
+            }
+        }
+        dialog.show()
     }
 
     // ------------------------------------------------------------------ sorting

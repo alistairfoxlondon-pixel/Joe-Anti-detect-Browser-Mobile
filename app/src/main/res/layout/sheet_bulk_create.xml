@@ -1,0 +1,127 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Bulk create sheet.
+
+  Four choices and one number. Everything else is generated: each profile gets its own
+  fingerprint (engine + OS are the only identity inputs the user has to pick), and names are
+  numbered from the base name so a batch of 20 is readable in the list.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="@color/surface"
+    android:orientation="vertical"
+    android:paddingStart="20dp"
+    android:paddingTop="18dp"
+    android:paddingEnd="20dp"
+    android:paddingBottom="20dp">
+
+    <TextView
+        style="@style/Text.Jb.ScreenTitle"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="@string/bulk_title" />
+
+    <TextView
+        style="@style/Text.Jb.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="2dp"
+        android:text="@string/bulk_hint" />
+
+    <com.google.android.material.textfield.TextInputLayout
+        android:id="@+id/bulkNameLayout"
+        style="@style/Widget.Jb.TextInput"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:hint="@string/bulk_name">
+
+        <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/bulkNameInput"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:inputType="text"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:orientation="horizontal">
+
+        <com.google.android.material.textfield.TextInputLayout
+            android:id="@+id/bulkCountLayout"
+            style="@style/Widget.Jb.TextInput"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginEnd="5dp"
+            android:layout_weight="1"
+            android:hint="@string/bulk_count">
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/bulkCountInput"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:inputType="number"
+                android:maxLines="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <com.google.android.material.textfield.TextInputLayout
+            style="@style/Widget.Jb.TextInput.Dropdown"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="5dp"
+            android:layout_weight="1.4"
+            android:hint="@string/bulk_engine">
+
+            <AutoCompleteTextView
+                android:id="@+id/bulkEngine"
+                android:layout_width="match_parent"
+                android:layout_height="52dp"
+                android:inputType="none"
+                android:maxLines="1" />
+        </com.google.android.material.textfield.TextInputLayout>
+    </LinearLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Jb.TextInput.Dropdown"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:hint="@string/bulk_os">
+
+        <AutoCompleteTextView
+            android:id="@+id/bulkOs"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:inputType="none"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.textfield.TextInputLayout
+        style="@style/Widget.Jb.TextInput.Dropdown"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="10dp"
+        android:hint="@string/bulk_proxy">
+
+        <AutoCompleteTextView
+            android:id="@+id/bulkProxy"
+            android:layout_width="match_parent"
+            android:layout_height="52dp"
+            android:inputType="none"
+            android:maxLines="1" />
+    </com.google.android.material.textfield.TextInputLayout>
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/bulkCreateButton"
+        style="@style/Widget.Jb.Button"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/button_height"
+        android:layout_marginTop="18dp"
+        android:text="@string/bulk_create"
+        app:icon="@drawable/ic_plus" />
+</LinearLayout>
