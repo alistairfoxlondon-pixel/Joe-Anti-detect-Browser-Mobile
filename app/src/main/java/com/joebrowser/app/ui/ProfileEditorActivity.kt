@@ -499,7 +499,8 @@ class ProfileEditorActivity : AppCompatActivity() {
     }
 
     private fun applyTemplate(template: IdentityTemplate) {
-        profile.engine = template.engine
+        // profile.engine is a read-only view over browserKind; applyEngine performs the swap
+        // (engine id, pinned build, iOS build selection) and refreshes the summary.
         binding.editorEngine.setText(template.engine.title, false)
         applyEngine(template.engine)
         applyOs(template.os)
