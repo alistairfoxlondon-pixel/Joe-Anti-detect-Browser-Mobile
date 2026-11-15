@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.view.View
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
+import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -371,6 +372,7 @@ class ProfileEditorActivity : AppCompatActivity() {
     private fun bindActions() {
         binding.btnEditorBack.setOnClickListener { onBackPressedDispatcher.onBackPressed() }
         binding.btnRegenerate.setOnClickListener { regenerateIdentity() }
+        installBackGuard()
         binding.btnEditorSave.setOnClickListener { save(thenLaunch = false) }
         binding.btnEditorSaveOpen.setOnClickListener { save(thenLaunch = true) }
         binding.btnEditorDelete.setOnClickListener { confirmDelete() }
@@ -764,22 +766,38 @@ class ProfileEditorActivity : AppCompatActivity() {
             .show()
     }
 
-    @Deprecated("Deprecated in Java")
-    override fun onBackPressed() {
-        if (dirty) {
-            MaterialAlertDialogBuilder(this)
-                .setTitle(R.string.editor_unsaved_title)
-                .setMessage(R.string.editor_unsaved_body)
-                .setPositiveButton(R.string.action_save) { _, _ ->
-                    if (save(thenLaunch = false)) finish()
+    /**
+     * Unsaved-changes guard.
+     *
+     * Registered on the dispatcher instead of overriding the deprecated `onBackPressed()`, so the
+     * same dialog appears for the system back gesture, the toolbar back button and any caller
+     * that goes through `onBackPressedDispatcher` (the editor's own back arrow already does).
+     */
+    private fun installBackGuard() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (!dirty) {
+                    isEnabled = false
+                    onBackPressedDispatcher.onBackPressed()
+                    return
                 }
-                .setNegativeButton(R.string.action_cancel, null)
-                .setNeutralButton(R.string.action_discard) { _, _ -> finish() }
-                .show()
-            return
-        }
-        @Suppress("DEPRECATION")
-        super.onBackPressed()
+                MaterialAlertDialogBuilder(this@ProfileEditorActivity)
+                    .setTitle(R.string.editor_unsaved_title)
+                    .setMessage(R.string.editor_unsaved_body)
+                    .setPositiveButton(R.string.action_save) { _, _ ->
+                        if (save(thenLaunch = false)) {
+                            isEnabled = false
+                            onBackPressedDispatcher.onBackPressed()
+                        }
+                    }
+                    .setNegativeButton(R.string.action_cancel, null)
+                    .setNeutralButton(R.string.action_discard) { _, _ ->
+                        isEnabled = false
+                        onBackPressedDispatcher.onBackPressed()
+                    }
+                    .show()
+            }
+        })
     }
 
     private fun intervalLabel(seconds: Int): String = when {
