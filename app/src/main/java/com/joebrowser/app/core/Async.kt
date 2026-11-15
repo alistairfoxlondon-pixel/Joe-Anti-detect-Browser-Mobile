@@ -147,6 +147,12 @@ object Errors {
             raw.contains("timed out", true) || raw.contains("timeout", true) -> "Timed out"
             raw.contains("Unable to resolve host", true) || raw.contains("UnknownHost", true) -> "Host not found"
             raw.contains("SSL", true) || raw.contains("certificate", true) -> "TLS handshake failed"
+            // Android's SocketException text is technical but contains the one fact the user
+            // needs (the proxy refused or reset the connection), so it is translated, not dumped.
+            raw.contains("failed to connect", true) || raw.contains("Connection reset", true) ->
+                "Connection refused"
+            raw.contains("Network is unreachable", true) || raw.contains("No route to host", true) ->
+                "No route to host"
             raw.length > 120 -> raw.take(117) + "…"
             else -> raw
         }

@@ -3,6 +3,7 @@ package com.joebrowser.app.proxy
 import android.content.Context
 import com.joebrowser.app.AppEvents
 import com.joebrowser.app.core.Async
+import com.joebrowser.app.core.Errors
 import com.joebrowser.app.data.Database
 import com.joebrowser.app.data.MonitorAlert
 import com.joebrowser.app.data.Prefs
@@ -383,7 +384,10 @@ object ProxyMonitorEngine {
         val app = context.applicationContext
         Async.bg {
             val result = runCatching { ProxyTester.test(profile.proxy) }
-                .getOrElse { ProxyTestResult(ok = false, error = it.message ?: "Unreachable") }
+                // Human-readable reason: the raw exception text ("failed to connect to
+                // /127.0.0.1 (port 8090) after 10000ms") is what the user sees in the alert and
+                // on the proxy card, so it goes through the same mapping the UI uses.
+                .getOrElse { ProxyTestResult(ok = false, error = Errors.userMessage(it, "Unreachable")) }
             val target = Target(
                 key = "profile:" + profile.id,
                 label = profile.displayName(),
