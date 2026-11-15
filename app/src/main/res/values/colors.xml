@@ -46,6 +46,7 @@
     <color name="neutral">#6B7C72</color>
 
     <!-- Brand furniture -->
+    <color name="tile_fill">#FFFFFF</color>
     <color name="brand_deep">#0B3D2E</color>
     <color name="brand_deep_pressed">#082F23</color>
     <color name="brand_ivory">#F4F7F5</color>

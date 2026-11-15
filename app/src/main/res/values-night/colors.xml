@@ -39,6 +39,7 @@
     <color name="danger_soft">#26F98A82</color>
     <color name="neutral">#8C9C91</color>
 
+    <color name="tile_fill">#16211B</color>
     <color name="brand_deep">#0B3D2E</color>
     <color name="brand_deep_pressed">#082F23</color>
     <color name="brand_ivory">#F4F7F5</color>

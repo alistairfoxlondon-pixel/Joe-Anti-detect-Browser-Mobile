@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- 40dp rounded tile behind a leading icon in list rows. -->
+<!-- 44dp tile behind a leading mark in list rows. White in light, surface in dark, so official
+     brand marks keep their own colours instead of sitting on a tinted plate. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
-    <solid android:color="@color/surface_muted" />
+    <solid android:color="@color/tile_fill" />
     <corners android:radius="12dp" />
 </shape>

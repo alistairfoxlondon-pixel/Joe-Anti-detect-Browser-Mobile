@@ -25,12 +25,15 @@
         android:layout_height="44dp"
         android:background="@drawable/bg_icon_tile">
 
+        <!-- fitCenter keeps each official mark's aspect ratio (Brave's lion is 0.85:1, the
+             rest are square) instead of stretching them onto a fixed box. -->
         <ImageView
             android:id="@+id/engineLogo"
-            android:layout_width="26dp"
-            android:layout_height="26dp"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
             android:layout_gravity="center"
             android:contentDescription="@null"
+            android:scaleType="fitCenter"
             tools:src="@drawable/logo_chrome" />
     </FrameLayout>
 
