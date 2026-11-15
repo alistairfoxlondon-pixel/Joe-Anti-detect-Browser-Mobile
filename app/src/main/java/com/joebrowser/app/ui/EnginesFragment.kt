@@ -97,18 +97,23 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
         val card = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             background = ContextCompat.getDrawable(context, R.drawable.bg_card)
-            setPadding(dp(14), dp(14), dp(14), dp(14))
+            setPadding(dp(12), dp(12), dp(12), dp(12))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { bottomMargin = dp(10) }
         }
 
-        // Title row: name + usage badge
+        // Row 1: official brand mark + name + usage chip
         val titleRow = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
         }
+        titleRow.addView(android.widget.ImageView(context).apply {
+            setImageResource(brandLogoRes(engine))
+            layoutParams = LinearLayout.LayoutParams(dp(32), dp(32)).apply { marginEnd = dp(12) }
+            contentDescription = null
+        })
         titleRow.addView(TextView(context).apply {
             text = engine.title
             setTextAppearance(R.style.Text_Jb_CardTitle)
@@ -119,7 +124,7 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
         titleRow.addView(TextView(context).apply {
             text = if (usedBy > 0) getString(R.string.engines_used_by, usedBy)
             else getString(R.string.engines_unused)
-            textSize = 10.5f
+            textSize = 10f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(context, if (usedBy > 0) R.color.accent else R.color.text_muted))
             setBackgroundResource(R.drawable.bg_chip_neutral)
@@ -127,20 +132,9 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
         })
         card.addView(titleRow)
 
-        // Family + rendering line
+        // Row 2: pinned builds (mono, inset, single line)
         card.addView(TextView(context).apply {
-            text = engine.engineFamily + " · " + getString(R.string.engines_rendering_value)
-            textSize = 11.5f
-            setTextColor(ContextCompat.getColor(context, R.color.text_muted))
-            setPadding(0, dp(3), 0, 0)
-            maxLines = 1
-            ellipsize = android.text.TextUtils.TruncateAt.END
-        })
-
-        // Pinned builds
-        val builds = FingerprintFactory.buildsFor(engine).take(3).joinToString("  ·  ")
-        card.addView(TextView(context).apply {
-            text = builds
+            text = FingerprintFactory.buildsFor(engine).take(3).joinToString(" · ")
             textSize = 11f
             typeface = Typeface.MONOSPACE
             setTextColor(ContextCompat.getColor(context, R.color.text_dim))
@@ -157,17 +151,18 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
         if (engine == BrowserEngine.FIREFOX) {
             card.addView(TextView(context).apply {
                 setText(R.string.engines_firefox_note)
-                textSize = 11f
+                textSize = 10.5f
                 setTextColor(ContextCompat.getColor(context, R.color.warning))
                 setPadding(0, dp(7), 0, 0)
-                maxLines = 2
+                maxLines = 1
+                ellipsize = android.text.TextUtils.TruncateAt.END
             })
         }
 
-        val action = MaterialButton(
+        card.addView(MaterialButton(
             context, null, com.google.android.material.R.attr.materialButtonOutlinedStyle
         ).apply {
-            setText(getString(R.string.engines_create, engine.title))
+            setText(R.string.profiles_new)
             textSize = 12.5f
             isAllCaps = false
             minHeight = dp(44)
@@ -184,11 +179,18 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
             }
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT, dp(44)
-            ).apply { topMargin = dp(11) }
-        }
-        card.addView(action)
+            ).apply { topMargin = dp(10) }
+        })
 
         return card
+    }
+
+    private fun brandLogoRes(engine: BrowserEngine): Int = when (engine) {
+        BrowserEngine.CHROME -> R.drawable.logo_chrome
+        BrowserEngine.CHROMIUM -> R.drawable.logo_chromium
+        BrowserEngine.BRAVE -> R.drawable.logo_brave
+        BrowserEngine.EDGE -> R.drawable.logo_edge
+        BrowserEngine.FIREFOX -> R.drawable.logo_firefox
     }
 
     override fun onDestroyView() {

@@ -4,7 +4,30 @@
 isolated identity — cookies, storage, proxy and fingerprint — so multiple accounts can
 be managed from one device without cross-contamination.
 
-No account. No cloud. No telemetry. Everything lives on the device.
+Local account only. No cloud. No telemetry. Everything lives on the device.
+
+## New in 1.4.0
+
+**Local account gate** — first launch creates a device-local account (email + password,
+PBKDF2-HmacSHA256 hash in private, unbacked-up storage). Sign in on every cold start;
+**Tools → Lock app** re-locks instantly. The account is local-only — no server, no email
+verification, no sync; resetting it erases only the account, never your profiles.
+
+**One-tap identity templates** — new profiles can start from coherent presets
+(US/UK/DE Windows + Chrome/Edge/Firefox, US iPhone Chrome, US/BD Android Chrome/Brave).
+Engine, OS, GPU, screen, timezone and language are generated as one consistent identity.
+
+**Proxy failover** — opt-in in Tools (*Auto-switch on proxy failure*): when a watched
+profile proxy fails twice in a row, the profile is transparently re-pointed at the
+healthiest watched library proxy and you get an alert. Never on the first blip, never
+silently on another device.
+
+**Engine catalog with real brand marks** — Chrome, Chromium, Brave, Edge and Firefox
+cards now carry the official logos, single-line pinned builds, and a compact create
+action. No paragraphs.
+
+**Interface copy diet** — user-facing static copy cut by ~42% against 1.3.0 while
+removing dead strings (41 unused keys swept, reference-checked).
 
 ## New in 1.3.0
 

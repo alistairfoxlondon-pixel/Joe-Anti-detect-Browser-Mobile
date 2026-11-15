@@ -186,6 +186,16 @@ object ProxyMonitorEngine {
                 val previousIp = state?.ip.orEmpty()
                 val wasNotifiedOffline = state?.notifiedOff ?: false
 
+                if (!result.ok && Prefs.autoRotateOnFailure(context)) {
+                    val failsBefore = state?.fails ?: 0
+                    if (failsBefore + 1 >= FAIL_THRESHOLD && rotateToBackup(context, target)) {
+                        // The target flipped to a fresh backup; reset the watch state so the
+                        // next sweep measures the new egress cleanly instead of inheriting fails.
+                        database.setWatchState(target.key, "", 0, false, -1)
+                        online++
+                        return@forEach
+                    }
+                }
                 if (result.ok) {
                     online++
                     // Reflect the measurement in the record the user actually sees, so the
@@ -240,6 +250,56 @@ object ProxyMonitorEngine {
             ProfileRepository.notifyExternalChange()
         }
         return CycleResult(checked, online, offline, rotated, recovered)
+    }
+
+    /**
+     * AdsPower/GoLogin-style backup failover: a profile that just went offline is transparently
+     * re-pointed at a healthy library proxy from the user's pool. Explicit opt-in, never fires on
+     * the very first failure (one blip must not swap the user's egress), never touches shared
+     * profiles or disabled backups, and always tells the user.
+     */
+    private fun rotateToBackup(context: Context, target: Target): Boolean {
+        if (target.profileId == null) return false
+        val database = Database.get(context)
+        val profile = runCatching { database.getProfile(target.profileId) }.getOrNull() ?: return false
+        val current = profile.proxy
+
+        val backup = runCatching { database.getAllProxies() }.getOrDefault(emptyList())
+            .filter { it.config.enabled && it.config.watch }
+            .filter { it.id != target.savedProxyId }
+            .filter { it.config.lastIp.isNotBlank() && it.config.latencyMs >= 0 }
+            .filter { current.host != it.config.host || current.port != it.config.port || current.type != it.config.type }
+            .minByOrNull { it.config.latencyMs }
+            ?: return false
+
+        val rotated = profile.proxy.duplicate().apply {  // fresh copy; never touch the stashed original
+            type = backup.config.type
+            host = backup.config.host
+            port = backup.config.port
+            user = backup.config.user
+            password = backup.config.password
+            lastIp = ""
+            lastCountry = ""
+            lastCountryCode = ""
+            lastCity = ""
+            lastTimezone = ""
+            lastCheckedAt = 0L
+            latencyMs = -1
+            lastError = ""
+            failStreak = 0
+            rotations += 1
+            watch = current.watch
+            watchIntervalSec = current.watchIntervalSec
+        }
+        // Mutate the loaded record in place and upsert it under the same id (CONFLICT_REPLACE).
+        profile.proxy = rotated
+        runCatching { database.saveProfile(profile) }.getOrElse { return false }
+        raise(
+            context, MonitorAlert.KIND_ROTATED,
+            profile.displayName(),
+            backup.displayName() + " · " + context.getString(com.joebrowser.app.R.string.auto_rotate_notice)
+        )
+        return true
     }
 
     /**

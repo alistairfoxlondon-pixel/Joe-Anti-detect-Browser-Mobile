@@ -91,6 +91,7 @@ class ProfileEditorActivity : AppCompatActivity() {
                 binding.btnEditorDelete.visibility = View.GONE
             }
             setupDropdowns()
+        setupTemplates()
             configureRows()
             populate()
             bindActions()
@@ -460,6 +461,58 @@ class ProfileEditorActivity : AppCompatActivity() {
         profile.browserVersion = profile.fp.browserVersion
         markDirty()
         updateFingerprintSummary()
+    }
+
+    /**
+     * Quick-start identity templates (AdsPower/GoLogin-style one-tap device presets).
+     * Visible for new profiles only; applying one sets engine + OS + locale/timezone coherently.
+     */
+    private data class IdentityTemplate(
+        val label: String,
+        val engine: BrowserEngine,
+        val os: String,
+        val timezone: String,
+        val language: String
+    )
+
+    private val identityTemplates = listOf(
+        IdentityTemplate("US · Win11 · Chrome", BrowserEngine.CHROME, "Windows 11", "America/New_York", "en-US"),
+        IdentityTemplate("UK · Win11 · Edge", BrowserEngine.EDGE, "Windows 11", "Europe/London", "en-GB"),
+        IdentityTemplate("DE · Win11 · Firefox", BrowserEngine.FIREFOX, "Windows 11", "Europe/Berlin", "de-DE"),
+        IdentityTemplate("US · iPhone · Chrome", BrowserEngine.CHROME, "iPhone", "America/New_York", "en-US"),
+        IdentityTemplate("US · Android · Brave", BrowserEngine.BRAVE, "Android", "America/Los_Angeles", "en-US"),
+        IdentityTemplate("BD · Android · Chrome", BrowserEngine.CHROME, "Android", "Asia/Dhaka", "bn-BD"),
+    )
+
+    private fun setupTemplates() {
+        if (editingId != null) return  // templates are a new-profile convenience
+        binding.templateScroll.visibility = View.VISIBLE
+        identityTemplates.forEach { template ->
+            val chip = com.google.android.material.chip.Chip(this).apply {
+                text = template.label
+                isCheckable = false
+                isClickable = true
+                setOnClickListener { applyTemplate(template) }
+            }
+            binding.templateChips.addView(chip)
+        }
+    }
+
+    private fun applyTemplate(template: IdentityTemplate) {
+        // profile.engine is a read-only view over browserKind; applyEngine performs the swap
+        // (engine id, pinned build, iOS build selection) and refreshes the summary.
+        binding.editorEngine.setText(template.engine.title, false)
+        applyEngine(template.engine)
+        applyOs(template.os)
+        binding.editorOs.setText(template.os, false)
+        profile.fp.timezone = template.timezone
+        binding.editorTimezone.setText(template.timezone, false)
+        profile.fp.language = template.language
+        profile.fp.acceptLanguage = FingerprintFactory.acceptLanguageFor(template.language)
+        binding.editorLanguage.setText(template.language, false)
+        markDirty()
+        updateFingerprintSummary()
+        Async.toast(this, getString(R.string.editor_template_applied, template.label))
     }
 
     private fun applyOs(os: String) {

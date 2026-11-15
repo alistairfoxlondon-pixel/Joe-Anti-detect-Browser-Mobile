@@ -2,10 +2,9 @@
 <!--
   Browser engines tab.
 
-  One line of context at the top (the only explanatory sentence in the app that cannot be
-  inferred), then a vertical list of engine cards rendered from code because each card is the
-  same 5-element structure with different data. Cards come from a single builder in
-  EnginesFragment, which is why they cannot drift apart visually.
+  Brand-first engine list: one card per identity, built from code so all five share one
+  layout. No explanatory copy — the card shows the logo, the family, the pinned builds and
+  how many profiles use it.
 -->
 <androidx.core.widget.NestedScrollView xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -30,13 +29,6 @@
             android:layout_height="wrap_content"
             android:text="@string/engines_title" />
 
-        <TextView
-            style="@style/Text.Jb.BodyMedium"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/gap_xs"
-            android:layout_marginBottom="@dimen/gap_m"
-            android:text="@string/engines_body" />
 
         <LinearLayout
             android:id="@+id/engineContainer"

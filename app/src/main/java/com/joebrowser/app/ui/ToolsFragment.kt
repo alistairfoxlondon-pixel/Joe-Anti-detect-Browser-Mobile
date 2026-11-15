@@ -161,6 +161,10 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
             else ProxyMonitorService.stop(requireContext())
             refreshMonitorStatus()
         }
+        binding.switchAutoRotate.isChecked = Prefs.autoRotateOnFailure(requireContext())
+        binding.switchAutoRotate.setOnCheckedChangeListener { _, checked ->
+            Prefs.setAutoRotateOnFailure(requireContext(), checked)
+        }
         binding.valueMonitorInterval.text = intervalLabel(Prefs.monitorIntervalSec(requireContext()))
         binding.rowMonitorInterval.setOnClickListener { showIntervalDialog() }
     }
@@ -399,6 +403,13 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
             versionName(),
             versionCode().toString()
         )
+        binding.rowLockApp.setOnClickListener {
+            com.joebrowser.app.auth.LocalAccount.lock()
+            val gate = Intent(requireContext(), AccountActivity::class.java)
+            gate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+            startActivity(gate)
+            requireActivity().finishAffinity()
+        }
         binding.rowLicenses.setOnClickListener {
             Async.safe { startActivity(Intent(requireContext(), LicensesActivity::class.java)) }
         }
