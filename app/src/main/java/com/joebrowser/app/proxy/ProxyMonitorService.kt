@@ -79,7 +79,7 @@ class ProxyMonitorService : Service() {
      * own interval has not elapsed) and re-arm. Any failure is swallowed so the timer survives
      * a bad network, a corrupt row or a database lock.
      */
-    private val cycleRunnable = Runnable {
+    private val cycleRunnable: Runnable = Runnable {
         var keepGoing = true
         try {
             val watched = ProxyMonitorEngine.watchedCount(this)
