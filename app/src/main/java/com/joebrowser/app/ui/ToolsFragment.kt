@@ -491,7 +491,8 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
 
     private fun bindAbout() {
         binding.rowVersion.rowIcon.setImageResource(R.drawable.ic_info)
-        binding.rowVersion.rowTitle.setText(R.string.tools_section_about)
+        // The row label is the app's name, not a section header repeated as a row title.
+        binding.rowVersion.rowTitle.setText(R.string.app_name)
         binding.rowVersion.rowValue.text = getString(R.string.tools_version, versionName(), versionCode().toString())
 
         binding.rowLicenses.rowIcon.setImageResource(R.drawable.ic_folder)

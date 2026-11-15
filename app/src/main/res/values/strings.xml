@@ -256,7 +256,6 @@
     <string name="tools_reset_title">Reset all data?</string>
     <string name="tools_reset_body">Delete every profile, proxy and history entry?</string>
     <string name="tools_account">Account</string>
-    <string name="tools_account_hint">On this device only</string>
     <string name="tools_sign_out">Sign out</string>
     <string name="tools_sign_out_title">Sign out?</string>
     <string name="tools_sign_out_body">You will need your password to get back in.</string>
