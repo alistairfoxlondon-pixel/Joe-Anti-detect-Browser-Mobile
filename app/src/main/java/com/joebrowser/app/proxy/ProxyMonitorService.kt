@@ -103,9 +103,19 @@ class ProxyMonitorService : Service() {
         if (keepGoing) handler.postDelayed(cycleRunnable, tickDelayMs()) else stopSelf()
     }
 
-    /** Re-reads the user's chosen cadence each tick so a settings change applies immediately. */
-    private fun tickDelayMs(): Long =
-        (Prefs.monitorIntervalSec(this).coerceIn(30, 3600) * 1000L).coerceAtLeast(30_000L)
+    /**
+     * Re-reads the cadence each tick so a settings change applies immediately.
+     *
+     * Wakes at the *shortest* watched interval (the engine skips targets that are not due yet),
+     * so a target the user configured for 30 s is never silently rounded up to the global
+     * cadence. The global setting still caps how long a pass may sleep when it is shorter.
+     */
+    private fun tickDelayMs(): Long {
+        val global = Prefs.monitorIntervalSec(this).coerceIn(30, 3600)
+        val shortest = runCatching { ProxyMonitorEngine.shortestIntervalSec(this) }.getOrDefault(0)
+        val chosen = if (shortest <= 0) global else minOf(global, shortest)
+        return (chosen.coerceIn(30, 3600) * 1000L).coerceAtLeast(30_000L)
+    }
 
     override fun onBind(intent: Intent?): IBinder? = null
 

@@ -92,9 +92,7 @@ object ProxyMonitorEngine {
                             key = "profile:" + profile.id,
                             label = profile.displayName(),
                             config = profile.proxy,
-                            intervalSec = profile.tools.proxyWatchIntervalSec
-                                .coerceAtLeast(MIN_INTERVAL_SEC)
-                                .let { if (it <= 0) globalInterval else it },
+                            intervalSec = watchIntervalFor(profile.tools.proxyWatchIntervalSec, globalInterval),
                             profileId = profile.id
                         )
                     )
@@ -106,6 +104,29 @@ object ProxyMonitorEngine {
     }
 
     fun watchedCount(context: Context): Int = collectTargets(context).size
+
+    /**
+     * A profile's own cadence, falling back to the global setting when it carries none.
+     *
+     * `coerceAtLeast` alone was applied to the raw value, so an unset (0) interval clamped to
+     * 30 s rather than inheriting the user's global choice.
+     */
+    private fun watchIntervalFor(own: Int, global: Int): Int =
+        (if (own <= 0) global else own).coerceAtLeast(MIN_INTERVAL_SEC)
+
+    /**
+     * How often the service must wake so that *every* watched target is checked on time.
+     *
+     * Returns 0 when nothing is watched. The service used to tick purely on the global cadence,
+     * which silently throttled any target set to a shorter one — a profile the user configured
+     * for 30 s was only reached every couple of minutes. The engine already skips targets whose
+     * interval has not elapsed, so ticking at the shortest interval is both correct and cheap.
+     */
+    fun shortestIntervalSec(context: Context): Int {
+        val targets = collectTargets(context)
+        if (targets.isEmpty()) return 0
+        return targets.minOf { it.intervalSec }.coerceAtLeast(MIN_INTERVAL_SEC)
+    }
 
     /**
      * Runs one monitoring pass. Skips targets whose interval has not elapsed, so a 30-second
