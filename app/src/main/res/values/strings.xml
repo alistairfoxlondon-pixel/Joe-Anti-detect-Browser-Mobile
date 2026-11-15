@@ -302,6 +302,7 @@
     <string name="browser_proxy_unsupported_toast">WebView cannot route</string>
     <string name="browser_download_description">Downloaded by Joe Browser</string>
     <string name="browser_download_direct_note">%1$s: downloads go direct</string>
+    <string name="browser_download_permission">Allow storage to save downloads</string>
     <string name="browser_download_started">Download started</string>
     <string name="browser_download_failed">Could not start the download</string>
     <string name="browser_kernel_fallback">Injection at page start</string>
