@@ -548,6 +548,71 @@ data class FingerprintWarning(val message: String, val severity: String)
 // --------------------------------------------------------------------- export
 
 object ExportFormat {
+
+    /** Result of reading a backup file back in. */
+    data class Restore(
+        val profiles: List<Profile>,
+        val proxies: List<SavedProxy>,
+        val skippedProfiles: Int,
+        val skippedProxies: Int,
+        val hadCredentials: Boolean,
+        val app: String
+    ) {
+        val total: Int get() = profiles.size + proxies.size
+    }
+
+    /**
+     * Parses a backup produced by [build].
+     *
+     * Deliberately tolerant: one malformed profile must not discard the rest of the file, and a
+     * file from an unknown app or a newer format version is rejected outright rather than
+     * half-imported. Returns null only when the file is not a Joe Browser backup at all.
+     */
+    fun parse(text: String?): Restore? {
+        if (text.isNullOrBlank()) return null
+        val root = runCatching { JSONObject(text) }.getOrNull() ?: return null
+        val app = root.optString("app", "")
+        if (app.isBlank()) return null
+        val version = root.optInt("formatVersion", 1)
+        if (version > 2) return null
+
+        var skippedProfiles = 0
+        var skippedProxies = 0
+
+        val profiles = mutableListOf<Profile>()
+        root.optJSONArray("profiles")?.let { array ->
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i)
+                if (item == null) { skippedProfiles++; continue }
+                val parsed = Profile.fromJson(item)
+                if (parsed.id.isBlank() || parsed.name.isBlank()) skippedProfiles++ else profiles.add(parsed)
+            }
+        }
+
+        val proxies = mutableListOf<SavedProxy>()
+        root.optJSONArray("proxies")?.let { array ->
+            for (i in 0 until array.length()) {
+                val item = array.optJSONObject(i)
+                if (item == null) { skippedProxies++; continue }
+                val parsed = SavedProxy.fromJson(item)
+                if (parsed.id.isBlank() || parsed.config.host.isBlank() || parsed.config.port !in 1..65535) {
+                    skippedProxies++
+                } else {
+                    proxies.add(parsed)
+                }
+            }
+        }
+
+        return Restore(
+            profiles = profiles,
+            proxies = proxies,
+            skippedProfiles = skippedProfiles,
+            skippedProxies = skippedProxies,
+            hadCredentials = root.optBoolean("includeCredentials", false),
+            app = app
+        )
+    }
+
     fun build(
         profiles: List<Profile>,
         proxies: List<SavedProxy>,
@@ -559,6 +624,10 @@ object ExportFormat {
         put("formatVersion", 2)
         put("exportedAt", System.currentTimeMillis())
         put("includeCredentials", includeSecrets)
+        // Portability is the point of an export: the on-device ciphertext is sealed with this
+        // install's Android Keystore key and cannot be read anywhere else. Secrets therefore
+        // leave as plaintext inside the (user-chosen) file, and the flag says so.
+        put("credentialFormat", "plaintext")
         put("profiles", JSONArray().apply { profiles.forEach { put(it.toJson(includeSecrets)) } })
         put("proxies", JSONArray().apply { proxies.forEach { put(it.toJson(includeSecrets)) } })
         put("extensions", JSONArray().apply { extensions.forEach { put(it.toJson()) } })

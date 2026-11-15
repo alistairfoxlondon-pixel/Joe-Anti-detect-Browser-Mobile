@@ -96,11 +96,18 @@ class MainActivity : AppCompatActivity() {
         super.onStop()
     }
 
+    /**
+     * Maps a deep-link/notification hint onto a real tab. Only ids that exist in the bottom
+     * navigation are allowed: pointing at a removed tab would leave the nav bar and the visible
+     * fragment disagreeing.
+     */
     private fun tabFromExtra(extra: String?): Int = when (extra) {
         "proxies" -> R.id.nav_proxies
         "profiles" -> R.id.nav_profiles
-        "engines", "browsers" -> R.id.nav_browsers
-        "tools", "settings", "extensions" -> R.id.nav_tools
+        // "engines" is kept as an alias for older notification intents; the Engines screen lives
+        // under the Engines tab, which is nav_browsers.
+        "engines" -> R.id.nav_browsers
+        "tools", "settings" -> R.id.nav_tools
         else -> R.id.nav_home
     }
 

@@ -264,6 +264,74 @@ object ProfileRepository {
         }) { onResult(it) }
     }
 
+    /** Outcome of a restore: counts for the confirmation toast. */
+    data class RestoreResult(val profiles: Int, val proxies: Int, val skipped: Int, val hadCredentials: Boolean)
+
+    /**
+     * Writes a parsed backup into the database.
+     *
+     * Ids are preserved so a restore over the same install is idempotent, and every restored
+     * profile gets a fresh isolation directory (a cloned backup must never share cookies with the
+     * profile it came from). Runs serially with every other write so a concurrent save cannot
+     * interleave with a restore.
+     */
+    fun restoreBackup(context: Context, restore: ExportFormat.Restore, onDone: (RestoreResult) -> Unit) {
+        val app = context.applicationContext
+        Async.serialize {
+            var profiles = 0
+            var proxies = 0
+            var failed = 0
+            runCatching {
+                val database = db(app)
+                restore.proxies.forEach { proxy ->
+                    runCatching {
+                        database.saveProxy(proxy)
+                        proxies++
+                    }.onFailure { failed++ }
+                }
+                restore.profiles.forEach { profile ->
+                    runCatching {
+                        ProfileStorage.ensure(app, profile.id)
+                        database.saveProfile(profile)
+                        profiles++
+                    }.onFailure { failed++ }
+                }
+            }
+            val result = RestoreResult(
+                profiles = profiles,
+                proxies = proxies,
+                skipped = failed + restore.skippedProfiles + restore.skippedProxies,
+                hadCredentials = restore.hadCredentials
+            )
+            Async.onMain { onDone(result) }
+            notifyChanged()
+        }
+    }
+
+    /** Reads a backup file from a content Uri and hands back the parse result. */
+    fun readBackup(context: Context, uri: android.net.Uri, onResult: (ExportFormat.Restore?) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({
+            val text = runCatching {
+                app.contentResolver.openInputStream(uri)?.use { stream ->
+                    // Cap the read: a backup is metadata only, so anything huge is not ours.
+                    val buffer = java.io.ByteArrayOutputStream()
+                    val chunk = ByteArray(64 * 1024)
+                    var total = 0L
+                    while (true) {
+                        val read = stream.read(chunk)
+                        if (read <= 0) break
+                        total += read
+                        if (total > 16L * 1024L * 1024L) return@use null
+                        buffer.write(chunk, 0, read)
+                    }
+                    buffer.toString("UTF-8")
+                }
+            }.getOrNull()
+            ExportFormat.parse(text)
+        }) { onResult(it) }
+    }
+
     fun resetEverything(context: Context, onDone: () -> Unit = {}) {
         val app = context.applicationContext
         Async.serialize {

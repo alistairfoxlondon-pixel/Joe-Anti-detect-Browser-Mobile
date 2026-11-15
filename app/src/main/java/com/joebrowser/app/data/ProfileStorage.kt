@@ -41,9 +41,25 @@ object ProfileStorage {
 
     fun root(context: Context): File = File(context.applicationContext.filesDir, ROOT)
 
-    fun dirFor(context: Context, profileId: String): File {
-        val safe = profileId.replace(Regex("[^A-Za-z0-9_-]"), "_").ifBlank { "unknown" }
-        return File(root(context), safe)
+    fun dirFor(context: Context, profileId: String): File = File(root(context), dirName(profileId))
+
+    /**
+     * Directory name for a profile.
+     *
+     * Sanitising alone is not safe here: `a.b` and `a:b` both collapse to `a_b`, which would put
+     * two identities in one directory — deleting one profile would then erase the other's
+     * cookies. Whenever the id has to be changed, a short digest of the original is appended so
+     * distinct ids always stay distinct.
+     */
+    fun dirName(profileId: String): String {
+        val raw = profileId.ifBlank { "unknown" }
+        val clean = raw.replace(Regex("[^A-Za-z0-9_-]"), "_")
+        if (clean == raw) return clean
+        val digest = runCatching {
+            java.security.MessageDigest.getInstance("SHA-256").digest(raw.toByteArray(Charsets.UTF_8))
+                .take(4).joinToString("") { String.format(java.util.Locale.US, "%02x", it) }
+        }.getOrNull() ?: return clean
+        return clean + "-" + digest
     }
 
     /** Creates the isolated directory tree if needed. Safe to call on every launch. */
@@ -217,9 +233,21 @@ object ProfileStorage {
         }
     }
 
+    /** Breadth-first size walk: never recurses, so a deep cache tree cannot blow the stack. */
     private fun sizeOf(file: File): Long {
         if (!file.exists()) return 0L
-        if (file.isFile) return file.length()
-        return file.listFiles()?.sumOf { sizeOf(it) } ?: 0L
+        var total = 0L
+        val pending = ArrayDeque<File>()
+        pending.add(file)
+        while (pending.isNotEmpty()) {
+            val current = pending.removeFirst()
+            if (current.isFile) {
+                total += current.length()
+            } else {
+                current.listFiles()?.let { children -> children.forEach { pending.addLast(it) } }
+            }
+        }
+        return total
     }
+
 }

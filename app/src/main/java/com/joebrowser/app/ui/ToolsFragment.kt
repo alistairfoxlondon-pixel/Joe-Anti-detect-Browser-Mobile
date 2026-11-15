@@ -1,6 +1,7 @@
 package com.joebrowser.app.ui
 
 import android.content.Intent
+import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -35,6 +36,52 @@ import java.util.Locale
  *  - trash / storage / reset → real filesystem and database operations.
  */
 class ToolsFragment : Fragment(), MainActivity.Refreshable {
+
+    private val backupPicker = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode != android.app.Activity.RESULT_OK) return@registerForActivityResult
+        val uri = result.data?.data ?: return@registerForActivityResult
+        val context = requireContext()
+        ProfileRepository.readBackup(context, uri) { restore ->
+            if (!isAdded) return@readBackup
+            if (restore == null) {
+                Async.toast(context, getString(R.string.tools_import_invalid))
+                return@readBackup
+            }
+            if (restore.total == 0) {
+                Async.toast(context, getString(R.string.tools_import_empty))
+                return@readBackup
+            }
+            val body = buildString {
+                append(getString(R.string.tools_import_confirm, restore.profiles.size, restore.proxies.size))
+                if (restore.hadCredentials) {
+                    append("\n\n")
+                    append(getString(R.string.tools_import_credentials))
+                }
+                val skipped = restore.skippedProfiles + restore.skippedProxies
+                if (skipped > 0) {
+                    append("\n\n")
+                    append(getString(R.string.tools_import_skipped, skipped))
+                }
+            }
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.tools_import)
+                .setMessage(body)
+                .setPositiveButton(R.string.tools_import) { _, _ ->
+                    ProfileRepository.restoreBackup(context, restore) { outcome ->
+                        val message = getString(R.string.tools_import_done, outcome.profiles, outcome.proxies)
+                        Async.toast(context, message)
+                        if (outcome.skipped > 0) {
+                            Async.toast(context, getString(R.string.tools_import_skipped, outcome.skipped))
+                        }
+                        ProxyMonitorService.startIfNeeded(context)
+                        refresh()
+                    }
+                }
+                .setNegativeButton(R.string.action_cancel, null)
+                .show()
+        }
+    }
+
 
     private var _binding: FragmentToolsBinding? = null
     private val binding get() = _binding!!
@@ -204,6 +251,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         binding.btnExportSafe.setOnClickListener { exportBackup(includeSecrets = false) }
 
         binding.btnReset.setOnClickListener { confirmReset() }
+        binding.btnRestore.setOnClickListener { pickBackup() }
         binding.switchJitter.isChecked = Prefs.humanPasteJitter(requireContext())
         binding.switchJitter.setOnCheckedChangeListener { _, checked ->
             Prefs.setHumanPasteJitter(requireContext(), checked)
@@ -254,6 +302,17 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
                 startActivity(Intent.createChooser(intent, getString(R.string.tools_export_chooser)))
             }
         }
+    }
+
+    /** Opens the system picker; the SAF grant is read once and never persisted. */
+    private fun pickBackup() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+            putExtra(Intent.EXTRA_MIME_TYPES, arrayOf("application/json", "text/plain", "application/octet-stream"))
+        }
+        runCatching { backupPicker.launch(intent) }
+            .onFailure { Async.toast(requireContext(), getString(R.string.error_generic)) }
     }
 
     private fun confirmReset() {
