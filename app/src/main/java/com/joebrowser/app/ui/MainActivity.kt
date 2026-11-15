@@ -177,6 +177,9 @@ class MainActivity : AppCompatActivity() {
      */
     fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        // Never ask twice: a denial is an answer, and re-prompting on every launch is the kind
+        // of nagging that gets an app's notifications switched off at the OS level.
+        if (Prefs.notificationAsked(this)) return
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) return

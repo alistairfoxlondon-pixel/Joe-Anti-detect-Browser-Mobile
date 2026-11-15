@@ -14,6 +14,7 @@ import androidx.activity.OnBackPressedCallback
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.BrowserActivity
 import com.joebrowser.app.browser.BrowserKernel
@@ -103,6 +104,13 @@ class ProfileEditorActivity : AppCompatActivity() {
         }
         val fresh = Profile(browserKind = requestedEngine.id)
         FingerprintFactory.regenerate(fresh.fp, "Android", null, requestedEngine)
+        // A new profile must not be an exact twin of an existing one: the seed is part of the
+        // signature, but two profiles created back to back can still land on the same screen, GPU
+        // and locale. FingerprintFactory.ensureUnique re-rolls the seed until it differs.
+        val existing = runCatching {
+            Database.get(this).getAllProfiles().map { FingerprintFactory.signature(it.fp) }
+        }.getOrDefault(emptyList())
+        FingerprintFactory.ensureUnique(fresh.fp, existing)
         fresh.browserVersion = fresh.fp.browserVersion
         fresh.tools = ToolConfig(
             humanPaste = Prefs.humanPasteEnabled(this),
@@ -742,6 +750,10 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.btnEditorSave.isEnabled = true
             binding.btnEditorSaveOpen.isEnabled = true
             dirty = false
+            // Tell the screens behind this one (Home counters, the profile list) to repaint.
+            // They also refresh on resume; this makes the change visible immediately for the
+            // "save and open" path, which leaves the editor on screen over the list.
+            AppEvents.emitDataChanged(app, "profile-saved")
             Async.toast(this, getString(if (wasNew) R.string.editor_created else R.string.editor_saved))
             if (thenLaunch) {
                 BrowserActivity.launch(this, saved.id)
@@ -769,7 +781,10 @@ class ProfileEditorActivity : AppCompatActivity() {
                 )
             )
             .setPositiveButton(R.string.action_delete) { _, _ ->
-                ProfileRepository.deleteProfile(this, profile, keepTrash) { finish() }
+                ProfileRepository.deleteProfile(this, profile, keepTrash) {
+                    AppEvents.emitDataChanged(applicationContext, "profile-deleted")
+                    finish()
+                }
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()

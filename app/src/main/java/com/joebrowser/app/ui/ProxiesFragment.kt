@@ -198,7 +198,10 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
                 ProfileRepository.saveProxy(
                     requireContext(),
                     SavedProxy(id = item.id, name = name, note = item.note, config = item.config.duplicate())
-                ) { refresh() }
+                ) {
+                    AppEvents.emitDataChanged(requireContext().applicationContext, "proxy-saved")
+                    refresh()
+                }
             }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
@@ -242,6 +245,7 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
             // just asked to be told when this proxy goes down.
             if (watch) (activity as? MainActivity)?.ensureNotificationPermission()
             ProxyMonitorService.startIfNeeded(requireContext())
+            AppEvents.emitDataChanged(requireContext().applicationContext, "proxy-saved")
             refresh()
         }
     }

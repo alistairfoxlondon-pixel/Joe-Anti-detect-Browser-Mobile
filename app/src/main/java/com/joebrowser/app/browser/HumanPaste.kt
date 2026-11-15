@@ -97,10 +97,6 @@ object HumanPaste {
         progressSink = callback
     }
 
-    fun reportProgress(typed: Int, total: Int) {
-        progressSink?.invoke(typed, total)
-    }
-
     fun clearProgressSink() {
         progressSink = null
     }

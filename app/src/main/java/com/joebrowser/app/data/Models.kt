@@ -199,8 +199,6 @@ data class ProxyConfig(
     val online: Boolean get() = enabled && lastIp.isNotBlank() && latencyMs >= 0
     val checked: Boolean get() = lastCheckedAt > 0L
 
-    fun isOnline(): Boolean = online
-
     fun label(): String = when {
         !enabled -> "Direct"
         lastCountryCode.isNotBlank() -> type.uppercase() + " · " + lastCountryCode

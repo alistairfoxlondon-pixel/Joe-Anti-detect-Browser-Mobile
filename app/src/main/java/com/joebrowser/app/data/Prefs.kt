@@ -84,8 +84,6 @@ object Prefs {
         sp(context).edit().putInt(KEY_SORT, value.coerceIn(0, 4)).apply()
 
     fun defaultGroup(context: Context): String = sp(context).getString(KEY_DEFAULT_GROUP, "") ?: ""
-    fun setDefaultGroup(context: Context, value: String) =
-        sp(context).edit().putString(KEY_DEFAULT_GROUP, value.trim()).apply()
 
     fun notificationAsked(context: Context): Boolean = sp(context).getBoolean(KEY_NOTIF_ASKED, false)
     fun setNotificationAsked(context: Context, value: Boolean) =

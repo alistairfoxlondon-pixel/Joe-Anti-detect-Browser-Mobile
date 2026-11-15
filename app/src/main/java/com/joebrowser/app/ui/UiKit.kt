@@ -68,23 +68,6 @@ object UiKit {
         }
     }
 
-    /** Consistent single-line guard used on every list subtitle. */
-    fun applySingleLine(textView: TextView, maxLines: Int = 1) {
-        textView.maxLines = maxLines
-        textView.isSingleLine = maxLines == 1
-        textView.ellipsize = android.text.TextUtils.TruncateAt.END
-    }
-
-    fun digitsOnlyFilter(): InputFilter = InputFilter { source, _, _, dest, dstart, dend ->
-        val candidate = source.toString()
-        if (candidate.all { it.isDigit() }) {
-            // Keep ports inside 1..65535 while typing.
-            val text = (dest.subSequence(0, dstart).toString() + candidate + dest.subSequence(dend, dest.length))
-            if (text.length <= 5) null else ""
-        } else {
-            ""
-        }
-    }
 
     fun rangeFilter(min: Int, max: Int): InputFilter = InputFilter { source, _, _, dest, dstart, dend ->
         val candidate = source.toString()
@@ -95,36 +78,11 @@ object UiKit {
         if (value in min..max) null else ""
     }
 
-    /** Coloured status chip used on cards and rows ("Online", "Alert", "Direct"). */
-    fun statusChip(context: Context, label: String, colorRes: Int): Chip = Chip(context).apply {
-        text = label
-        isCheckable = false
-        isClickable = false
-        isFocusable = false
-        chipMinHeight = UiKit.dpFloat(context, 24f)
-        textSize = 10.5f
-        setTextColor(ContextCompat.getColor(context, colorRes))
-        chipBackgroundColor = android.content.res.ColorStateList.valueOf(
-            withAlpha(ContextCompat.getColor(context, colorRes), 0.12f)
-        )
-        chipStrokeWidth = 0f
-        chipStartPadding = UiKit.dpFloat(context, 8f)
-        chipEndPadding = UiKit.dpFloat(context, 8f)
-    }
 
     fun withAlpha(color: Int, alpha: Float): Int = Color.argb(
         (alpha.coerceIn(0f, 1f) * 255).toInt(), Color.red(color), Color.green(color), Color.blue(color)
     )
 
-    /** Two-tone label ("Online · 42 ms") where the first part carries the semantic colour. */
-    fun twoTone(context: Context, head: String, tail: String, headColorRes: Int): CharSequence {
-        val span = SpannableString(head + tail)
-        span.setSpan(
-            ForegroundColorSpan(ContextCompat.getColor(context, headColorRes)),
-            0, head.length, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE
-        )
-        return span
-    }
 
     fun flagEmoji(countryCode: String?): String {
         val code = countryCode?.uppercase()?.takeIf { it.length == 2 } ?: return ""
@@ -143,27 +101,6 @@ object UiKit {
         else -> R.drawable.ic_os_android
     }
 
-    fun engineLabel(kind: String): String = com.joebrowser.app.data.BrowserEngine.of(kind).title
-
-    /** Builds the small "dot + label" row used by status lines. */
-    fun statusDotRow(context: Context, colorRes: Int): View {
-        val density = context.resources.displayMetrics.density
-        val size = (8 * density).toInt()
-        val dot = View(context)
-        dot.layoutParams = LinearLayout.LayoutParams(size, size)
-        dot.background = dotBackground(colorRes, context)
-        return dot
-    }
-
-    fun sectionLabel(context: Context, text: String): TextView = TextView(context).apply {
-        this.text = text
-        setTextAppearance(R.style.Text_Jb_Section)
-        gravity = Gravity.START
-        includeFontPadding = false
-        layoutParams = ViewGroup.LayoutParams(
-            ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT
-        )
-    }
 
     fun formatRelative(ts: Long): String {
         if (ts <= 0L) return "Never"

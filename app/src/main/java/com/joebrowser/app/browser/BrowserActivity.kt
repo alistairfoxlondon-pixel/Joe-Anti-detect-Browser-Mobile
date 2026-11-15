@@ -1180,6 +1180,30 @@ class BrowserActivity : AppCompatActivity() {
         runCatching { webView?.onResume() }
         runCatching { webView?.resumeTimers() }
         updateNavButtons()
+        refreshIdentityIfEdited()
+    }
+
+    /**
+     * Picks up a profile edited while this session was in the background.
+     *
+     * Without this the tab kept answering as the *old* identity until the user closed it,
+     * which is the one thing a profile editor must never do: change the label and leave the
+     * fingerprint behind. Only a real change triggers the reload, so a plain app switch costs
+     * nothing.
+     */
+    private fun refreshIdentityIfEdited() {
+        val current = profile ?: return
+        val web = webView ?: return
+        val active = kernel ?: return
+        ProfileRepository.profile(this, current.id) { latest ->
+            if (latest == null || isFinishing || isDestroyed) return@profile
+            profile = latest
+            binding.browserEngineChip.text = latest.engine.title
+            binding.browserProfileName.text = latest.displayName()
+            // The kernel compares the rebuilt payload, so an unrelated edit (a renamed
+            // profile, a new tag) does not reload the page under the user.
+            if (active.refreshScript(web, latest)) web.reload()
+        }
     }
 
     override fun onDestroy() {
@@ -1222,9 +1246,6 @@ class BrowserActivity : AppCompatActivity() {
         private var liveWindows = 0
 
         fun openWindowCount(): Int = liveWindows
-
-        /** Kept for callers that only need to know the feature exists. */
-        fun isSupported(): Boolean = true
     }
 
 }

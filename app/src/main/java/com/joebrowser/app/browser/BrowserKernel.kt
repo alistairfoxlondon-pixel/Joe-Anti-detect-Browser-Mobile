@@ -5,7 +5,6 @@ import android.content.Context
 import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
-import android.webkit.WebViewClient
 import androidx.webkit.Profile as WebKitProfile
 import androidx.webkit.ProfileStore
 import androidx.webkit.WebViewCompat
@@ -35,7 +34,9 @@ import com.joebrowser.app.fingerprint.FingerprintScript
  * `onPageStarted` **and** `onPageCommitVisible` and reports [InjectionMode.EARLY_FALLBACK].
  *
  * The kernel is deliberately stateless between sessions: it is constructed per WebView,
- * [install]s once, and reports back through the supplied listener.
+ * [install]s once, and reports back through the supplied listener. Editing a profile's
+ * identity mid-session is handled by [refreshScript], which replaces the attached rule
+ * rather than stacking another one on top of it.
  */
 class BrowserKernel(
     private val context: Context,
@@ -59,8 +60,14 @@ class BrowserKernel(
     private var installed = false
     private var token: String = ""
 
-    val scriptForWebView: String get() = script
-    val hasDocumentStart: Boolean get() = injectionMode == InjectionMode.DOCUMENT_START
+    /**
+     * Handle to the document-start rule currently attached to the WebView.
+     *
+     * Kept so a refresh can `removeDocumentStartJavaScript` it: the WebKit API has no
+     * replace, and stacking a second rule would leave the old identity's script running
+     * first, which defeats the point of the update.
+     */
+    private var startHandle: String? = null
 
     private var injectionMode: InjectionMode = InjectionMode.EARLY_FALLBACK
     private var isolationMode: IsolationMode = IsolationMode.SHARED
@@ -134,7 +141,7 @@ class BrowserKernel(
         // ---- fingerprint injection: earliest possible hook
         injectionMode = if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) && script.isNotEmpty()) {
             try {
-                WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
+                startHandle = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
                 InjectionMode.DOCUMENT_START
             } catch (t: Throwable) {
                 Log.w(Async.TAG, "Document-start injection failed; using early fallback", t)
@@ -165,12 +172,42 @@ class BrowserKernel(
         runCatching { webView.evaluateJavascript(script, null) }
     }
 
-    /** Rebuilds and re-attaches the script (used when the identity changes mid-session). */
-    fun refreshScript(webView: WebView, updated: Profile) {
-        script = runCatching {
+    /**
+     * Rebuilds the script after the profile's identity changed and re-attaches it.
+     *
+     * Returns true when the payload actually differed — the caller then reloads, because a
+     * document already parsed with the old values keeps them (navigator, screen and WebGL are
+     * patched at document start, so only a fresh document picks up new ones).
+     *
+     * The previous document-start rule is removed first. `addDocumentStartJavaScript` has no
+     * replace semantics: leaving the old rule attached would run the old identity's script
+     * ahead of the new one on every subsequent document.
+     */
+    fun refreshScript(webView: WebView, updated: Profile): Boolean {
+        val rebuilt = runCatching {
             FingerprintScript.build(updated.fp, updated.engine, updated.tools.unlockSelection)
-        }.getOrDefault(script)
-        runCatching { WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*")) }
+        }.getOrNull()
+        if (rebuilt.isNullOrEmpty() || rebuilt == script) return false
+        script = rebuilt
+
+        if (injectionMode == InjectionMode.DOCUMENT_START &&
+            WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
+        ) {
+            startHandle?.let { handle ->
+                runCatching { WebViewCompat.removeDocumentStartJavaScript(webView, handle) }
+                startHandle = null
+            }
+            runCatching {
+                startHandle = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
+            }.onFailure {
+                Log.w(Async.TAG, "Could not re-attach document-start script", it)
+                injectionMode = InjectionMode.EARLY_FALLBACK
+            }
+        }
+        // The fallback path injects into the live document too, so a reload is not strictly
+        // required for it to take effect — but the page's cached globals still are, so the
+        // caller reloads identically in both modes.
+        return true
     }
 
     /** The bucket's cookie store when isolation is active, otherwise the global one. */
@@ -252,25 +289,6 @@ class BrowserKernel(
             WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
 
         /**
-         * Prepares a WebView for a profile and returns the kernel. Order matters:
-         * prepare -> new WebView -> install.
-         */
-        fun attach(
-            context: Context,
-            webView: WebView,
-            profile: Profile,
-            onStatus: (KernelStatus) -> Unit
-        ): BrowserKernel {
-            val kernel = BrowserKernel(context, profile, onStatus)
-            kernel.prepare()
-            kernel.install(webView)
-            return kernel
-        }
-
-        /** AndroidX WebKit requires the profile be set before the WebView is created. */
-        fun prebind(profile: Profile): String = profile.id
-
-        /**
          * Cheap pre-flight used by the browser activity *before* it creates a WebView.
          *
          * It answers one question — "can this device run the session as advertised?" — and it
@@ -285,13 +303,4 @@ class BrowserKernel(
             false
         }
     }
-
-    /** Convenience for a WebViewClient that wants to call back into the kernel. */
-    interface Host {
-        fun kernelInjectionFallback(webView: WebView)
-        fun kernelInjectionCommit(webView: WebView)
-    }
-
-    @Suppress("unused")
-    private fun noopClient(): WebViewClient = WebViewClient()
 }

@@ -180,6 +180,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
             )
             .setPositiveButton(R.string.action_delete) { _, _ ->
                 ProfileRepository.deleteProfile(requireContext(), profile, keepTrash) {
+                    AppEvents.emitDataChanged(requireContext().applicationContext, "profile-deleted")
                     if (_binding != null) refresh()
                 }
             }

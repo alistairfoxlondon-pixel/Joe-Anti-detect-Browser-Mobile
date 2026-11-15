@@ -468,7 +468,5 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
 
         fun start(upstream: ProxyConfig): LocalProxyRelay = LocalProxyRelay(upstream).start()
 
-        /** True when [config] is usable as an upstream proxy. */
-        fun canRelay(config: ProxyConfig): Boolean = config.enabled
     }
 }

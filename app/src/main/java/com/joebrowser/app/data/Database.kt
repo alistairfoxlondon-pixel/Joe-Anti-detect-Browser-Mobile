@@ -325,10 +325,6 @@ class Database private constructor(context: Context) :
         writableDatabase.insertWithOnConflict("watch_state", null, values, SQLiteDatabase.CONFLICT_REPLACE)
     }
 
-    fun clearWatchStates() {
-        runCatching { writableDatabase.delete("watch_state", null, null) }
-    }
-
     // --------------------------------------------------------------- alerts
 
     fun addAlert(alert: MonitorAlert): Long = try {
