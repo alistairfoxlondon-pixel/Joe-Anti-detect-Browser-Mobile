@@ -3,6 +3,7 @@ package com.joebrowser.app.data
 import android.content.Context
 import android.util.Log
 import com.joebrowser.app.core.Async
+import com.joebrowser.app.fingerprint.FingerprintFactory
 import java.util.concurrent.CopyOnWriteArrayList
 
 /**
@@ -119,6 +120,32 @@ object ProfileRepository {
         val app = context.applicationContext
         Async.serialize {
             val copy = profile.duplicate()
+            // A clone must not be a twin. The seed drives the canvas/audio noise, so copying it
+            // verbatim handed two "separate" profiles byte-identical fingerprints — exactly the
+            // correlation duplicating a profile is meant to avoid. Re-seeding keeps every
+            // deliberate choice (OS, screen, GPU, proxy) and changes only the noise.
+            runCatching {
+                val existing = db(app).getAllProfiles().map { FingerprintFactory.signature(it.fp) }
+                FingerprintFactory.ensureUnique(copy.fp, existing)
+            }
+            // The copy has never been opened and its proxy has never been probed from this
+            // profile, so it must not inherit the original's measurements — otherwise a brand new
+            // profile shows a latency, an exit IP and a country nobody measured for it.
+            copy.openCount = 0
+            copy.lastOpened = 0L
+            copy.everLaunched = false
+            copy.proxy = copy.proxy.duplicate().apply {
+                lastIp = ""
+                lastCountry = ""
+                lastCountryCode = ""
+                lastCity = ""
+                lastTimezone = ""
+                lastCheckedAt = 0L
+                latencyMs = -1
+                lastError = ""
+                failStreak = 0
+                rotations = 0
+            }
             val saved = runCatching { db(app).saveProfile(copy); copy }.getOrNull()
             // The copy gets its own isolated storage tree and its own WebKit bucket token,
             // so the clone never shares cookies with the original.
