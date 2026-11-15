@@ -504,7 +504,8 @@ class BrowserActivity : AppCompatActivity() {
         popup.menu.findItem(R.id.speedNatural).isChecked = false
         popup.menu.findItem(R.id.speedFast).isChecked = false
         popup.menu.findItem(R.id.speedInstant).isChecked = false
-        val currentSpeed = Prefs.humanPasteSpeed(this)
+        val currentSpeed = profile?.tools?.humanPasteSpeed?.takeIf { it.isNotBlank() }
+            ?: Prefs.humanPasteSpeed(this)
         when (currentSpeed) {
             "relaxed" -> popup.menu.findItem(R.id.speedRelaxed).isChecked = true
             "fast" -> popup.menu.findItem(R.id.speedFast).isChecked = true
@@ -595,8 +596,12 @@ class BrowserActivity : AppCompatActivity() {
             Async.toast(this, getString(R.string.browser_paste_empty))
             return
         }
-        val speed = Prefs.humanPasteSpeed(this)
-        val jitter = profile?.tools?.humanPasteJitter ?: true
+        // Profile is the source of truth: the editor lets each profile choose its own cadence,
+        // and the in-session menu writes straight back to it (see setSpeed). Reading the global
+        // preference here would ignore every per-profile choice the user made.
+        val configured = profile?.tools?.humanPasteSpeed?.takeIf { it.isNotBlank() }
+        val speed = configured ?: Prefs.humanPasteSpeed(this)
+        val jitter = profile?.tools?.humanPasteJitter ?: Prefs.humanPasteJitter(this)
         Async.toast(this, getString(R.string.browser_paste_started, HumanPaste.describe(clipboard, speed)))
         HumanPaste.setProgressSink { typed, total ->
             if (!isFinishing && !isDestroyed && ::binding.isInitialized) {
