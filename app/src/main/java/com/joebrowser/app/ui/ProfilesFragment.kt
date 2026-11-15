@@ -87,11 +87,11 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
     override fun onStart() {
         super.onStart()
-        AppEvents.register(this, receiver, listOf(AppEvents.ACTION_DATA_CHANGED))
+        AppEvents.register(requireContext().applicationContext, receiver, listOf(AppEvents.ACTION_DATA_CHANGED))
     }
 
     override fun onStop() {
-        AppEvents.unregister(this, receiver)
+        runCatching { context?.applicationContext?.let { AppEvents.unregister(it, receiver) } }
         super.onStop()
     }
 

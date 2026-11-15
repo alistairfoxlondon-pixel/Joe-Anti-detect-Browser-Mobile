@@ -91,13 +91,15 @@ class TrackerMonitor(private val onChange: (total: Int, trackers: Int) -> Unit) 
         }
     }
 
-    private fun hostOf(url: String): String? = try {
-        val afterScheme = url.substringAfter("://", missingDelimiterValue = "")
-        if (afterScheme.isEmpty()) return null
-        val authority = afterScheme.substringBefore('/').substringBefore('?').substringBefore('#')
-        authority.substringAfterLast('@').substringBefore(':').lowercase().ifBlank { null }
-    } catch (t: Throwable) {
-        null
+    private fun hostOf(url: String): String? {
+        return try {
+            val afterScheme = url.substringAfter("://", missingDelimiterValue = "")
+            if (afterScheme.isEmpty()) return null
+            val authority = afterScheme.substringBefore('/').substringBefore('?').substringBefore('#')
+            authority.substringAfterLast('@').substringBefore(':').lowercase().ifBlank { null }
+        } catch (t: Throwable) {
+            null
+        }
     }
 
     fun isTracker(host: String): Boolean {

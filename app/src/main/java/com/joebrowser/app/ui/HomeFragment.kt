@@ -72,11 +72,11 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
 
     override fun onStart() {
         super.onStart()
-        AppEvents.register(this, receiver, listOf(AppEvents.ACTION_DATA_CHANGED))
+        AppEvents.register(requireContext().applicationContext, receiver, listOf(AppEvents.ACTION_DATA_CHANGED))
     }
 
     override fun onStop() {
-        AppEvents.unregister(this, receiver)
+        AppEvents.unregister(requireContext().applicationContext, receiver)
         super.onStop()
     }
 
@@ -182,9 +182,7 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
             val target = _binding ?: return@compute
             target.metricAlertsValue.text = (count ?: 0).toString()
         }
-        Async.compute {
-            ProxyMonitorEngine.statusLine(app) to ProxyMonitorEngine.watchedCount(app)
-        } { result ->
+        Async.compute({ ProxyMonitorEngine.statusLine(app) to ProxyMonitorEngine.watchedCount(app) }) { result ->
             val target = _binding ?: return@compute
             val (line, watching) = result ?: ("" to 0)
             target.monitorStatus.text = line

@@ -95,7 +95,7 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
     }
 
     override fun onStop() {
-        AppEvents.unregister(this, receiver)
+        runCatching { context?.applicationContext?.let { AppEvents.unregister(it, receiver) } }
         super.onStop()
     }
 
@@ -307,10 +307,10 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
             target.fabAddProxy.visibility = if (empty) View.GONE else View.VISIBLE
         }
 
-        Async.compute {
+        Async.compute({
             val watching = ProxyMonitorEngine.watchedCount(context)
             watching to ProxyMonitorEngine.statusLine(context)
-        } { result ->
+        }) { result ->
             val target = _binding ?: return@compute
             val (watching, line) = result ?: (0 to "")
             target.monitorStatusText.text = line

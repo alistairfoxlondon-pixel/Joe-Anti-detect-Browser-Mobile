@@ -338,9 +338,10 @@ class Database private constructor(context: Context) :
             put("detail", alert.detail)
             put("ts", alert.ts)
         }
-        writableDatabase.insert("alerts", null, values)
-        // Bound the alert log.
+        val rowId = writableDatabase.insert("alerts", null, values)
+        // Bound the alert log so the table cannot grow without limit.
         writableDatabase.execSQL("DELETE FROM alerts WHERE id NOT IN (SELECT id FROM alerts ORDER BY ts DESC LIMIT 200)")
+        rowId
     } catch (t: Throwable) {
         Log.w(Async.TAG, "addAlert failed", t)
         -1L

@@ -442,8 +442,9 @@ object FingerprintFactory {
 
     /** 0–100 coherence score for the editor badge (100 = no findings). */
     fun coherenceScore(warnings: List<FingerprintWarning>): Int {
-        val penalty = warnings.sumOf {
-            when (it.severity) {
+        var penalty = 0
+        for (warning in warnings) {
+            penalty += when (warning.severity) {
                 "high" -> 30
                 "medium" -> 14
                 else -> 6

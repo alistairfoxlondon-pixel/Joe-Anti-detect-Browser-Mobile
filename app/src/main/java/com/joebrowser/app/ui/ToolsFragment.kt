@@ -119,10 +119,10 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
 
     private fun refreshMonitorStatus() {
         val context = requireContext().applicationContext
-        Async.compute {
+        Async.compute({
             val watching = ProxyMonitorEngine.watchedCount(context)
             watching to ProxyMonitorEngine.statusLine(context)
-        } { result ->
+        }) { result ->
             val target = _binding ?: return@compute
             val (watching, line) = result ?: (0 to "")
             target.valueMonitorStatus.text = line

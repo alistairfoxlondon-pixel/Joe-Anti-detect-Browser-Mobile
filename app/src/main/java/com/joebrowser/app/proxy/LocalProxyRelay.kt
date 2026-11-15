@@ -336,7 +336,7 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
                 sb.setLength(sb.length - 1)
                 return sb.toString()
             }
-            if (current != '\r') sb.append(current.toChar())
+            if (current != '\r'.code) sb.append(current.toChar())
             previous = current
             if (sb.length > MAX_HEADER_BYTES) return null
         }
