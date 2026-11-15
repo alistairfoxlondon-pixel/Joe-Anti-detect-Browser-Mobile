@@ -34,7 +34,7 @@
 
         <!-- The screen name, not the app name: the tab bar already says which app you are in. -->
         <TextView
-            android:id="@+id/versionLabel"
+            android:id="@+id/screenTitle"
             style="@style/Text.Jb.ScreenTitle"
             android:layout_width="0dp"
             android:layout_height="wrap_content"

@@ -69,7 +69,7 @@ class MainActivity : AppCompatActivity() {
         binding.btnQuickNewProfile.setOnClickListener {
             ProfileEditorActivity.launch(this, null)
         }
-        binding.versionLabel.setText(R.string.nav_home)
+        binding.screenTitle.setText(R.string.nav_home)
 
         binding.bottomNav.setOnItemSelectedListener { item ->
             showTab(item.itemId)
@@ -170,7 +170,7 @@ class MainActivity : AppCompatActivity() {
                 R.id.nav_tools -> tagTools
                 else -> tagHome
             }
-            binding.versionLabel.setText(
+            binding.screenTitle.setText(
                 when (itemId) {
                     R.id.nav_profiles -> R.string.nav_profiles
                     R.id.nav_proxies -> R.string.nav_proxies
