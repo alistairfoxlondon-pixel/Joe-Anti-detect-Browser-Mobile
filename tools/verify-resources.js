@@ -363,6 +363,28 @@ function bindingToLayout(bindingName) {
   return snake;
 }
 
+// ------------------------------------------------------------- touch targets
+
+/**
+ * Nothing clickable may be smaller than 48dp on either axis. A 34dp tab counter is how a
+ * "responsive" layout ends up unusable on a phone; the pattern that fixes it (a small visual
+ * inside a 48dp transparent frame) is in the same file, so the rule is easy to follow.
+ */
+for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml'))) {
+  const text = fs.readFileSync(file, 'utf8');
+  for (const m of text.matchAll(/<([A-Za-z.]+)\s([^>]*?)\/?>/gs)) {
+    const body = m[2];
+    if (!/android:clickable="true"/.test(body)) continue;
+    if (/android:minHeight="(?:4[89]|[5-9]\d|\d{3,})dp"/.test(body)) continue;
+    const w = /android:layout_width="(\d+)dp"/.exec(body);
+    const h = /android:layout_height="(\d+)dp"/.exec(body);
+    if ((w && Number(w[1]) < 48) || (h && Number(h[1]) < 48)) {
+      const id = /android:id="@\+id\/(\w+)"/.exec(body);
+      fail(`${path.relative(ROOT, file)}: ${id ? id[1] : m[1]} is clickable but smaller than 48dp`);
+    }
+  }
+}
+
 // --------------------------------------------------------------- dead copy check
 
 /**

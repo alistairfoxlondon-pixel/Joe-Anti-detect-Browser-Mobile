@@ -366,23 +366,30 @@
                 android:src="@drawable/ic_refresh" />
         </LinearLayout>
 
-        <TextView
+        <!-- The pill is 34dp because a tab counter that size reads correctly, but the touch
+             target must be 48dp: wrap it in a transparent, padded frame. -->
+        <FrameLayout
             android:id="@+id/btnTabs"
-            android:layout_width="34dp"
-            android:layout_height="34dp"
-            android:layout_marginStart="4dp"
-            android:layout_marginEnd="2dp"
-            android:background="@drawable/bg_chip_neutral"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
             android:clickable="true"
             android:contentDescription="@string/browser_tabs_title"
-            android:focusable="true"
-            android:foreground="?attr/selectableItemBackground"
-            android:gravity="center"
-            android:maxLines="1"
-            android:text="1"
-            android:textColor="@color/accent"
-            android:textSize="12sp"
-            android:textStyle="bold" />
+            android:focusable="true">
+
+            <TextView
+                android:id="@+id/tabsCount"
+                android:layout_width="30dp"
+                android:layout_height="30dp"
+                android:layout_gravity="center"
+                android:background="@drawable/bg_chip_neutral"
+                android:gravity="center"
+                android:maxLines="1"
+                android:text="1"
+                android:textColor="@color/accent"
+                android:textSize="12sp"
+                android:textStyle="bold" />
+        </FrameLayout>
 
         <ImageButton
             android:id="@+id/btnBrowserMenu"

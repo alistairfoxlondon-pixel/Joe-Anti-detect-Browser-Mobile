@@ -233,7 +233,7 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun updateTabBadge() {
         if (!::binding.isInitialized) return
-        binding.btnTabs.text = tabs.size.coerceAtLeast(1).toString()
+        binding.tabsCount.text = tabs.size.coerceAtLeast(1).toString()
     }
 
     private fun openNewTab(initialUrl: String? = null) {
