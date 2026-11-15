@@ -74,6 +74,9 @@ class HistoryActivity : AppCompatActivity() {
         }
         ProfileRepository.history(app, null, 500) { entries ->
             allEntries = entries
+            // Chips are built from the entry list (each profile's count), so they must be
+            // rebuilt here as well — the first build ran before any entry was known.
+            buildProfileChips()
             applyFilter()
         }
     }
@@ -118,8 +121,9 @@ class HistoryActivity : AppCompatActivity() {
         adapter.submit(filtered)
         binding.historyCount.text = filtered.size.toString()
         binding.historyEmpty.visibility = if (filtered.isEmpty()) View.VISIBLE else View.GONE
-        val emptyLabel = binding.historyEmpty.findViewById<TextView?>(R.id.historyEmptyText)
-        emptyLabel?.setText(
+        // Cached rather than looked up per keystroke, and it always exists in the layout, so a
+        // null here would silently mislabel the empty state.
+        binding.historyEmptyText.setText(
             if (allEntries.isEmpty()) R.string.history_empty_title else R.string.history_empty
         )
     }
@@ -136,9 +140,14 @@ class HistoryActivity : AppCompatActivity() {
             )
             .setPositiveButton(R.string.history_clear_all) { _, _ ->
                 val app = applicationContext
-                ProfileRepository.clearHistory(app, profileFilter) {
-                    allEntries = emptyList()
-                    profileFilter = null
+                val clearedProfile = profileFilter
+                ProfileRepository.clearHistory(app, clearedProfile) {
+                    // A scoped clear removes only that profile's rows. Clearing everything in
+                    // memory and dropping the filter made the screen claim the whole log was
+                    // gone when the other profiles' entries were still in the database.
+                    allEntries = if (clearedProfile == null) emptyList()
+                    else allEntries.filterNot { it.profileId == clearedProfile }
+                    if (clearedProfile != null && allEntries.isEmpty()) profileFilter = null
                     buildProfileChips()
                     applyFilter()
                     Async.toast(this, getString(R.string.status_deleted))
