@@ -31,8 +31,11 @@ exact warnings the editor uses, then one-tap detectors (BrowserScan, IPHey, Pixe
 IPFighter, Whoer, Sannysoft, DeviceInfo) that open **inside the selected profile's session**, so
 what you test is what that profile will show the world.
 
-**Copy diet.** Duplicate labels were merged into single keys (`Not checked` existed four times),
-the dashboard hero absorbed the Verify row, and static user-facing copy was cut again.
+**Copy and chrome diet.** Duplicate labels were merged into single keys (`Not checked` existed four
+times), the dashboard hero absorbed the Verify row, four editor section headers were replaced by
+grouping, and every section that can be empty now collapses instead of printing a sentence about
+being empty. `node tools/copy-report.js` prints the exact per-key comparison against 1.4.0 on every
+CI run — see [`QA.md`](QA.md) for the numbers and what is still unverified.
 
 ## New in 1.4.0
 
@@ -193,7 +196,8 @@ used for sideloading. Locally, place a `keystore.properties` (git-ignored) with
 
 ## Verification status
 
-Being straight about what was and wasn't tested:
+Full detail, including a per-screen trace and the exact copy numbers, lives in [`QA.md`](QA.md).
+The short version:
 
 - ✅ **Compiles** — `assembleDebug` and `assembleRelease` (R8 + resource shrinking) pass in CI on
   every push; the workflow is the gate, not a local run.
