@@ -8,8 +8,7 @@
    * Text colours come in exactly three weights (text / text_dim / text_muted) plus the
      semantic accents; anything else is a bug in the design system.
    * Surfaces are layered: bg (page) < surface (card) < surface_muted (inset control).
-   * The brand is a deep emerald ("jade"): primary actions read #0B8A5A on white so they
-     keep AA contrast, and the hero gradient runs emerald → forest for depth.
+   * The brand is a single solid deep green; no gradients are used anywhere in the system.
 -->
 <resources>
 
@@ -46,11 +45,12 @@
     <color name="danger_soft">#1AB42318</color>
     <color name="neutral">#6C7D71</color>
 
-    <!-- Hero gradient stops (dashboard header) -->
-    <color name="hero_start">#0E9F6E</color>
-    <color name="hero_end">#053B26</color>
+    <!-- Brand: solid deep green, no gradients anywhere in the system -->
+    <color name="brand_deep">#0B3D2E</color>
+    <color name="brand_deep_pressed">#082F23</color>
+    <color name="brand_ivory">#F2F7F3</color>
     <color name="hero_text">#FFFFFF</color>
-    <color name="hero_text_dim">#B9E9CE</color>
+    <color name="hero_text_dim">#BFE3CF</color>
 
     <!-- Legacy aliases kept so older references keep resolving after the refactor. -->
     <color name="bg_soft">@color/surface</color>

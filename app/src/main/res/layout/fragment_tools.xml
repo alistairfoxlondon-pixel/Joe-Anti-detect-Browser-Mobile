@@ -69,6 +69,28 @@
             </LinearLayout>
 
             <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/touch_target"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <TextView
+                    style="@style/Text.Jb.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/tools_auto_rotate" />
+
+                <com.google.android.material.materialswitch.MaterialSwitch
+                    android:id="@+id/switchAutoRotate"
+                    style="@style/Widget.Jb.Switch"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content" />
+            </LinearLayout>
+
+            <LinearLayout
                 android:id="@+id/rowMonitorInterval"
                 android:layout_width="match_parent"
                 android:layout_height="@dimen/touch_target"
@@ -545,6 +567,35 @@
                         android:ellipsize="end"
                         android:maxLines="1" />
                 </LinearLayout>
+            </LinearLayout>
+
+            <LinearLayout
+                android:id="@+id/rowLockApp"
+                android:layout_width="match_parent"
+                android:layout_height="@dimen/touch_target"
+                android:layout_marginTop="@dimen/gap_m"
+                android:background="?attr/selectableItemBackground"
+                android:clickable="true"
+                android:focusable="true"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:layout_width="@dimen/icon_md"
+                    android:layout_height="@dimen/icon_md"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_lock"
+                    app:tint="@color/text_dim" />
+
+                <TextView
+                    style="@style/Text.Jb.Body"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:layout_weight="1"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/tools_lock_app" />
             </LinearLayout>
 
             <LinearLayout

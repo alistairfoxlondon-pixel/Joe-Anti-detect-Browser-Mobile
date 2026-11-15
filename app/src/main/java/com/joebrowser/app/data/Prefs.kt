@@ -24,6 +24,7 @@ object Prefs {
     private const val KEY_NOTIF_ASKED = "notification_asked"
     private const val KEY_LAST_PROFILE_ID = "last_profile_id"
     private const val KEY_MONITOR_INTERVAL = "monitor_interval_sec"
+    private const val KEY_AUTO_ROTATE = "auto_rotate_on_failure"
     private const val KEY_MONITOR_ENABLED = "monitor_enabled"
     private const val KEY_HUMAN_PASTE = "global_human_paste"
     private const val KEY_HUMAN_SPEED = "global_human_speed"
@@ -99,6 +100,10 @@ object Prefs {
     fun monitorEnabled(context: Context): Boolean = sp(context).getBoolean(KEY_MONITOR_ENABLED, true)
     fun setMonitorEnabled(context: Context, value: Boolean) =
         sp(context).edit().putBoolean(KEY_MONITOR_ENABLED, value).apply()
+
+    fun autoRotateOnFailure(context: Context): Boolean = sp(context).getBoolean(KEY_AUTO_ROTATE, false)
+    fun setAutoRotateOnFailure(context: Context, value: Boolean) =
+        sp(context).edit().putBoolean(KEY_AUTO_ROTATE, value).apply()
 
     /** Background health-check cadence in seconds (30–3600). */
     fun monitorIntervalSec(context: Context): Int =

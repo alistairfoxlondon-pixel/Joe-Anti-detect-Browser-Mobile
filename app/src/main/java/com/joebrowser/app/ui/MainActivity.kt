@@ -52,6 +52,17 @@ class MainActivity : AppCompatActivity() {
         setTheme(R.style.Theme_JoeBrowser)
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
+        if (!com.joebrowser.app.auth.LocalAccount.isUnlocked()) {
+            // Cold start or locked: hand off to the local account screen, preserving
+            // deep-link extras so the intended tab opens after sign-in.
+            val forward = Intent(this, AccountActivity::class.java)
+            intent?.extras?.let { forward.putExtras(it) }
+            intent?.data?.let { forward.data = it }
+            startActivity(forward)
+            finish()
+            return
+        }
+
         setContentView(binding.root)
 
         binding.btnHistory.setOnClickListener { openSafely(HistoryActivity::class.java) }

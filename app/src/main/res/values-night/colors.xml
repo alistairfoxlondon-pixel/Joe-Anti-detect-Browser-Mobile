@@ -39,9 +39,10 @@
     <color name="danger_soft">#26FF7B72</color>
     <color name="neutral">#8B9B8F</color>
 
-    <!-- Hero gradient stops -->
-    <color name="hero_start">#0C6B47</color>
-    <color name="hero_end">#04281A</color>
+    <!-- Brand: solid deep green, same on dark -->
+    <color name="brand_deep">#0B3D2E</color>
+    <color name="brand_deep_pressed">#082F23</color>
+    <color name="brand_ivory">#F2F7F3</color>
     <color name="hero_text">#FFFFFF</color>
     <color name="hero_text_dim">#A8D8BE</color>
 
