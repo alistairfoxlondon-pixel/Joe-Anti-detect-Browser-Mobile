@@ -69,12 +69,10 @@
                     android:id="@+id/clearSearch"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    style="@style/Widget.Jb.IconButton"
                     android:contentDescription="@string/action_clear"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_close"
-                    app:tint="@color/text_muted"
-                    android:visibility="gone" />
+                    android:visibility="gone"
+                    android:src="@drawable/ic_close" />
             </LinearLayout>
 
             <ImageView

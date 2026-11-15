@@ -6,6 +6,34 @@ be managed from one device without cross-contamination.
 
 Local account only. No cloud. No telemetry. Everything lives on the device.
 
+## New in 1.5.0
+
+**Signed, correctly-named APKs — and an install guide.** 1.5.0 ships `joe-browser-1.5.0-release.apk`
+signed with v1+v2+v3 schemes (when keystore secrets are configured), alongside a `SHA256SUMS.txt`
+on every release. If Windows SmartScreen or Defender blocks or deletes the download, read
+[`INSTALL.md`](INSTALL.md): it explains why an unknown, unsigned, generically-named APK is
+heuristic-bad and shows how to verify the checksum before installing.
+
+**New brand mark and icon set.** A shield-and-keyhole mark on deep green replaces the old logo;
+the full 69-icon set was redrawn on a single 24dp grid with one stroke weight, and the launcher
+foreground/background layers were rebuilt at the correct safe-zone scale.
+
+**One type system, one colour.** Plus Jakarta Sans 400–800 everywhere (`@font/jakarta`), a single
+brand green (`#0C7A52` light / `#2FBF8F` dark) with a deep-green `#0B3D2E` hero surface, and
+**no gradients anywhere** — every surface is a flat fill.
+
+**Bulk profile creation.** Profiles → layers icon: name prefix, count (up to 50), engine, OS and
+one shared proxy. Every profile in the batch is de-duplicated against all existing signatures, so
+twenty profiles are twenty fingerprints, not twenty copies.
+
+**Fingerprint Lab.** Profiles → ⋮ → *Test fingerprint* opens an on-device coherence score with the
+exact warnings the editor uses, then one-tap detectors (BrowserScan, IPHey, PixelScan, CreepJS,
+IPFighter, Whoer, Sannysoft, DeviceInfo) that open **inside the selected profile's session**, so
+what you test is what that profile will show the world.
+
+**Copy diet.** Duplicate labels were merged into single keys (`Not checked` existed four times),
+the dashboard hero absorbed the Verify row, and static user-facing copy was cut again.
+
 ## New in 1.4.0
 
 **Local account gate** — first launch creates a device-local account (email + password,
@@ -59,11 +87,27 @@ and a batch of overflow/crash fixes across the UI.
 
 ## Get the app
 
-- **GitHub Releases**: tagged releases attach the APKs (`app-debug.apk` is signed with the
-  Android debug key and installable directly; `app-release-unsigned.apk` is the minified
-  release build and is only installable after signing — see *Signing* below).
-- **CI**: every push builds `debug` and `release` APKs (GitHub Actions → *Build* workflow →
-  artifact `joe-browser-apks`).
+- **GitHub Releases** (recommended): each release attaches
+  `joe-browser-<version>-release.apk` (minified, signed), `joe-browser-<version>-debug.apk`
+  (debug key), and `SHA256SUMS.txt`.
+- **Verify before installing** — the download is a plain `.apk` from an unknown publisher, which
+  is exactly the shape OS heuristics distrust. Compare the SHA-256:
+
+  ```powershell
+  Get-FileHash .\joe-browser-1.5.0-release.apk -Algorithm SHA256
+  ```
+
+  ```bash
+  shasum -a 256 joe-browser-1.5.0-release.apk
+  ```
+
+  The digest must match the line for that file in `SHA256SUMS.txt`.
+- **Why Windows warns** — SmartScreen/Defender flag unsigned or low-reputation binaries, and a
+  generic `app-release-unsigned.apk` name scores badly on its own. 1.5.0 fixes all three causes:
+  builds are signed, filenames are specific and versioned, and checksums are published. Full
+  detail, false-positive reporting links and Android/WSL/macOS install steps: [`INSTALL.md`](INSTALL.md).
+- **CI**: every push builds debug and release APKs (Actions → *Build* → artifact `joe-browser-apks`),
+  and the workflow fails if either APK is unsigned.
 
 ## What it does
 

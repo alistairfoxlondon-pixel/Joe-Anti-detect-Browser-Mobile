@@ -146,12 +146,9 @@
             android:id="@+id/profileMore"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginStart="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_more"
-            android:padding="11dp"
-            android:src="@drawable/ic_more"
-            app:tint="@color/text_muted" />
+            android:src="@drawable/ic_more" />
     </LinearLayout>
 
     <!-- Band 2: proxy + last opened -->

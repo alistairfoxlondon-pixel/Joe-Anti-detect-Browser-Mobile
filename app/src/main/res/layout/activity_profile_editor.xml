@@ -1137,14 +1137,9 @@
 
         <ImageButton
             android:id="@+id/btnEditorDelete"
-            android:layout_width="@dimen/touch_target"
-            android:layout_height="@dimen/touch_target"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_delete"
-            android:padding="13dp"
-            android:src="@drawable/ic_trash"
-            app:tint="@color/danger"
-            android:visibility="gone" />
+            android:src="@drawable/ic_trash" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnEditorSave"

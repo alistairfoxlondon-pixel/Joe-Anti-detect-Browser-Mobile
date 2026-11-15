@@ -39,11 +39,10 @@
             android:id="@+id/btnBrowserBack"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_back"
-            android:padding="10dp"
-            android:src="@drawable/ic_back"
-            app:tint="@color/text_dim" />
+            android:padding="11dp"
+            android:src="@drawable/ic_back" />
 
         <!-- Avatar + isolation-health dot -->
         <FrameLayout
@@ -106,24 +105,22 @@
             android:id="@+id/browserProxyButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/browser_proxy"
-            android:padding="10dp"
-            android:src="@drawable/ic_shield_check"
+            android:padding="11dp"
             android:visibility="gone"
-            app:tint="@color/text_muted" />
+            android:src="@drawable/ic_shield_check" />
 
         <!-- Tracker tally: icon-only, amber while trackers are active on the page -->
         <ImageButton
             android:id="@+id/browserTrackerButton"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/browser_tracker_title"
-            android:padding="10dp"
-            android:src="@drawable/ic_eye"
+            android:padding="11dp"
             android:visibility="gone"
-            app:tint="@color/text_muted" />
+            android:src="@drawable/ic_eye" />
     </LinearLayout>
 
     <View
@@ -263,33 +260,27 @@
             android:id="@+id/browserFindPrev"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:layout_marginStart="2dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/browser_find_prev"
-            android:padding="10dp"
-            android:rotation="180"
-            android:src="@drawable/ic_chevron_down"
-            app:tint="@color/text_dim" />
+            android:padding="11dp"
+            android:src="@drawable/ic_chevron_down" />
 
         <ImageButton
             android:id="@+id/browserFindNext"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/browser_find_next"
-            android:padding="10dp"
-            android:src="@drawable/ic_chevron_down"
-            app:tint="@color/text_dim" />
+            android:padding="11dp"
+            android:src="@drawable/ic_chevron_down" />
 
         <ImageButton
             android:id="@+id/browserFindClose"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_close"
-            android:padding="11dp"
-            android:src="@drawable/ic_close"
-            app:tint="@color/text_dim" />
+            android:src="@drawable/ic_close" />
     </LinearLayout>
 
     <!-- =========================================================== address bar -->
@@ -313,22 +304,19 @@
             android:id="@+id/btnNavBack"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_back"
-            android:padding="10dp"
-            android:src="@drawable/ic_back"
-            app:tint="@color/text_dim" />
+            android:padding="11dp"
+            android:src="@drawable/ic_back" />
 
         <ImageButton
             android:id="@+id/btnNavForward"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/browser_forward"
-            android:padding="10dp"
-            android:rotation="180"
-            android:src="@drawable/ic_back"
-            app:tint="@color/text_dim" />
+            android:padding="11dp"
+            android:src="@drawable/ic_back" />
 
         <LinearLayout
             android:layout_width="0dp"
@@ -373,11 +361,9 @@
                 android:id="@+id/btnNavReload"
                 android:layout_width="34dp"
                 android:layout_height="34dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Jb.IconButton"
                 android:contentDescription="@string/browser_reload"
-                android:padding="8dp"
-                android:src="@drawable/ic_refresh"
-                app:tint="@color/text_muted" />
+                android:src="@drawable/ic_refresh" />
         </LinearLayout>
 
         <TextView
@@ -402,11 +388,10 @@
             android:id="@+id/btnBrowserMenu"
             android:layout_width="40dp"
             android:layout_height="40dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/browser_menu"
-            android:padding="10dp"
-            android:src="@drawable/ic_more"
-            app:tint="@color/text_dim" />
+            android:padding="11dp"
+            android:src="@drawable/ic_more" />
     </LinearLayout>
 
     <!-- ========================================================= fullscreen video -->

@@ -73,13 +73,9 @@
 
             <ImageButton
                 android:id="@+id/btnCheckDevice"
-                android:layout_width="@dimen/touch_target"
-                android:layout_height="@dimen/touch_target"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                style="@style/Widget.Jb.IconButton"
                 android:contentDescription="@string/action_check_now"
-                android:padding="13dp"
-                android:src="@drawable/ic_refresh"
-                app:tint="@color/text_dim" />
+                android:src="@drawable/ic_refresh" />
         </LinearLayout>
 
         <!-- Monitor strip -->
