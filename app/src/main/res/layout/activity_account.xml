@@ -61,7 +61,7 @@
             <!-- Mode switch: two equal halves, the active one is filled. -->
             <LinearLayout
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
+                android:layout_height="48dp"
                 android:layout_marginTop="22dp"
                 android:background="@drawable/bg_segment"
                 android:orientation="horizontal"
@@ -73,6 +73,8 @@
                     android:layout_height="match_parent"
                     android:layout_weight="1"
                     android:background="@drawable/bg_segment_thumb"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center"
                     android:text="@string/account_signin"
                     android:textColor="@color/text"
@@ -84,6 +86,8 @@
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_weight="1"
+                    android:clickable="true"
+                    android:focusable="true"
                     android:gravity="center"
                     android:text="@string/account_create"
                     android:textColor="@color/text_dim"
@@ -164,12 +168,14 @@
                 android:id="@+id/forgotPassword"
                 style="@style/Text.Jb.Caption"
                 android:layout_width="match_parent"
-                android:layout_height="44dp"
-                android:layout_marginTop="6dp"
+                android:layout_height="48dp"
+                android:layout_marginTop="4dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
+                android:clickable="true"
+                android:focusable="true"
                 android:gravity="center"
                 android:text="@string/account_forgot"
-                android:textColor="@color/text_dim" />
+                android:textColor="@color/accent" />
 
             <!-- Replaces the old full-width text toggle; the segmented control is the switcher. -->
             <TextView
