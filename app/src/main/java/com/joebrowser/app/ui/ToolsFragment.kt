@@ -161,7 +161,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         (0..2).forEach { mode ->
             val chip = Chip(requireContext()).apply {
                 id = View.generateViewId()
-                text = Prefs.themeLabel(mode)
+                text = Prefs.themeLabel(requireContext(), mode)
                 isCheckable = true
                 isChecked = mode == current
                 setOnClickListener {

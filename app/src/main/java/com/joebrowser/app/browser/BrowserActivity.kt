@@ -334,10 +334,11 @@ class BrowserActivity : AppCompatActivity() {
         )
         binding.browserKernelDot.contentDescription =
             getString(if (isolated) R.string.browser_kernel_ok else R.string.home_kernel_shared)
-        if (!isolated) {
-            Async.toast(this, getString(R.string.browser_kernel_shared_toast))
-        } else if (status.warning != null && status.injection == BrowserKernel.InjectionMode.EARLY_FALLBACK) {
-            Async.toast(this, getString(R.string.browser_kernel_fallback))
+        // One toast, chosen by the worst capability this WebView is missing.
+        when (status.warning) {
+            BrowserKernel.Warning.SHARED_STORAGE -> Async.toast(this, getString(R.string.browser_kernel_shared_toast))
+            BrowserKernel.Warning.LATE_INJECTION -> Async.toast(this, getString(R.string.browser_kernel_fallback))
+            null -> Unit
         }
     }
 

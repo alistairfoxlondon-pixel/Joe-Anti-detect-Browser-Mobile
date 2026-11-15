@@ -82,7 +82,7 @@ object ProfileRepository {
                 onDone?.let { callback -> Async.onMain { runCatching { callback(saved) } } }
                 notifyChanged()
             } else {
-                Async.toast(app, "Could not save the profile")
+                Async.toast(app, app.getString(com.joebrowser.app.R.string.error_save_profile))
             }
         }
     }
@@ -222,7 +222,7 @@ object ProfileRepository {
         val app = context.applicationContext
         Async.serialize {
             val ok = runCatching { db(app).saveProxy(proxy) }.isSuccess
-            if (ok) Async.onMain { onDone?.invoke() } else Async.toast(app, "Could not save the proxy")
+            if (ok) Async.onMain { onDone?.invoke() } else Async.toast(app, app.getString(com.joebrowser.app.R.string.error_save_proxy))
             notifyChanged()
         }
     }

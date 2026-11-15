@@ -49,12 +49,20 @@ class BrowserKernel(
 
     enum class InjectionMode { DOCUMENT_START, EARLY_FALLBACK }
 
+    /** What the kernel had to give up, if anything. A type, not a sentence: the UI owns wording. */
+    enum class Warning {
+        /** No storage isolation: every profile shares one cookie jar and cache. */
+        SHARED_STORAGE,
+        /** No document-start hook: the spoof runs at page start instead, one beat later. */
+        LATE_INJECTION
+    }
+
     data class KernelStatus(
         val isolation: IsolationMode,
         val injection: InjectionMode,
         val profileToken: String,
         /** Set when the kernel had to degrade; shown once in the browser UI. */
-        val warning: String? = null
+        val warning: Warning? = null
     )
 
     private var script: String = ""
@@ -251,18 +259,16 @@ class BrowserKernel(
 
     private fun store(): ProfileStore? = runCatching { ProfileStore.getInstance() }.getOrNull()
 
-    fun status(): KernelStatus {
-        val warning = when {
-            isolationMode == IsolationMode.SHARED && injectionMode == InjectionMode.EARLY_FALLBACK ->
-                "This WebView cannot isolate storage or inject before load. Update Android System WebView."
-            isolationMode == IsolationMode.SHARED ->
-                "This WebView cannot isolate profile storage. Update Android System WebView."
-            injectionMode == InjectionMode.EARLY_FALLBACK ->
-                "Fingerprint layer injected at page start (document-start hook unavailable)."
+    fun status(): KernelStatus = KernelStatus(
+        isolationMode,
+        injectionMode,
+        token,
+        when {
+            isolationMode == IsolationMode.SHARED -> Warning.SHARED_STORAGE
+            injectionMode == InjectionMode.EARLY_FALLBACK -> Warning.LATE_INJECTION
             else -> null
         }
-        return KernelStatus(isolationMode, injectionMode, token, warning)
-    }
+    )
 
     /** The bucket's cookie store when isolation is active, otherwise the global one. */
     fun activeCookieManager(): CookieManager? = cookieStore()
