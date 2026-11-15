@@ -31,13 +31,9 @@
 
         <ImageButton
             android:id="@+id/btnEditorBack"
-            android:layout_width="@dimen/touch_target"
-            android:layout_height="@dimen/touch_target"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_back"
-            android:padding="13dp"
-            android:src="@drawable/ic_back"
-            app:tint="@color/text_dim" />
+            android:src="@drawable/ic_back" />
 
         <TextView
             android:id="@+id/editorTitle"
@@ -94,6 +90,7 @@
                 style="@style/Text.Jb.Section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/gap_s"
                 android:text="@string/editor_section_identity" />
 
             <HorizontalScrollView
@@ -119,7 +116,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Jb.TextInput"
@@ -284,7 +281,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <TextView
                     android:id="@+id/fpSummary"
@@ -321,6 +318,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/gap_l"
+                android:layout_marginBottom="@dimen/gap_s"
                 android:text="@string/editor_section_screen" />
 
             <LinearLayout
@@ -329,7 +327,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Jb.TextInput.Dropdown"
@@ -446,7 +444,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -551,7 +549,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Jb.TextInput.Dropdown"
@@ -624,7 +622,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -1131,6 +1129,7 @@
         android:background="@color/surface"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:elevation="2dp"
         android:paddingStart="12dp"
         android:paddingTop="10dp"
         android:paddingEnd="12dp"
@@ -1153,7 +1152,7 @@
             android:layout_width="0dp"
             android:layout_height="@dimen/button_height"
             android:layout_marginStart="4dp"
-            android:layout_weight="1"
+            android:layout_weight="1.35"
             android:text="@string/editor_save" />
 
         <com.google.android.material.button.MaterialButton

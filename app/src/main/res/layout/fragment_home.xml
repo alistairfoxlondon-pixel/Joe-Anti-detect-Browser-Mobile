@@ -118,7 +118,10 @@
 
             <include
                 android:id="@+id/statProfiles"
-                layout="@layout/item_stat_card" />
+                layout="@layout/item_stat_card"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
 
             <View
                 android:layout_width="1dp"
@@ -129,7 +132,10 @@
 
             <include
                 android:id="@+id/statProxies"
-                layout="@layout/item_stat_card" />
+                layout="@layout/item_stat_card"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
 
             <View
                 android:layout_width="1dp"
@@ -140,7 +146,10 @@
 
             <include
                 android:id="@+id/statAlerts"
-                layout="@layout/item_stat_card" />
+                layout="@layout/item_stat_card"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
         </LinearLayout>
 
         <!-- =========================================================== actions -->
