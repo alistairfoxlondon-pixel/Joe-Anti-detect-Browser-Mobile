@@ -24,6 +24,10 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history: the copy-budget report diffs the 1.4.0 baseline strings, and the
+          # apk-naming step reads the tag. A shallow clone silently disabled both.
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5

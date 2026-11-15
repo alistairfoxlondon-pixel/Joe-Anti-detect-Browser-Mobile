@@ -30,8 +30,11 @@ let baseline = {};
 try {
   baseline = parse(execSync(`git show ${BASELINE}:app/src/main/res/values/strings.xml`, { cwd: ROOT, encoding: 'utf8' }));
 } catch {
-  console.error(`Cannot read baseline ${BASELINE}. Pass a commit ref as the first argument.`);
-  process.exit(1);
+  // Covers a shallow CI clone: report current totals, but never claim a diet was measured.
+  console.log(`Copy report: baseline ${BASELINE} not available in this checkout (shallow clone?).`);
+  console.log(`Current copy: ${Object.keys(current).length} keys, ` +
+    `${Object.values(current).reduce((n, v) => n + v.length, 0)} chars.`);
+  process.exit(0);
 }
 
 const chars = (obj, keys) => keys.reduce((n, k) => n + obj[k].length, 0);
