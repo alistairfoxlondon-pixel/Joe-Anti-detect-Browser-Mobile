@@ -726,9 +726,20 @@ __PATCH_HELPERS__
   } catch (e) {}
 
   /* ----------------------------------------------------------- geolocation */
+  /*
+   * Geolocation is a singleton in every engine, but the patch is installed through the accessor
+   * anyway: if a provider ever hands back a fresh object per access, patching only the returned
+   * instance would leave the *next* call unpatched. Pinning the same object on the instance keeps
+   * the two views identical.
+   */
   try {
     if (navigator.geolocation) {
       var geo = navigator.geolocation;
+      try {
+        Object.defineProperty(navigator, 'geolocation', {
+          get: function () { return geo; }, configurable: true, enumerable: true
+        });
+      } catch (e) {}
       if (JB.geoMode === 'block') {
         var deny = function (success, error) {
           if (typeof error === 'function') {
@@ -738,17 +749,36 @@ __PATCH_HELPERS__
         geo.getCurrentPosition = deny;
         geo.watchPosition = function (success, error) { deny(success, error); return 0; };
       } else if (JB.geoMode === 'custom') {
-        var fakePosition = function () {
-          return {
-            coords: {
-              latitude: JB.geoLat, longitude: JB.geoLng, accuracy: 25,
-              altitude: null, altitudeAccuracy: null, heading: null, speed: null
-            },
-            timestamp: Date.now()
+        /*
+         * A custom location with no usable coordinates must not fall through to 0,0: that point
+         * is in the Gulf of Guinea, where no real user sits, so the fake location itself gives
+         * the profile away. Without coordinates the honest answer is 'unavailable'.
+         */
+        var hasCoords = typeof JB.geoLat === 'number' && typeof JB.geoLng === 'number' &&
+          isFinite(JB.geoLat) && isFinite(JB.geoLng) &&
+          !(JB.geoLat === 0 && JB.geoLng === 0) &&
+          Math.abs(JB.geoLat) <= 90 && Math.abs(JB.geoLng) <= 180;
+        if (hasCoords) {
+          var fakePosition = function () {
+            return {
+              coords: {
+                latitude: JB.geoLat, longitude: JB.geoLng, accuracy: 25,
+                altitude: null, altitudeAccuracy: null, heading: null, speed: null
+              },
+              timestamp: Date.now()
+            };
           };
-        };
-        geo.getCurrentPosition = function (success) { if (typeof success === 'function') success(fakePosition()); };
-        geo.watchPosition = function (success) { if (typeof success === 'function') success(fakePosition()); return 1; };
+          geo.getCurrentPosition = function (success) { if (typeof success === 'function') success(fakePosition()); };
+          geo.watchPosition = function (success) { if (typeof success === 'function') success(fakePosition()); return 1; };
+        } else {
+          var unavailable = function (success, error) {
+            if (typeof error === 'function') {
+              error({ code: 2, message: 'Position unavailable', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+            }
+          };
+          geo.getCurrentPosition = unavailable;
+          geo.watchPosition = function (success, error) { unavailable(success, error); return 0; };
+        }
       }
     }
   } catch (e) {}

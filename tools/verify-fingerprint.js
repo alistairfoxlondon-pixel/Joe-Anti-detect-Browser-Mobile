@@ -104,6 +104,28 @@ function makeEnvironment(cfg) {
     get: function () { return true; }, configurable: true, enumerable: true
   });
 
+  // Surfaces the script patches beyond navigator identity: the mock has to expose them, or an
+  // assertion about them silently passes against an untouched object.
+  // Blink returns the SAME Geolocation instance on every access, so a patch applied to it sticks.
+  const geolocationSingleton = {
+    getCurrentPosition: function (success) { success({ coords: { latitude: 1, longitude: 2 } }); },
+    watchPosition: function (success) { success({ coords: { latitude: 1, longitude: 2 } }); return 7; }
+  };
+  Object.defineProperty(navProto, 'geolocation', {
+    get: function () { return geolocationSingleton; },
+    configurable: true, enumerable: true
+  });
+  Object.defineProperty(navProto, 'connection', {
+    get: function () { return { effectiveType: '3g', rtt: 200, downlink: 2, saveData: true }; },
+    configurable: true, enumerable: true
+  });
+  Object.defineProperty(navProto, 'getBattery', {
+    value: function getBattery() {
+      return Promise.resolve({ charging: false, chargingTime: Infinity, dischargingTime: 900, level: 0.5 });
+    },
+    configurable: true, writable: true, enumerable: false
+  });
+
   const screenProto = protoGetters({}, {
     width: 360, height: 640, availWidth: 360, availHeight: 640, colorDepth: 24, pixelDepth: 24
   });
@@ -303,6 +325,40 @@ check('userAgent stable on repeat read', nav.userAgent === cfg.ua, true);
 check('languages array is frozen', Object.isFrozen(nav.languages), true);
 
 // ------------------------------------------------------- identity coherence
+// ----------------------------------------------------------- geolocation
+console.log('\ngeolocation');
+
+function geoResult(overrides) {
+  const c = sampleConfig(overrides);
+  const e = run(build(c), makeEnvironment(c));
+  let ok = null;
+  let err = null;
+  try {
+    e.navigator.geolocation.getCurrentPosition(
+      (p) => { ok = p; },
+      (x) => { err = x; }
+    );
+  } catch (ex) {
+    err = { code: -1, message: String(ex) };
+  }
+  return { ok, err };
+}
+
+const custom = geoResult({ geoMode: 'custom', geoLat: 52.52, geoLng: 13.4 });
+check('custom mode returns the profile coordinates', custom.ok && custom.ok.coords.latitude, 52.52);
+check('custom mode returns the profile longitude', custom.ok && custom.ok.coords.longitude, 13.4);
+
+const noCoords = geoResult({ geoMode: 'custom', geoLat: 0, geoLng: 0 });
+check('custom mode without coordinates does NOT answer 0,0', noCoords.ok === null, true);
+check('custom mode without coordinates reports unavailable', noCoords.err && noCoords.err.code, 2);
+
+const outOfRange = geoResult({ geoMode: 'custom', geoLat: 120, geoLng: 400 });
+check('out-of-range coordinates are refused', outOfRange.ok === null, true);
+
+const blocked = geoResult({ geoMode: 'block' });
+check('block mode denies', blocked.err && blocked.err.code, 1);
+check('block mode never succeeds', blocked.ok === null, true);
+
 console.log('\nidentity coherence');
 
 function identity(overrides) {

@@ -689,8 +689,10 @@ class ProfileEditorActivity : AppCompatActivity() {
         fp.availW = fp.screenW
         fp.availH = if (fp.deviceType == "mobile") fp.screenH else (fp.screenH - 48).coerceAtLeast(200)
         fp.manualScreen = true
-        binding.editorLat.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { fp.geoLat = it }
-        binding.editorLng.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }?.let { fp.geoLng = it }
+        // Assign unconditionally: with `takeIf { it.isNotEmpty() }` a user who cleared the fields
+        // kept the old coordinates, so deleting a custom location silently did nothing.
+        fp.geoLat = binding.editorLat.text?.toString()?.trim().orEmpty()
+        fp.geoLng = binding.editorLng.text?.toString()?.trim().orEmpty()
         profile.name = binding.editorName.text?.toString()?.trim().orEmpty()
         profile.group = binding.editorGroup.text?.toString()?.trim().orEmpty()
         profile.tags = binding.editorTags.text?.toString()?.trim().orEmpty()
