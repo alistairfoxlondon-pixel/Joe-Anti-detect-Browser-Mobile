@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      dry_run_release:
+        description: 'Exercise the release job without publishing (no real release is created)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -194,7 +199,9 @@ jobs:
   release:
     name: Publish GitHub release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Tags publish for real; a manual run with dry_run_release exercises the same steps against a
+    # throwaway tag so the job is never first tried on the day of a release.
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.dry_run_release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -210,10 +217,16 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run_release && '1' || '0' }}
         shell: bash
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          if [ "$DRY_RUN" = "1" ]; then
+            # Dry run: publish nothing, but prove the asset list, checksums and notes render.
+            tag="dry-run-${GITHUB_RUN_ID}"
+            echo "::notice::Dry run — no release will be created."
+          fi
           assets=$(find apks -name '*.apk' -type f | sort)
           echo "Assets:"; echo "$assets"
 
@@ -227,6 +240,16 @@ jobs:
             signed_note="Signed release APK attached. Verify with \`apksigner verify\` and the SHA-256 sums below."
           else
             signed_note="No signing key was configured for this build, so only the debug-signed APK is attached. Install it by allowing your file manager to install unknown apps; see INSTALL.md."
+          fi
+
+          if [ "$DRY_RUN" = "1" ]; then
+            echo "--- checksums that would be published ---"
+            cat apks/SHA256SUMS.txt
+            echo "--- notes that would be published ---"
+            echo "## Joe Browser ${tag}"
+            echo "${signed_note}"
+            echo "::notice::Dry run complete: $assets"
+            exit 0
           fi
 
           gh release create "$tag" $assets \
