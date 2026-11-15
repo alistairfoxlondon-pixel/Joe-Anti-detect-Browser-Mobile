@@ -36,9 +36,16 @@ object UiKit {
      * Avatar palette: eight fixed, evenly-weighted hues that all read against white text.
      * Deliberately not brand green — an avatar is an identifier, not an action.
      */
+    /**
+     * Five tones of the one brand green, not a rainbow.
+     *
+     * Profile avatars need to be distinguishable at a glance; they do not need to introduce
+     * blue, purple, orange and pink into a single-colour identity. Every tone here is dark
+     * enough for white initials (≥4.5:1), so the hue can vary without the contrast varying.
+     */
     private val avatarPalette = intArrayOf(
-        0xFF2563EB.toInt(), 0xFF7C4DE0.toInt(), 0xFF0E8F7E.toInt(), 0xFFC2571F.toInt(),
-        0xFF2F7D4F.toInt(), 0xFF9C6B12.toInt(), 0xFF475FB8.toInt(), 0xFFA83C6B.toInt()
+        0xFF0B3D2E.toInt(), 0xFF0C7A52.toInt(), 0xFF14624B.toInt(),
+        0xFF1F5C46.toInt(), 0xFF178A5E.toInt()
     )
 
     fun avatarColor(key: String): Int {

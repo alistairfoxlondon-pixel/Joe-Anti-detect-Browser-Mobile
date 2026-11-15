@@ -360,6 +360,48 @@ function bindingToLayout(bindingName) {
   return snake;
 }
 
+// --------------------------------------------------------- single-colour policy
+
+/**
+ * Requirement: one solid green identity, no gradients.
+ *
+ * Layouts and Kotlin must not invent colours — a literal `#RRGGBB` in a layout is how the old
+ * rainbow avatar palette and the stray `#10B981` chip survived a redesign unnoticed. Shape
+ * drawables may use alpha-white overlays on the deep-green hero (`#1FFFFFFF`), which are scrims on
+ * a known surface, not new hues; anything else is an error.
+ */
+{
+  const ALLOWED_SCRIM = /^#(?:[0-9A-Fa-f]{2})?FFFFFF$|^#00000000$/;
+  for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml'))) {
+    const text = fs.readFileSync(file, 'utf8');
+    for (const m of text.matchAll(/android:(?:textColor|background|tint)="(#[0-9A-Fa-f]{6,8})"/g)) {
+      fail(`${path.relative(ROOT, file)}: hard-coded colour ${m[1]} — use a @color role`);
+    }
+  }
+  // Launcher/splash artwork paints brand colours on purpose; the ic_* icon set must stay
+  // untinted black so one usage-site tint controls it.
+  const ARTWORK = /(launcher|splash|ic_logo)/;
+  for (const file of walk(path.join(RES, 'drawable')).filter((f) => f.endsWith('.xml'))) {
+    const text = fs.readFileSync(file, 'utf8');
+    if (/<gradient\b/.test(text)) {
+      fail(`${path.relative(ROOT, file)}: gradient — the design is solid fills only`);
+    }
+    // A drawable that paints a path is an icon: its fill must be #000 + a tint at usage site.
+    const isArtwork = ARTWORK.test(path.basename(file));
+    for (const m of (isArtwork ? [] : text.matchAll(/android:fillColor="(#[0-9A-Fa-f]{6,8})"/g))) {
+      // #000 (filled) and #00000000 (stroke-only) are both correct for a tinted icon.
+      if (!/^#(?:FF)?000000$|^#00000000$/i.test(m[1])) {
+        fail(`${path.relative(ROOT, file)}: icon fill ${m[1]} — icons must be #000 and tinted`);
+      }
+    }
+    for (const m of (isArtwork ? [] : text.matchAll(/<solid android:color="(#[0-9A-Fa-f]{6,8})"/g))) {
+      if (!ALLOWED_SCRIM.test(m[1])) {
+        fail(`${path.relative(ROOT, file)}: hard-coded fill ${m[1]} — use a @color role`);
+      }
+    }
+  }
+}
+
 // ------------------------------------------------- non-public Material attributes
 
 /**

@@ -33,7 +33,7 @@
         android:gravity="center"
         android:importantForAccessibility="no"
         android:text="JB"
-        android:textColor="#FFFFFF"
+        android:textColor="@color/on_accent"
         android:textSize="14sp"
         android:textStyle="bold" />
 

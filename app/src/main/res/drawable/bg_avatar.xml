@@ -1,4 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Avatar disc. Colour is applied per profile by UiKit.avatarBackground(), so the base fill is
+     the plain accent and never a second, undocumented green. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="oval">
-    <solid android:color="#0B8A5A" />
+    <solid android:color="@color/accent" />
 </shape>
