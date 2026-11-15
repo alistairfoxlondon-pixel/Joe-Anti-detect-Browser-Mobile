@@ -128,6 +128,9 @@ Being straight about what was and wasn't tested:
   flows (WebView `MULTI_PROFILE` bucket binding, document-start injection, proxy relay CONNECT,
   tracker sheet, downloads, file chooser, fullscreen video) are implemented but untested at
   runtime. Please file issues with logs if something misbehaves.
+- ⚠️ **Downloads do not use the profile proxy.** Android's `DownloadManager` cannot be pointed at
+  a proxy, so a file downloaded from a proxied profile is fetched over the device's own
+  connection. The app says so at the moment you download. Page loads are unaffected.
 - ❌ **Fingerprint coherence vs. live detector services** (BrowserScan, IPHey, PixelScan, …) —
   not validated end-to-end; the editor shows the consistency warnings it computes locally and
   the in-browser *Fingerprint check* menu opens those services inside the profile.

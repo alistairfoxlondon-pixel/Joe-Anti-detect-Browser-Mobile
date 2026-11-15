@@ -281,6 +281,8 @@
     <string name="notify_denied">Alerts need notification permission. The monitor itself keeps running; turn alerts on later in system settings.</string>
     <string name="browser_proxy_checking">Checking proxy…</string>
     <string name="browser_proxy_unsupported">This WebView cannot route proxy traffic — update Android System WebView</string>
+    <string name="browser_download_description">Downloaded by Joe Browser</string>
+    <string name="browser_download_direct_note">%1$s uses a proxy for pages; the system downloader cannot, so this file is fetched directly</string>
     <string name="browser_download_started">Download started</string>
     <string name="browser_download_failed">Could not start the download</string>
     <string name="browser_kernel_fallback">Fingerprint layer applied at page start. Update Android System WebView for pre-load injection.</string>

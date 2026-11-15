@@ -747,15 +747,36 @@ class BrowserActivity : AppCompatActivity() {
         }
     }
 
+    /**
+     * Hands a download to the system DownloadManager.
+     *
+     * Naming: the public Downloads folder is shared, so a second "report.pdf" used to silently
+     * overwrite the first. Collisions are renamed instead.
+     *
+     * Routing: DownloadManager cannot be told to use a proxy, so a file fetched from a proxied
+     * profile goes out over the device's own connection. That is a real limitation, not something
+     * to paper over with a header the downloader ignores — the profile's proxy keeps protecting
+     * page loads, and the user is told the difference at the moment they download.
+     */
     private fun download(url: String, userAgent: String?, disposition: String?, mimeType: String?) {
+        val loaded = profile
+        val guessed = runCatching { android.webkit.URLUtil.guessFileName(url, disposition, mimeType) }
+            .getOrNull()?.takeIf { it.isNotBlank() } ?: "download.bin"
+        val fileName = uniqueDownloadName(guessed)
         val request = runCatching {
             DownloadManager.Request(Uri.parse(url)).apply {
                 setMimeType(mimeType)
-                addRequestHeader("User-Agent", userAgent)
+                if (!userAgent.isNullOrBlank()) addRequestHeader("User-Agent", userAgent)
                 setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
-                setDestinationInExternalPublicDir(
-                    Environment.DIRECTORY_DOWNLOADS,
-                    android.webkit.URLUtil.guessFileName(url, disposition, mimeType)
+                // Goes to the public Downloads folder so the user can find it in Files.
+                setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+                allowScanningByMediaScanner()
+                setDescription(
+                    if (loaded?.proxy?.enabled == true) {
+                        getString(R.string.browser_download_direct_note, loaded.name)
+                    } else {
+                        getString(R.string.browser_download_description)
+                    }
                 )
             }
         }.getOrNull()
@@ -766,10 +787,29 @@ class BrowserActivity : AppCompatActivity() {
         val queued = runCatching {
             (getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager).enqueue(request)
         }.isSuccess
-        Async.toast(
-            this,
-            getString(if (queued) R.string.browser_download_started else R.string.browser_download_failed)
-        )
+        if (!queued) {
+            Async.toast(this, getString(R.string.browser_download_failed))
+            return
+        }
+        Async.toast(this, getString(R.string.browser_download_started))
+        // Say it out loud when the file will not share the page's exit node.
+        if (loaded?.proxy?.enabled == true) {
+            Async.toast(this, getString(R.string.browser_download_direct_note, loaded.name))
+        }
+    }
+
+    /** Adds "-1", "-2", … before the extension when the public Downloads folder already has it. */
+    private fun uniqueDownloadName(name: String): String {
+        val dir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_DOWNLOADS)
+        if (dir == null || !java.io.File(dir, name).exists()) return name
+        val dot = name.lastIndexOf('.')
+        val stem = if (dot > 0) name.substring(0, dot) else name
+        val ext = if (dot > 0) name.substring(dot) else ""
+        for (index in 1..99) {
+            val candidate = "$stem-$index$ext"
+            if (!java.io.File(dir, candidate).exists()) return candidate
+        }
+        return "$stem-${System.currentTimeMillis()}$ext"
     }
 
     // ------------------------------------------------------------------- state
