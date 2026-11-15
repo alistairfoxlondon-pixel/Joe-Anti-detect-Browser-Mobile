@@ -512,8 +512,11 @@ class BrowserActivity : AppCompatActivity() {
             "instant" -> popup.menu.findItem(R.id.speedInstant).isChecked = true
             else -> popup.menu.findItem(R.id.speedNatural).isChecked = true
         }
-        popup.menu.findItem(R.id.menuPasteHuman).isEnabled = Prefs.humanPasteEnabled(this) ||
-            profile?.tools?.humanPaste == true
+        // The profile decides; the global preference is only the default for profiles that have
+        // never been edited. 'Either is on' would let a profile with the feature switched off
+        // still paste as human because the app-wide default happened to be on.
+        popup.menu.findItem(R.id.menuPasteHuman).isEnabled =
+            profile?.tools?.humanPaste ?: Prefs.humanPasteEnabled(this)
 
         popup.setOnMenuItemClickListener { item -> onMenuItem(item) }
         popup.show()
