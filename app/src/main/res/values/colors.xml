@@ -1,29 +1,64 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Joe Browser — light theme tokens.
+
+  Rules:
+   * Every colour used by a layout lives here (and in values-night/colors.xml), never
+     hard-coded in a layout, so both themes stay in lock-step.
+   * Text colours come in exactly three weights (text / text_dim / text_muted) plus the
+     semantic accents; anything else is a bug in the design system.
+   * Surfaces are layered: bg (page) < surface (card) < surface_muted (inset control).
+-->
 <resources>
-    <!-- Joe Browser light palette (mirrors the desktop build) -->
-    <color name="bg">#F7F8FA</color>
-    <color name="bg_soft">#FFFFFF</color>
-    <color name="sidebar">#F1F3F7</color>
-    <color name="card">#FFFFFF</color>
-    <color name="panel">#FFFFFF</color>
-    <color name="panel_hover">#F2F4F8</color>
-    <color name="panel2">#ECEEF3</color>
-    <color name="input">#FFFFFF</color>
-    <color name="line">#DFE2E8</color>
-    <color name="line_soft">#EBEDF2</color>
-    <color name="text">#16181D</color>
-    <color name="text_dim">#4A4E57</color>
-    <color name="text_faint">#6B707A</color>
-    <color name="accent">#2C6BD6</color>
-    <color name="accent_hover">#3D7BE6</color>
-    <color name="accent_pressed">#2055B0</color>
+
+    <!-- Layered surfaces -->
+    <color name="bg">#F4F6F9</color>
+    <color name="surface">#FFFFFF</color>
+    <color name="surface_muted">#EDF0F4</color>
+    <color name="surface_raised">#FFFFFF</color>
+    <color name="scrim">#66090D14</color>
+
+    <!-- Lines -->
+    <color name="line">#DFE3EA</color>
+    <color name="line_soft">#EAEDF2</color>
+    <!-- Fixed on-accent text colour: readable on the brand blue in both themes. -->
+    <color name="white">#FFFFFFFF</color>
+
+    <!-- Type -->
+    <color name="text">#0F141A</color>
+    <color name="text_dim">#464E59</color>
+    <color name="text_muted">#78818D</color>
+    <color name="text_on_accent">#FFFFFF</color>
+
+    <!-- Accents -->
+    <color name="accent">#2563EB</color>
+    <color name="accent_pressed">#1D4ED8</color>
+    <color name="accent_soft">#1A2563EB</color>
     <color name="on_accent">#FFFFFF</color>
-    <color name="success">#1F8A5F</color>
-    <color name="danger">#C33744</color>
-    <color name="warning">#B45309</color>
-    <color name="accent_soft">#1F2C6BD6</color>
-    <color name="success_soft">#1F1F8A5F</color>
-    <color name="danger_soft">#1FC33744</color>
-    <color name="warning_soft">#1FB45309</color>
-    <color name="scrim">#3C000000</color>
+
+    <color name="success">#11785A</color>
+    <color name="success_soft">#1A11785A</color>
+    <color name="warning">#A65A05</color>
+    <color name="warning_soft">#1AA65A05</color>
+    <color name="danger">#B42318</color>
+    <color name="danger_soft">#1AB42318</color>
+    <color name="neutral">#78818D</color>
+
+    <!-- Hero gradient stops (dashboard header) -->
+    <color name="hero_start">#1E4FD8</color>
+    <color name="hero_end">#12328F</color>
+    <color name="hero_text">#FFFFFF</color>
+    <color name="hero_text_dim">#D5E1FF</color>
+
+    <!-- Legacy aliases kept so older references keep resolving after the refactor. -->
+    <color name="bg_soft">@color/surface</color>
+    <color name="sidebar">@color/surface</color>
+    <color name="card">@color/surface</color>
+    <color name="panel">@color/surface</color>
+    <color name="panel_hover">@color/surface_muted</color>
+    <color name="panel2">@color/surface_muted</color>
+    <color name="input">@color/surface</color>
+    <color name="text_faint">@color/text_muted</color>
+    <color name="accent_hover">@color/accent</color>
+    <color name="danger_soft_legacy">@color/danger_soft</color>
 </resources>

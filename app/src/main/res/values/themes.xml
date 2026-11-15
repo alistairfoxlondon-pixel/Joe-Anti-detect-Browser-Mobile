@@ -1,40 +1,77 @@
 <?xml version="1.0" encoding="utf-8"?>
-<resources>
+<!--
+  Joe Browser design system.
+
+  Everything a screen needs is declared once here:
+   * Theme.JoeBrowser      — Material 3 DayNight base + all colour/typography mapping.
+   * Text appearances      — one scale, no ad-hoc sizes in layouts.
+   * Widget.Jb.*           — card, chip, button, switch, nav indicator, text field.
+   * ThemeOverlay.Jb.*     — dialogs and bottom sheets.
+
+  Layouts are then written with `style="@style/..."` only, which is what keeps light and
+  dark identical in structure and prevents the "one screen forgot the theme" class of bug.
+-->
+<resources xmlns:tools="http://schemas.android.com/tools">
+
+    <!-- ============================================================== theme -->
 
     <style name="Theme.JoeBrowser" parent="Theme.Material3.DayNight.NoActionBar">
         <item name="android:colorBackground">@color/bg</item>
-        <item name="colorSurface">@color/card</item>
-        <item name="colorSurfaceVariant">@color/panel2</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="colorSurfaceVariant">@color/surface_muted</item>
+        <item name="colorSurfaceContainer">@color/surface</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_raised</item>
         <item name="colorPrimary">@color/accent</item>
         <item name="colorPrimaryDark">@color/accent_pressed</item>
         <item name="colorOnPrimary">@color/on_accent</item>
         <item name="colorSecondary">@color/accent</item>
+        <item name="colorOnSecondary">@color/on_accent</item>
         <item name="colorOnSurface">@color/text</item>
+        <item name="colorOnSurfaceVariant">@color/text_dim</item>
         <item name="colorOnBackground">@color/text</item>
         <item name="colorOutline">@color/line</item>
         <item name="colorOutlineVariant">@color/line_soft</item>
         <item name="colorError">@color/danger</item>
+        <item name="colorOnError">@color/text_on_accent</item>
+        <item name="colorControlHighlight">@color/accent_soft</item>
+
         <item name="android:textColorPrimary">@color/text</item>
         <item name="android:textColorSecondary">@color/text_dim</item>
+        <item name="android:textColorTertiary">@color/text_muted</item>
+        <item name="android:textColorHint">@color/text_muted</item>
+
         <item name="android:fontFamily">@font/inter</item>
         <item name="fontFamily">@font/inter</item>
-        <item name="android:statusBarColor">?attr/colorSurface</item>
-        <item name="android:navigationBarColor">?attr/colorSurface</item>
+
+        <item name="android:statusBarColor">@color/bg</item>
+        <item name="android:navigationBarColor">@color/bg</item>
         <item name="android:windowLightStatusBar">@bool/is_light</item>
         <item name="android:windowLightNavigationBar">@bool/is_light</item>
-        <!-- Material shapes stay crisp: 8-10dp, never pill-everything. -->
-        <item name="shapeAppearanceSmallComponent">@style/ShapeSmall</item>
-        <item name="shapeAppearanceMediumComponent">@style/ShapeMedium</item>
-        <item name="shapeAppearanceLargeComponent">@style/ShapeMedium</item>
-        <item name="textAppearanceBodyLarge">@style/JbText.Body</item>
-        <item name="textAppearanceBodyMedium">@style/JbText.BodyMedium</item>
-        <item name="textAppearanceTitleLarge">@style/JbText.Title</item>
-        <item name="textAppearanceTitleMedium">@style/JbText.SectionTitle</item>
-        <item name="textAppearanceTitleSmall">@style/JbText.Label</item>
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:windowNoTitle">true</item>
+
+        <!-- Shape scale: small = chips/inputs, medium = cards/buttons, large = sheets -->
+        <item name="shapeAppearanceSmallComponent">@style/Shape.Jb.Small</item>
+        <item name="shapeAppearanceMediumComponent">@style/Shape.Jb.Medium</item>
+        <item name="shapeAppearanceLargeComponent">@style/Shape.Jb.Large</item>
+
+        <item name="textAppearanceBodyLarge">@style/Text.Jb.Body</item>
+        <item name="textAppearanceBodyMedium">@style/Text.Jb.BodyMedium</item>
+        <item name="textAppearanceBodySmall">@style/Text.Jb.Caption</item>
+        <item name="textAppearanceTitleLarge">@style/Text.Jb.ScreenTitle</item>
+        <item name="textAppearanceTitleMedium">@style/Text.Jb.CardTitle</item>
+        <item name="textAppearanceTitleSmall">@style/Text.Jb.Section</item>
+        <item name="textAppearanceLabelLarge">@style/Text.Jb.Button</item>
+        <item name="textAppearanceLabelMedium">@style/Text.Jb.Label</item>
+
         <item name="materialCardViewStyle">@style/Widget.Jb.Card</item>
         <item name="chipStyle">@style/Widget.Jb.Chip</item>
+        <item name="materialButtonStyle">@style/Widget.Jb.Button</item>
         <item name="materialAlertDialogTheme">@style/ThemeOverlay.Jb.Dialog</item>
         <item name="bottomSheetDialogTheme">@style/ThemeOverlay.Jb.BottomSheet</item>
+        <item name="floatingActionButtonStyle">@style/Widget.Jb.Fab</item>
+        <item name="toolbarStyle">@style/Widget.Jb.Toolbar</item>
+        <item name="android:windowContentTransitions" tools:targetApi="21">false</item>
     </style>
 
     <style name="Theme.JoeBrowser.Splash" parent="Theme.JoeBrowser">
@@ -43,119 +80,284 @@
         <item name="android:navigationBarColor">@color/bg</item>
     </style>
 
-    <style name="ShapeSmall" parent="">
+    <!-- Full-bleed browser surface: no system-bar tinting, the page owns the screen. -->
+    <style name="Theme.JoeBrowser.Browser" parent="Theme.JoeBrowser">
+        <item name="android:windowBackground">@color/bg</item>
+        <item name="android:windowSoftInputMode">adjustResize</item>
+    </style>
+
+    <!-- ============================================================== shapes -->
+
+    <style name="Shape.Jb.Small" parent="ShapeAppearance.Material3.Corner.Small">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">8dp</item>
     </style>
 
-    <style name="ShapeMedium" parent="">
+    <style name="Shape.Jb.Medium" parent="ShapeAppearance.Material3.Corner.Medium">
         <item name="cornerFamily">rounded</item>
-        <item name="cornerSize">10dp</item>
+        <item name="cornerSize">12dp</item>
     </style>
 
-    <style name="JbText.Body" parent="TextAppearance.Material3.BodyLarge">
+    <style name="Shape.Jb.Large" parent="ShapeAppearance.Material3.Corner.Large">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSize">16dp</item>
+    </style>
+
+    <!-- ========================================================== typography -->
+
+    <style name="Text.Jb.ScreenTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">20sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <style name="Text.Jb.CardTitle" parent="TextAppearance.Material3.TitleMedium">
         <item name="android:fontFamily">@font/inter</item>
         <item name="android:textSize">15sp</item>
+        <item name="android:textStyle">bold</item>
         <item name="android:textColor">@color/text</item>
     </style>
 
-    <style name="JbText.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
+    <style name="Text.Jb.Section" parent="TextAppearance.Material3.TitleSmall">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">true</item>
+        <item name="android:letterSpacing">0.09</item>
+        <item name="android:textColor">@color/text_muted</item>
+    </style>
+
+    <style name="Text.Jb.Body" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <style name="Text.Jb.BodyMedium" parent="TextAppearance.Material3.BodyMedium">
         <item name="android:fontFamily">@font/inter</item>
         <item name="android:textSize">13sp</item>
         <item name="android:textColor">@color/text_dim</item>
     </style>
 
-    <style name="JbText.Title" parent="TextAppearance.Material3.TitleLarge">
+    <style name="Text.Jb.Caption" parent="TextAppearance.Material3.BodySmall">
         <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/text_muted</item>
+    </style>
+
+    <style name="Text.Jb.Label" parent="TextAppearance.Material3.LabelMedium">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">11sp</item>
         <item name="android:textStyle">bold</item>
-        <item name="android:textSize">22sp</item>
+        <item name="android:textColor">@color/text_muted</item>
+    </style>
+
+    <style name="Text.Jb.Button" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">14sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textAllCaps">false</item>
+    </style>
+
+    <style name="Text.Jb.Metric" parent="TextAppearance.Material3.HeadlineMedium">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">26sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:letterSpacing">-0.02</item>
         <item name="android:textColor">@color/text</item>
     </style>
 
-    <style name="JbText.SectionTitle" parent="TextAppearance.Material3.TitleMedium">
-        <item name="android:fontFamily">@font/inter</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textSize">13sp</item>
-        <item name="android:letterSpacing">0.08</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textColor">@color/text_faint</item>
+    <style name="Text.Jb.Mono" parent="TextAppearance.Material3.BodySmall">
+        <item name="android:fontFamily">monospace</item>
+        <item name="android:textSize">11sp</item>
+        <item name="android:textColor">@color/text_dim</item>
     </style>
 
-    <style name="JbText.Label" parent="TextAppearance.Material3.TitleSmall">
-        <item name="android:fontFamily">@font/inter</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textSize">12sp</item>
-        <item name="android:letterSpacing">0.06</item>
-        <item name="android:textAllCaps">true</item>
-        <item name="android:textColor">@color/text_faint</item>
-    </style>
+    <!-- ============================================================= widgets -->
 
-    <style name="Widget.Jb.Card" parent="Widget.Material3.CardView.Elevated">
-        <item name="cardBackgroundColor">@color/card</item>
+    <style name="Widget.Jb.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/surface</item>
         <item name="cardElevation">0dp</item>
-        <item name="cardCornerRadius">10dp</item>
+        <item name="cardCornerRadius">12dp</item>
         <item name="strokeColor">@color/line_soft</item>
         <item name="strokeWidth">1dp</item>
+        <item name="android:stateListAnimator">@null</item>
     </style>
 
-    <style name="Widget.Jb.Chip" parent="Widget.Material3.Chip.Filter">
-        <item name="android:textColor">@color/text_dim</item>
-        <item name="chipBackgroundColor">@color/panel2</item>
-        <item name="chipStrokeColor">@color/line</item>
-        <item name="chipStrokeWidth">1dp</item>
+    <style name="Widget.Jb.Card.Selectable" parent="Widget.Jb.Card">
+        <item name="android:clickable">true</item>
+        <item name="android:focusable">true</item>
+        <item name="rippleColor">@color/accent_soft</item>
     </style>
 
-    <style name="ThemeOverlay.Jb.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
-        <item name="shapeAppearanceMediumComponent">@style/ShapeMedium</item>
-        <item name="materialAlertDialogTitleTextStyle">@style/JbText.DialogTitle</item>
-    </style>
-
-    <style name="JbText.DialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
-        <item name="android:fontFamily">@font/inter</item>
-        <item name="android:textStyle">bold</item>
-        <item name="android:textSize">18sp</item>
-        <item name="android:textColor">@color/text</item>
-    </style>
-
-    <style name="ThemeOverlay.Jb.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
-        <item name="shapeAppearanceLargeComponent">@style/ShapeMedium</item>
-    </style>
-
-    <style name="Jb.Button.Primary" parent="Widget.Material3.Button">
+    <style name="Widget.Jb.Button" parent="Widget.Material3.Button">
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="cornerRadius">8dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textAppearance">@style/Text.Jb.Button</item>
         <item name="backgroundTint">@color/accent</item>
         <item name="android:textColor">@color/on_accent</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:fontFamily">@font/inter</item>
-        <item name="android:textStyle">bold</item>
         <item name="iconTint">@color/on_accent</item>
+        <item name="iconPadding">8dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="cornerRadius">10dp</item>
     </style>
 
-    <style name="Jb.Button.Secondary" parent="Widget.Material3.Button.OutlinedButton">
+    <style name="Widget.Jb.Button.Outlined" parent="Widget.Material3.Button.OutlinedButton">
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
-        <item name="cornerRadius">8dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:textAppearance">@style/Text.Jb.Button</item>
         <item name="strokeColor">@color/line</item>
+        <item name="strokeWidth">1dp</item>
         <item name="android:textColor">@color/text</item>
-        <item name="android:textAllCaps">false</item>
-        <item name="android:fontFamily">@font/inter</item>
         <item name="iconTint">@color/text_dim</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="cornerRadius">10dp</item>
     </style>
 
-    <style name="Jb.Button.Text" parent="Widget.Material3.Button.TextButton">
+    <style name="Widget.Jb.Button.Text" parent="Widget.Material3.Button.TextButton">
         <item name="android:insetTop">0dp</item>
         <item name="android:insetBottom">0dp</item>
+        <item name="android:minHeight">44dp</item>
+        <item name="android:textAppearance">@style/Text.Jb.Button</item>
         <item name="android:textColor">@color/accent</item>
-        <item name="android:textAllCaps">false</item>
-        <item name="android:fontFamily">@font/inter</item>
         <item name="iconTint">@color/accent</item>
+        <item name="android:textAllCaps">false</item>
     </style>
 
+    <style name="Widget.Jb.Button.Danger" parent="Widget.Jb.Button.Outlined">
+        <item name="android:textColor">@color/danger</item>
+        <item name="strokeColor">@color/danger</item>
+        <item name="iconTint">@color/danger</item>
+    </style>
+
+    <!-- Legacy aliases used by older layouts -->
+    <style name="Jb.Button.Primary" parent="Widget.Jb.Button" />
+    <style name="Jb.Button.Secondary" parent="Widget.Jb.Button.Outlined" />
+    <style name="Jb.Button.Text" parent="Widget.Jb.Button.Text" />
+
+    <style name="Widget.Jb.Chip" parent="Widget.Material3.Chip.Filter">
+        <item name="chipBackgroundColor">@color/surface_muted</item>
+        <item name="chipStrokeColor">@color/line</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="android:textColor">@color/text_dim</item>
+        <item name="chipMinHeight">34dp</item>
+        <item name="checkedIconVisible">false</item>
+        <item name="android:textAppearance">@style/Text.Jb.BodyMedium</item>
+    </style>
+
+    <style name="Widget.Jb.Chip.Action" parent="Widget.Material3.Chip.Assist">
+        <item name="chipBackgroundColor">@color/surface_muted</item>
+        <item name="chipStrokeColor">@color/line</item>
+        <item name="chipStrokeWidth">1dp</item>
+        <item name="android:textColor">@color/text</item>
+        <item name="chipMinHeight">36dp</item>
+        <item name="android:textAppearance">@style/Text.Jb.BodyMedium</item>
+    </style>
+
+    <style name="Widget.Jb.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="android:minHeight">48dp</item>
+    </style>
+
+    <style name="Widget.Jb.Fab" parent="Widget.Material3.ExtendedFloatingActionButton.Primary">
+        <item name="backgroundTint">@color/accent</item>
+        <item name="android:textColor">@color/on_accent</item>
+        <item name="iconTint">@color/on_accent</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textSize">14sp</item>
+    </style>
+
+    <style name="Widget.Jb.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:background">@color/surface</item>
+        <item name="android:elevation">0dp</item>
+        <item name="titleTextAppearance">@style/Text.Jb.ScreenTitle</item>
+    </style>
 
     <style name="Widget.Jb.NavIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/accent_soft</item>
     </style>
 
+    <style name="Widget.Jb.NavView" parent="Widget.Material3.BottomNavigationView">
+        <item name="itemIconTint">@color/nav_item_color</item>
+        <item name="itemTextColor">@color/nav_item_color</item>
+        <item name="itemActiveIndicatorStyle">@style/Widget.Jb.NavIndicator</item>
+        <item name="labelVisibilityMode">labeled</item>
+        <item name="android:background">@color/surface</item>
+        <item name="android:elevation">0dp</item>
+    </style>
+
+    <style name="Widget.Jb.TextInput" parent="Widget.Material3.TextInputLayout.OutlinedBox">
+        <item name="boxStrokeColor">@color/line</item>
+        <item name="boxStrokeWidth">1dp</item>
+        <item name="hintTextColor">@color/text_muted</item>
+        <item name="android:textColorHint">@color/text_muted</item>
+        <item name="boxBackgroundColor">@color/surface</item>
+        <item name="boxCornerRadiusTopStart">10dp</item>
+        <item name="boxCornerRadiusTopEnd">10dp</item>
+        <item name="boxCornerRadiusBottomStart">10dp</item>
+        <item name="boxCornerRadiusBottomEnd">10dp</item>
+    </style>
+
+    <style name="Widget.Jb.TextInput.Dropdown" parent="Widget.Material3.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
+        <item name="boxStrokeColor">@color/line</item>
+        <item name="hintTextColor">@color/text_muted</item>
+        <item name="boxBackgroundColor">@color/surface</item>
+        <item name="boxCornerRadiusTopStart">10dp</item>
+        <item name="boxCornerRadiusTopEnd">10dp</item>
+        <item name="boxCornerRadiusBottomStart">10dp</item>
+        <item name="boxCornerRadiusBottomEnd">10dp</item>
+    </style>
+
+    <style name="Widget.Jb.Progress" parent="Widget.AppCompat.ProgressBar.Horizontal">
+        <item name="android:progressTint">@color/accent</item>
+        <item name="android:progressBackgroundTint">@color/line_soft</item>
+    </style>
+
+    <!-- ============================================================ overlays -->
+
+    <style name="ThemeOverlay.Jb.Dialog" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="shapeAppearanceMediumComponent">@style/Shape.Jb.Large</item>
+        <item name="colorSurface">@color/surface</item>
+        <item name="materialAlertDialogTitleTextStyle">@style/Text.Jb.DialogTitle</item>
+        <item name="buttonBarPositiveButtonStyle">@style/Widget.Jb.Button.Text</item>
+        <item name="buttonBarNegativeButtonStyle">@style/Widget.Jb.Button.Text</item>
+    </style>
+
+    <style name="Text.Jb.DialogTitle" parent="MaterialAlertDialog.Material3.Title.Text">
+        <item name="android:fontFamily">@font/inter</item>
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:textColor">@color/text</item>
+    </style>
+
+    <style name="ThemeOverlay.Jb.BottomSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="shapeAppearanceLargeComponent">@style/Shape.Jb.Large</item>
+        <item name="colorSurface">@color/surface</item>
+    </style>
+
+    <style name="Widget.Jb.Popup" parent="Widget.Material3.PopupMenu">
+        <item name="android:popupBackground">@color/surface</item>
+    </style>
+
+    <!-- Small square icon button used across toolbars (48dp target, 20dp glyph). -->
+    <style name="Widget.Jb.IconButton" parent="">
+        <item name="android:layout_width">48dp</item>
+        <item name="android:layout_height">48dp</item>
+        <item name="android:background">?attr/selectableItemBackgroundBorderless</item>
+        <item name="android:padding">13dp</item>
+        <item name="android:scaleType">fitCenter</item>
+        <item name="android:tint">@color/text_dim</item>
+    </style>
+
+    <!-- ============================================================ text-only -->
+
+    <style name="JbText.SectionTitle" parent="Text.Jb.Section" />
+    <style name="JbText.Label" parent="Text.Jb.Label" />
+    <style name="JbText.BodyMedium" parent="Text.Jb.BodyMedium" />
+    <style name="JbText.Body" parent="Text.Jb.Body" />
 </resources>

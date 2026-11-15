@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+    <!-- Portrait phones: one card per row. Tablets/landscape widen this (values-w600dp). -->
     <integer name="profiles_grid_span">1</integer>
+    <!-- Characters kept from long user-agent strings in summaries. -->
+    <integer name="summary_preview_chars">72</integer>
 </resources>

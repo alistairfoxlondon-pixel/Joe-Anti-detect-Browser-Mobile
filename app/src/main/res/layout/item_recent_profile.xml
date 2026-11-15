@@ -1,54 +1,91 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Recent-profile row used on the dashboard.
+
+  Layout contract:
+   * Avatar is a fixed square, the text block is weight=1 and every line is single-line with
+     an ellipsis, so a 60-character profile name can never widen the row or overlap the
+     chevron.
+   * The whole row is one touch target (min 56dp) rather than a nested list of small buttons.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
-    android:padding="10dp"
-    android:layout_marginBottom="8dp"
-    android:background="@drawable/bg_card_surface"
+    android:layout_marginBottom="@dimen/gap_s"
+    android:background="@drawable/bg_card"
     android:clickable="true"
-    android:focusable="true">
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="60dp"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="8dp"
+    android:paddingBottom="10dp">
 
     <TextView
         android:id="@+id/recentAvatar"
-        android:layout_width="40dp"
-        android:layout_height="40dp"
+        android:layout_width="@dimen/avatar_md"
+        android:layout_height="@dimen/avatar_md"
+        android:background="@drawable/bg_avatar"
         android:gravity="center"
-        android:textStyle="bold"
+        android:importantForAccessibility="no"
+        android:text="JB"
         android:textColor="#FFFFFF"
-        android:textSize="15sp" />
+        android:textSize="14sp"
+        android:textStyle="bold" />
 
     <LinearLayout
         android:layout_width="0dp"
-        android:layout_weight="1"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
         android:orientation="vertical">
+
         <TextView
             android:id="@+id/recentName"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:singleLine="true"
             android:ellipsize="end"
+            android:maxLines="1"
             android:text="Profile"
+            android:textColor="@color/text"
             android:textSize="14sp"
-            android:textStyle="bold"
-            android:textColor="@color/text" />
-        <TextView
-            android:id="@+id/recentMeta"
+            android:textStyle="bold" />
+
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:singleLine="true"
-            android:ellipsize="end"
-            android:text="Android · Direct"
-            android:textSize="11sp"
-            android:textColor="@color/text_faint" />
+            android:layout_marginTop="3dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <View
+                android:id="@+id/recentDot"
+                android:layout_width="@dimen/dot_size"
+                android:layout_height="@dimen/dot_size"
+                android:background="@drawable/bg_dot" />
+
+            <TextView
+                android:id="@+id/recentMeta"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="6dp"
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="Android · Direct"
+                android:textAppearance="@style/Text.Jb.Caption" />
+        </LinearLayout>
     </LinearLayout>
 
-    <ImageView
-        android:layout_width="20dp"
-        android:layout_height="20dp"
-        android:src="@drawable/ic_open_extern"
-        android:tint="@color/text_faint" />
+    <ImageButton
+        android:id="@+id/recentOpen"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/action_launch"
+        android:padding="10dp"
+        android:src="@drawable/ic_launch"
+        android:tint="@color/text_muted" />
 </LinearLayout>

@@ -1,4 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Proxies tab.
+
+  Three fixed regions above a stretching list:
+   1. "This device" card — public IP of the phone itself (no proxy), with a refresh target.
+   2. Monitor strip — engine state + interval, tapping it opens the monitor controls.
+   3. Alerts (collapsible) — latest offline/recovered/rotation events.
+   4. Library list — weight=1, bottom-padded past the FAB.
+
+  Every horizontal row uses a weight=1 middle column, so long host:port strings ellipsize
+  instead of pushing the switch/menu out of the card.
+-->
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
@@ -9,74 +21,149 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        android:padding="16dp">
+        android:paddingStart="@dimen/screen_h_pad"
+        android:paddingTop="@dimen/gap_m"
+        android:paddingEnd="@dimen/screen_h_pad">
 
         <!-- This device -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="horizontal"
+            android:background="@drawable/bg_card"
             android:gravity="center_vertical"
-            android:padding="14dp"
-            android:background="@drawable/bg_card_surface">
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingTop="10dp"
+            android:paddingEnd="4dp"
+            android:paddingBottom="10dp">
+
             <ImageView
-                android:layout_width="26dp"
-                android:layout_height="26dp"
-                android:src="@drawable/ic_globe" />
+                android:layout_width="22dp"
+                android:layout_height="22dp"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_globe"
+                android:tint="@color/accent" />
+
             <LinearLayout
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:layout_marginStart="12dp"
+                android:layout_marginStart="10dp"
+                android:layout_weight="1"
                 android:orientation="vertical">
+
                 <TextView
-                    android:layout_width="wrap_content"
+                    android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="This device (direct)"
-                    android:textSize="12sp"
-                    android:textStyle="bold"
-                    android:textColor="@color/text" />
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/proxies_device_title"
+                    android:textColor="@color/text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
                 <TextView
                     android:id="@+id/deviceIpText"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:singleLine="true"
                     android:ellipsize="end"
-                    android:text="Checking…"
-                    android:textSize="11sp"
-                    android:textColor="@color/text_dim" />
+                    android:maxLines="1"
+                    android:text="@string/proxies_device_idle"
+                    android:textAppearance="@style/Text.Jb.Caption" />
             </LinearLayout>
+
             <ImageButton
                 android:id="@+id/btnCheckDevice"
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:src="@drawable/ic_refresh"
+                android:layout_width="@dimen/touch_target"
+                android:layout_height="@dimen/touch_target"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:contentDescription="Check this device"
+                android:contentDescription="@string/action_check_now"
+                android:padding="13dp"
+                android:src="@drawable/ic_refresh"
                 android:tint="@color/text_dim" />
         </LinearLayout>
 
+        <!-- Monitor strip -->
+        <LinearLayout
+            android:id="@+id/monitorStrip"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="@dimen/gap_s"
+            android:background="@drawable/bg_card"
+            android:clickable="true"
+            android:focusable="true"
+            android:gravity="center_vertical"
+            android:minHeight="52dp"
+            android:orientation="horizontal"
+            android:paddingStart="12dp"
+            android:paddingEnd="12dp">
+
+            <View
+                android:id="@+id/monitorDot"
+                android:layout_width="@dimen/dot_size"
+                android:layout_height="@dimen/dot_size"
+                android:background="@drawable/bg_dot" />
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:text="@string/proxies_monitor_label"
+                    android:textColor="@color/text"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/monitorStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:ellipsize="end"
+                    android:maxLines="1"
+                    android:textAppearance="@style/Text.Jb.Caption" />
+            </LinearLayout>
+
+            <ImageView
+                android:layout_width="@dimen/icon_md"
+                android:layout_height="@dimen/icon_md"
+                android:contentDescription="@null"
+                android:src="@drawable/ic_chevron_right"
+                android:tint="@color/text_muted" />
+        </LinearLayout>
+
+        <!-- Section header -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:gravity="center_vertical">
+            android:layout_marginTop="@dimen/gap_l"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
             <TextView
+                style="@style/Text.Jb.Section"
                 android:layout_width="0dp"
-                android:layout_weight="1"
                 android:layout_height="wrap_content"
-                android:text="PROXY LIBRARY"
-                android:textAppearance="?attr/textAppearanceTitleSmall" />
+                android:layout_weight="1"
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:text="@string/proxies_library" />
+
             <TextView
                 android:id="@+id/btnCheckAll"
+                style="@style/Text.Jb.BodyMedium"
                 android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:padding="8dp"
-                android:text="Check all"
-                android:textSize="12sp"
-                android:textStyle="bold"
+                android:layout_height="@dimen/touch_target"
+                android:gravity="center_vertical"
+                android:minWidth="56dp"
+                android:text="@string/action_check_all"
                 android:textColor="@color/accent"
-                android:clickable="true" />
+                android:textStyle="bold" />
         </LinearLayout>
 
         <androidx.recyclerview.widget.RecyclerView
@@ -84,9 +171,10 @@
             android:layout_width="match_parent"
             android:layout_height="0dp"
             android:layout_weight="1"
-            android:paddingTop="8dp"
-            android:paddingBottom="84dp"
-            android:clipToPadding="false" />
+            android:clipToPadding="false"
+            android:paddingTop="@dimen/gap_xs"
+            android:paddingBottom="@dimen/list_bottom_inset"
+            android:scrollbars="none" />
     </LinearLayout>
 
     <!-- Empty state -->
@@ -94,64 +182,61 @@
         android:id="@+id/proxyEmptyState"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
-        android:orientation="vertical"
         android:gravity="center"
+        android:orientation="vertical"
         android:padding="32dp"
         android:visibility="gone">
+
         <ImageView
-            android:layout_width="72dp"
-            android:layout_height="72dp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:alpha="0.55"
+            android:contentDescription="@null"
             android:src="@drawable/ic_nav_proxies"
-            android:tint="@color/text_faint"
-            android:alpha="0.7" />
+            android:tint="@color/text_muted" />
+
         <TextView
+            style="@style/Text.Jb.CardTitle"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_marginTop="16dp"
-            android:text="No proxies yet"
-            android:textSize="17sp"
-            android:textStyle="bold"
-            android:textColor="@color/text" />
+            android:layout_marginTop="@dimen/gap_m"
+            android:text="@string/proxies_empty_title" />
+
         <TextView
-            android:layout_width="wrap_content"
+            style="@style/Text.Jb.BodyMedium"
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
+            android:layout_marginTop="@dimen/gap_xs"
             android:gravity="center"
-            android:text="Paste a proxy list from the clipboard or enter one manually. HTTP, HTTPS and SOCKS5 are supported."
-            android:textSize="12sp"
-            android:textColor="@color/text_dim" />
+            android:maxLines="2"
+            android:text="@string/proxies_empty_body" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/emptyPaste"
-            style="@style/Jb.Button.Secondary"
+            style="@style/Widget.Jb.Button.Outlined"
             android:layout_width="wrap_content"
-            android:layout_height="42dp"
-            android:layout_marginTop="18dp"
-            android:text="Paste from clipboard"
-            android:textAllCaps="false"
-            android:icon="@drawable/ic_paste"
-            android:iconTint="@color/text_dim" />
+            android:layout_height="@dimen/button_height"
+            android:layout_marginTop="@dimen/gap_l"
+            android:text="@string/proxies_import_paste"
+            app:icon="@drawable/ic_paste" />
+
         <com.google.android.material.button.MaterialButton
             android:id="@+id/emptyAdd"
-            style="@style/Jb.Button.Primary"
+            style="@style/Widget.Jb.Button"
             android:layout_width="wrap_content"
-            android:layout_height="44dp"
-            android:layout_marginTop="10dp"
-            android:text="Add a proxy"
-            android:textAllCaps="false"
-            android:icon="@drawable/ic_plus" />
+            android:layout_height="@dimen/button_height"
+            android:layout_marginTop="@dimen/gap_s"
+            android:text="@string/proxies_add"
+            app:icon="@drawable/ic_plus" />
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
         android:id="@+id/fabAddProxy"
+        style="@style/Widget.Jb.Fab"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|end"
-        android:layout_margin="16dp"
-        android:text="Add proxy"
-        android:icon="@drawable/ic_plus"
-        android:textAllCaps="false"
-        android:textStyle="bold"
-        app:backgroundTint="@color/accent"
-        app:iconTint="@color/on_accent"
-        android:textColor="@color/on_accent" />
+        android:layout_margin="@dimen/fab_margin"
+        android:text="@string/proxies_add"
+        app:icon="@drawable/ic_plus" />
 </FrameLayout>

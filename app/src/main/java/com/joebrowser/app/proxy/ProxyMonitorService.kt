@@ -5,176 +5,157 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ServiceInfo
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.IBinder
-import android.os.Build
-import com.joebrowser.app.AppEvents
-import com.joebrowser.app.data.Database
-import java.util.concurrent.Executors
-import java.util.concurrent.atomic.AtomicBoolean
+import androidx.core.content.ContextCompat
+import com.joebrowser.app.data.Prefs
 
 /**
- * Watches proxies (saved ones and every profile's own proxy with the watch enabled) and
- * posts a notification on three transitions: offline, back online, and exit-IP rotation.
- * Runs as a special-use foreground service; stops itself when nothing is watched anymore.
+ * Foreground service that drives [ProxyMonitorEngine] on a schedule.
+ *
+ * Lifecycle contract:
+ *  - Started only when at least one proxy is watched, and it stops itself as soon as the
+ *    watch list becomes empty, so it never lingers as an idle foreground service.
+ *  - The heavy lifting happens on a dedicated [HandlerThread] + the shared background pool
+ *    inside the engine; this class only owns the notification and the timer.
+ *  - Every OS-level call that can throw on a restricted device (foreground promotion,
+ *    notification channel) is guarded: if the OS refuses, the service shuts down cleanly
+ *    instead of crashing the process.
  */
 class ProxyMonitorService : Service() {
 
-    private val executor = Executors.newSingleThreadExecutor()
-    private val checking = AtomicBoolean(false)
-    private lateinit var handlerThread: HandlerThread
+    private lateinit var thread: HandlerThread
     private lateinit var handler: Handler
 
     override fun onCreate() {
         super.onCreate()
-        handlerThread = HandlerThread("joe-proxy-monitor").apply { start() }
-        handler = Handler(handlerThread.looper)
+        thread = HandlerThread("joe-monitor").apply { start() }
+        handler = Handler(thread.looper)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        val watched = watchTargets().size
-        if (watched == 0) {
+        val watched = runCatching { ProxyMonitorEngine.watchedCount(this) }.getOrDefault(0)
+        if (watched == 0 || !Prefs.monitorEnabled(this)) {
             stopSelf()
             return START_NOT_STICKY
         }
-        try {
-            if (Build.VERSION.SDK_INT >= 34) {
-                startForeground(ProxyNotifier.NOTIF_MONITOR, ProxyNotifier.monitorNotification(this, watched),
-                    ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE)
-            } else {
-                startForeground(ProxyNotifier.NOTIF_MONITOR, ProxyNotifier.monitorNotification(this, watched))
-            }
-        } catch (t: Throwable) {
+        if (!promoteToForeground(watched)) {
             stopSelf()
             return START_NOT_STICKY
         }
-        schedule(0)
+        scheduleNext(initialDelayMs = 1500L)
         return START_STICKY
     }
 
-    private fun schedule(delayMs: Long) {
-        handler.removeCallbacksAndMessages(null)
-        handler.postDelayed({ tick() }, delayMs)
+    /**
+     * Promotes to the foreground. This must succeed even when POST_NOTIFICATIONS was denied —
+     * Android still requires a notification for a foreground service, and it is the FGS that
+     * keeps the monitor alive; only *alert* notifications need the runtime permission.
+     */
+    private fun promoteToForeground(watched: Int): Boolean = try {
+        val notification = ProxyNotifier.monitorNotification(this, watched)
+        if (Build.VERSION.SDK_INT >= 34) {
+            startForeground(
+                ProxyNotifier.NOTIF_MONITOR, notification,
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
+            )
+        } else {
+            startForeground(ProxyNotifier.NOTIF_MONITOR, notification)
+        }
+        true
+    } catch (t: Throwable) {
+        false
+    }
+
+    private fun scheduleNext(initialDelayMs: Long = 0L) {
+        handler.removeCallbacks(cycleRunnable)
+        handler.postDelayed(cycleRunnable, initialDelayMs)
+    }
+
+    /**
+     * One tick: refresh the notification, run a pass (the engine already skips targets whose
+     * own interval has not elapsed) and re-arm. Any failure is swallowed so the timer survives
+     * a bad network, a corrupt row or a database lock.
+     */
+    /**
+     * The tick. Declared as a function-backed Runnable so the re-arm can reference it without
+     * the "must be initialized" problem of a val referring to itself during construction.
+     */
+    private val cycleRunnable: Runnable = object : Runnable {
+        override fun run() = tick()
     }
 
     private fun tick() {
-        if (checking.compareAndSet(false, true)) {
-            executor.execute {
-                try {
-                    checkAll()
-                } finally {
-                    checking.set(false)
-                }
-            }
-        }
-        schedule(TICK_MS)
-    }
-
-    private data class Target(val key: String, val label: String, val proxy: com.joebrowser.app.data.ProxyConfig, val intervalSec: Int)
-
-    private fun watchTargets(): List<Target> {
-        val db = Database.get(this)
-        val out = mutableListOf<Target>()
-        db.getAllProxies().forEach { p ->
-            if (p.config.watch && p.config.enabled) {
-                out += Target("saved:${p.id}", p.name.ifBlank { "${p.config.host}:${p.config.port}" }, p.config, p.config.watchIntervalSec.coerceAtLeast(30))
-            }
-        }
-        db.getAllProfiles().forEach { p ->
-            if (p.tools.proxyWatch && p.proxy.enabled) {
-                out += Target("profile:${p.id}", p.name.ifBlank { "Profile" }, p.proxy, p.tools.proxyWatchIntervalSec.coerceAtLeast(30))
-            }
-        }
-        return out
-    }
-
-    private fun checkAll() {
-        val db = Database.get(this)
-        val now = System.currentTimeMillis()
-        var checked = 0
-        for (t in watchTargets()) {
-            val state = db.getWatchState(t.key)
-            val lastCheck = lastCheckOf(t.key)
-            if (lastCheck > 0 && now - lastCheck < t.intervalSec * 1000L) continue
-            checked++
-
-            val result = ProxyTester.test(t.proxy, timeoutMs = 12_000)
-            val fails = state?.fails ?: 0
-            val prevIp = state?.ip ?: ""
-            val wasNotifiedOff = state?.notifiedOff ?: false
-
-            if (result.ok) {
-                val newIp = result.ip
-                db.setWatchState(t.key, newIp, 0, false)
-                if (prevIp.isNotBlank() && newIp.isNotBlank() && prevIp != newIp) {
-                    ProxyNotifier.proxyRotated(this, t.key, t.label, prevIp, newIp)
-                } else if (wasNotifiedOff) {
-                    ProxyNotifier.proxyRecovered(this, t.key, t.label, newIp)
-                }
+        var keepGoing = true
+        try {
+            val watched = ProxyMonitorEngine.watchedCount(this)
+            if (watched == 0 || !Prefs.monitorEnabled(this)) {
+                keepGoing = false
             } else {
-                val newFails = fails + 1
-                if (newFails >= 2 && !wasNotifiedOff) {
-                    ProxyNotifier.proxyOffline(this, t.key, t.label)
-                    db.setWatchState(t.key, prevIp, newFails, true)
-                } else {
-                    db.setWatchState(t.key, prevIp, newFails, wasNotifiedOff)
-                }
+                runCatching { ProxyNotifier.updateMonitor(this, watched) }
+                ProxyMonitorEngine.runCycle(this, force = false)
             }
+        } catch (t: Throwable) {
+            android.util.Log.w("JoeMonitor", "monitor tick failed", t)
         }
-        if (checked > 0) AppEvents.emitProxyState(this, "checked-$checked")
-        // Stop when nothing is watched anymore.
-        if (watchTargets().isEmpty()) {
-            stopSelf()
-        }
+        if (keepGoing) handler.postDelayed(cycleRunnable, tickDelayMs()) else stopSelf()
     }
 
-    private fun lastCheckOf(key: String): Long = try {
-        val c = Database.get(this).readableDatabase
-            .query("watch_state", arrayOf("last_check"), "key = ?", arrayOf(key), null, null, null)
-        c.use { if (it.moveToFirst()) it.getLong(0) else 0L }
-    } catch (t: Throwable) {
-        0L
+    /**
+     * Re-reads the cadence each tick so a settings change applies immediately.
+     *
+     * Wakes at the *shortest* watched interval (the engine skips targets that are not due yet),
+     * so a target the user configured for 30 s is never silently rounded up to the global
+     * cadence. The global setting still caps how long a pass may sleep when it is shorter.
+     */
+    private fun tickDelayMs(): Long {
+        val global = Prefs.monitorIntervalSec(this).coerceIn(30, 3600)
+        val shortest = runCatching { ProxyMonitorEngine.shortestIntervalSec(this) }.getOrDefault(0)
+        val chosen = if (shortest <= 0) global else minOf(global, shortest)
+        return (chosen.coerceIn(30, 3600) * 1000L).coerceAtLeast(30_000L)
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onDestroy() {
-        handler.removeCallbacksAndMessages(null)
-        handlerThread.quitSafely()
-        executor.shutdownNow()
+        runCatching { handler.removeCallbacksAndMessages(null) }
+        runCatching { thread.quitSafely() }
+        ProxyNotifier.cancelMonitor(this)
         super.onDestroy()
     }
 
     companion object {
-        private const val TICK_MS = 30_000L
-
-        fun maybeStart(context: Context) {
-            if (watchCount(context) > 0) {
-                val intent = Intent(context, ProxyMonitorService::class.java)
-                try {
-                    androidx.core.content.ContextCompat.startForegroundService(context, intent)
-                } catch (t: Throwable) {
-                    // Background start restrictions: fall back to plain start; the service
-                    // still enforces its own foreground promotion or stops cleanly.
-                }
+        /**
+         * Starts the monitor when at least one proxy is watched. Safe to call from any screen
+         * and from [BootReceiver]; background-start restrictions degrade to a no-op because
+         * the next app launch re-arms it.
+         */
+        fun startIfNeeded(context: Context) {
+            val app = context.applicationContext
+            if (!Prefs.monitorEnabled(app)) return
+            val watched = runCatching { ProxyMonitorEngine.watchedCount(app) }.getOrDefault(0)
+            if (watched <= 0) {
+                stop(context)
+                return
             }
+            val intent = Intent(app, ProxyMonitorService::class.java)
+            runCatching { ContextCompat.startForegroundService(app, intent) }
         }
 
-        fun watchCount(context: Context): Int {
-            val db = Database.get(context)
-            val saved = db.countWatchedProxies()
-            val profiles = db.getAllProfiles().count { it.tools.proxyWatch && it.proxy.enabled }
-            return saved + profiles
+        fun stop(context: Context) {
+            runCatching { context.applicationContext.stopService(Intent(context, ProxyMonitorService::class.java)) }
         }
     }
 }
 
-/** Restarts the monitor after a reboot when at least one proxy is watched. */
+/** Re-arms the monitor after a reboot when at least one proxy is watched. */
 class BootReceiver : BroadcastReceiver() {
-    override fun onReceive(context: Context, intent: Intent) {
-        if (intent.action == Intent.ACTION_BOOT_COMPLETED) {
-            ProxyMonitorService.maybeStart(context)
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (context == null) return
+        if (intent?.action == Intent.ACTION_BOOT_COMPLETED) {
+            ProxyMonitorService.startIfNeeded(context)
         }
     }
 }

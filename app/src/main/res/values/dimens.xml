@@ -1,7 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Spacing scale. Layouts use these names instead of raw dp so a density change is a
+  one-file edit, and so the "prevent overflow" rules have a single source of truth:
+
+   * screen_h_pad  — horizontal page gutter, constant on every screen,
+   * gap_xs..gap_xl— vertical rhythm,
+   * touch_target  — never ship an interactive element smaller than this,
+   * card_pad      — inner padding for every card surface,
+   * text_cap_*    — maxLines guard rails the layouts rely on.
+-->
 <resources>
-    <dimen name="screen_padding">16dp</dimen>
-    <dimen name="card_padding">14dp</dimen>
+    <dimen name="screen_h_pad">16dp</dimen>
+    <dimen name="screen_v_pad">14dp</dimen>
+    <dimen name="card_pad">14dp</dimen>
+    <dimen name="card_pad_wide">16dp</dimen>
     <dimen name="toolbar_height">56dp</dimen>
+    <dimen name="browser_toolbar_height">54dp</dimen>
     <dimen name="touch_target">48dp</dimen>
+    <dimen name="icon_sm">16dp</dimen>
+    <dimen name="icon_md">20dp</dimen>
+    <dimen name="icon_lg">24dp</dimen>
+    <dimen name="avatar_md">44dp</dimen>
+    <dimen name="avatar_lg">52dp</dimen>
+    <dimen name="gap_xs">4dp</dimen>
+    <dimen name="gap_s">8dp</dimen>
+    <dimen name="gap_m">12dp</dimen>
+    <dimen name="gap_l">18dp</dimen>
+    <dimen name="gap_xl">26dp</dimen>
+    <dimen name="dot_size">8dp</dimen>
+    <dimen name="badge_size">16dp</dimen>
+    <dimen name="fab_margin">16dp</dimen>
+    <dimen name="list_bottom_inset">96dp</dimen>
+    <dimen name="pill_height">38dp</dimen>
+    <dimen name="button_height">48dp</dimen>
 </resources>

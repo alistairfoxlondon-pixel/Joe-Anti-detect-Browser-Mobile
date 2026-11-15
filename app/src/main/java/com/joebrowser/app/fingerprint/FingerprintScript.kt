@@ -1,24 +1,128 @@
 package com.joebrowser.app.fingerprint
 
+import com.joebrowser.app.data.BrowserEngine
 import com.joebrowser.app.data.FingerprintConfig
 import org.json.JSONArray
 import org.json.JSONObject
 
 /**
- * Builds the document-start JavaScript that makes the WebView present the profile's
- * identity. The noise functions are deterministic (seeded per profile), so the same
- * profile answers the same way on every canvas/WebGL/audio probe — never contradictory.
+ * Builds the runtime spoofing layer injected before any page script runs.
+ *
+ * Injection strategy (see `BrowserKernel`):
+ *  1. `WebViewCompat.addDocumentStartJavaScript` — the earliest hook Android exposes, runs
+ *     before the page's own scripts evaluate.
+ *  2. If the installed WebView cannot do that, the script is re-injected from
+ *     `onPageStarted` and again on `onPageCommitVisible`, and `BrowserKernel` reports a
+ *     degraded-kernel warning so the user knows the guarantee is weaker.
+ *
+ * Design rules inside the JavaScript:
+ *  - Everything is deterministic from the profile seed. The same profile answers every
+ *    canvas/WebGL/audio probe identically on every visit, so a detection service that
+ *    probes twice sees one stable machine, not noise.
+ *  - Patched functions keep their original `name`, `length` and `toString()` so the
+ *    prototype cannot be fingerprinted by comparing native code strings.
+ *  - Every patch is individually wrapped in try/catch: one hostile page freezing a
+ *    prototype cannot prevent the rest of the layer from installing.
  */
 object FingerprintScript {
 
-    fun build(fp: FingerprintConfig, browserKind: String, unlockSelection: Boolean): String {
-        val brand = browserKind.lowercase()
-        val chromeLike = brand in listOf("chrome", "chromium", "brave", "edge") &&
-            (fp.os == "Android" || fp.os == "Windows 11" || fp.os == "Windows 10" || fp.os == "macOS" || fp.os == "Linux")
-        val isiOS = fp.os == "iPhone" || fp.os == "iPad"
+    private const val PATCH_HELPERS = """
+  function nativeToString(fn, original) {
+    try {
+      var text = Function.prototype.toString.call(original);
+      Object.defineProperty(fn, 'toString', {
+        value: function () { return text; }, configurable: true, writable: true
+      });
+    } catch (e) {}
+    return fn;
+  }
+  function patch(parent, prop, value) {
+    if (!parent) return;
+    try {
+      var descriptor = Object.getOwnPropertyDescriptor(parent, prop);
+      var original = parent[prop];
+      var wrapper = (typeof value === 'function') ? value : function () { return value; };
+      if (original && typeof original === 'function') nativeToString(wrapper, original);
+      Object.defineProperty(parent, prop, {
+        get: wrapper,
+        set: descriptor && descriptor.set ? descriptor.set : undefined,
+        configurable: true,
+        enumerable: descriptor ? descriptor.enumerable : true
+      });
+    } catch (e) {}
+  }
+  function patchValue(parent, prop, value) {
+    if (!parent) return;
+    try {
+      Object.defineProperty(parent, prop, { value: value, configurable: true, writable: true });
+    } catch (e) {}
+  }
+  function patchMethod(parent, prop, factory) {
+    if (!parent) return;
+    try {
+      var original = parent[prop];
+      if (typeof original !== 'function') return;
+      var wrapper = factory(original);
+      nativeToString(wrapper, original);
+      try { wrapper.name = original.name; } catch (e) {}
+      Object.defineProperty(parent, prop, { value: wrapper, configurable: true, writable: true, enumerable: false });
+    } catch (e) {}
+  }
+  function patchGetter(proto, prop, getter) {
+    if (!proto) return;
+    try { Object.defineProperty(proto, prop, { get: getter, configurable: true, enumerable: true }); } catch (e) {}
+  }
+  /*
+   * Some properties are own, non-enumerable descriptors on the instance rather than the
+   * prototype (navigator.webdriver is the famous one). The prototype patch above cannot
+   * reach those, so this walks the object first and only falls back to the prototype.
+   */
+  /*
+   * A prototype getter is shadowed by an own property, and vice versa: whichever one the
+   * engine consults first wins. These two helpers therefore always act as a pair — install on
+   * the instance AND on the prototype, and only declare success when reading the property back
+   * returns what we intended.
+   */
+  function installOwn(target, prop, getter) {
+    if (!target) return false;
+    try {
+      var own = Object.getOwnPropertyDescriptor(target, prop);
+      if (own && own.configurable === false) return false;
+      Object.defineProperty(target, prop, { get: getter, configurable: true, enumerable: false });
+      return true;
+    } catch (e) { return false; }
+  }
+  function patchOwn(target, proto, prop, getter) {
+    var onInstance = installOwn(target, prop, getter);
+    patchGetter(proto, prop, getter);
+    // If the instance descriptor is locked, undo the prototype patch so the object does not
+    // end up with two disagreeing definitions.
+    if (!onInstance && proto) {
+      try {
+        var locked = Object.getOwnPropertyDescriptor(target, prop);
+        if (locked && locked.configurable === false) {
+          Object.defineProperty(proto, prop, { get: function () { return target[prop]; }, configurable: true, enumerable: true });
+        }
+      } catch (e) {}
+    }
+  }
+"""
+
+    fun build(fp: FingerprintConfig, engine: BrowserEngine, unlockSelection: Boolean): String {
+        val brand = engine.id
+        val isIos = fp.os == "iPhone" || fp.os == "iPad"
+        val chromeLike = engine != BrowserEngine.FIREFOX && !isIos &&
+            (fp.os == "Android" || fp.os == "Windows 11" || fp.os == "Windows 10" ||
+                fp.os == "macOS" || fp.os == "Linux")
+        // An iOS identity means Safari's engine (WebKit), never Chrome/Firefox: iOS browsers are
+        // all WebKit shells, and WebKit exposes neither navigator.userAgentData nor
+        // navigator.deviceMemory. Treating iOS as Chrome-like was a self-contradiction that any
+        // half-decent probe could read straight off the page.
+        val safariLike = isIos
+        
         val vendor = when {
-            brand == "firefox" -> ""
-            isiOS -> "Apple Computer, Inc."
+            engine == BrowserEngine.FIREFOX -> ""
+            isIos -> "Apple Computer, Inc."
             else -> "Google Inc."
         }
         val languages = JSONArray().apply {
@@ -27,9 +131,31 @@ object FingerprintScript {
             if (base != fp.language) put(base)
             if (fp.language != "en" && base != "en") put("en")
         }
+        val brands = JSONArray().apply {
+            when (engine) {
+                BrowserEngine.CHROME -> {
+                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Chromium\""))
+                    put(brandEntry("\"Google Chrome\";v=\"" + major(fp.browserVersion) + "\"", "\"Google Chrome\""))
+                }
+                BrowserEngine.CHROMIUM -> {
+                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Chromium\""))
+                    put(brandEntry("\"Chromium\";v=\"" + major(fp.browserVersion) + "\"", "\"Chromium\""))
+                }
+                BrowserEngine.BRAVE -> {
+                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Brave\""))
+                    put(brandEntry("\"Brave\";v=\"" + major(fp.browserVersion) + "\"", "\"Brave\""))
+                }
+                BrowserEngine.EDGE -> {
+                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Microsoft Edge\""))
+                    put(brandEntry("\"Microsoft Edge\";v=\"" + major(fp.browserVersion) + "\"", "\"Microsoft Edge\""))
+                }
+                BrowserEngine.FIREFOX -> Unit
+            }
+        }
+
         val cfg = JSONObject().apply {
             put("seed", fp.seed)
-            put("ua", FingerprintFactory.userAgent(fp, brand))
+            put("ua", FingerprintFactory.userAgent(fp, engine))
             put("platform", FingerprintFactory.platformFor(fp.os))
             put("vendor", vendor)
             put("language", fp.language)
@@ -47,6 +173,12 @@ object FingerprintScript {
             put("canvasNoise", fp.canvasNoise)
             put("audioNoise", fp.audioNoise)
             put("hwNoise", fp.hardwareNoise)
+        // A stable per-profile offset (in 1/1000 px) applied to text measurements when font
+        // noise is on: measurements and getBoundingClientRect answers must agree with each other,
+        // which is why one shared value is used rather than independent jitter per call.
+        put("fontEpsilon", if (fp.fontNoise) 40 + Math.floorMod(fp.seed, 37) else 0)
+            put("fontNoise", fp.fontNoise)
+            put("mediaNoise", fp.mediaNoise)
             put("doNotTrack", fp.doNotTrack)
             put("spoofBattery", fp.spoofBattery)
             put("webrtcMode", fp.webrtcMode)
@@ -57,17 +189,57 @@ object FingerprintScript {
             put("webglRenderer", fp.webglRenderer)
             put("isDesktop", fp.deviceType == "desktop")
             put("chromeLike", chromeLike)
+            put("isFirefox", engine == BrowserEngine.FIREFOX)
+            put("isIos", isIos)
+            put("safariLike", safariLike)
             put("pdfViewer", chromeLike)
             put("unlockSelection", unlockSelection)
+            put("brands", brands)
+            // Model/platform-version tokens for getHighEntropyValues: they must describe the
+            // identity's platform, not this device. An Android identity reporting 'Pixel 9' on a
+            // Mac profile (or a fixed 15.0.0 on macOS) is a contradiction a probe can read.
+            put("androidModel", if (fp.os == "Android") fp.deviceModel else "")
+            put("platformVersion", when (fp.os) {
+                "Windows 11" -> "15.0.0"
+                "Windows 10" -> "10.0.0"
+                "macOS" -> "14.5.0"
+                "Linux" -> ""
+                "Android" -> fp.androidVersion.takeIf { it.isNotBlank() && it != "auto" } ?: ""
+                else -> ""
+            })
+            put("isMobile", fp.deviceType == "mobile")
         }
 
-        return """
+        return TEMPLATE.replace("__PATCH_HELPERS__", PATCH_HELPERS).replace("__CFG__", cfg.toString())
+    }
+
+    private val VERSION_PATTERN = Regex("v=\"?([0-9]+)")
+
+    private fun major(build: String): String = build.substringBefore('.')
+
+    private fun brandEntry(brand: String, out: String): JSONObject = JSONObject().apply {
+        put("brand", brand.trim('"').replace("\"", ""))
+        put("version", VERSION_PATTERN.find(brand)?.groupValues?.getOrNull(1).orEmpty())
+        put("out", out.trim('"').replace("\"", ""))
+        put("raw", brand)
+    }
+
+    // The script is kept as one template with two placeholders so it stays readable and
+    // Kotlin never has to escape JavaScript's own braces or quotes.
+    private val TEMPLATE: String = """
 (function () {
   'use strict';
-  var JB = $cfg;
-  var SEED = (JB.seed | 0) >>> 0;
-  if (SEED === 0) SEED = 1;
+  try {
+    if (window.__jbKernel) { return; }
+    Object.defineProperty(window, '__jbKernel', { value: true, enumerable: false, configurable: false });
+  } catch (e) { return; }
 
+  var JB = __CFG__;
+  var SEED = (JB.seed | 0) >>> 0;
+  if (SEED === 0) { SEED = 1; }
+__PATCH_HELPERS__
+
+  /* ------------------------------------------------------------------ noise */
   function ihash(a, b, c) {
     var h = (SEED ^ Math.imul(a | 0, 374761393) ^ Math.imul(b | 0, 668265263) ^ Math.imul(c | 0, 2246822519)) | 0;
     h = Math.imul(h ^ (h >>> 13), 1274126177);
@@ -76,352 +248,688 @@ object FingerprintScript {
   }
   function noiseAt(i, salt) { return (ihash(i | 0, 0, salt) % 5) - 2; }
   function clamp8(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
-  function def(obj, prop, getter) {
+
+  /* ------------------------------------------------------------------ fonts */
+  /*
+   * Font-metric defence. Text measurement is one of the cheapest fingerprinting signals: a page
+   * renders a hidden string and reads its width. Nothing here changes layout — the page still
+   * renders with the device's real fonts — it only shifts the *numbers handed to scripts* by a
+   * stable per-profile amount, so two profiles on one device do not report identical metrics.
+   *
+   * The original accessors are captured before patching; reading them back afterwards would
+   * recurse into this layer.
+   */
+  /*
+   * Two numbers, because the two surfaces have different precision:
+   *  - canvas measureText returns a float, so a sub-pixel offset is enough to make two profiles
+   *    on the same device disagree, with no visible effect at all;
+   *  - offsetWidth and friends are integers by definition, so a fractional offset would be
+   *    rounded away and every profile would look identical. There the offset is 0 or exactly
+   *    one pixel, chosen per profile: never enough to break a layout, enough to differ.
+   */
+  var FONT_FRACTION = (JB.fontEpsilon | 0) / 1000;
+  var FONT_SHIFT_PX = (JB.fontEpsilon | 0) >= 60 ? 1 : 0;
+  var FONT_TARGETS = ['offsetWidth', 'offsetHeight', 'scrollWidth', 'scrollHeight',
+    'clientWidth', 'clientHeight'];
+
+  function shiftMeasurement(value) {
+    if (!FONT_SHIFT_PX || typeof value !== 'number' || !isFinite(value) || value < 0) return value;
+    return value + FONT_SHIFT_PX;
+  }
+
+  function installFontMetricLayer() {
+    if (!FONT_FRACTION && !FONT_SHIFT_PX) return;
     try {
-      Object.defineProperty(obj, prop, { get: getter, configurable: true, enumerable: true });
-    } catch (e) { /* non-fatal */ }
-  }
+      if (window.HTMLElement) {
+        FONT_TARGETS.forEach(function (prop) {
+          try {
+            var descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop);
+            var nativeGet = descriptor && descriptor.get;
+            if (!nativeGet) return;
+            var wrapper = nativeToString(function () {
+              return shiftMeasurement(nativeGet.call(this));
+            }, nativeGet);
+            Object.defineProperty(HTMLElement.prototype, prop, {
+              get: wrapper, configurable: true, enumerable: descriptor.enumerable
+            });
+          } catch (e) {}
+        });
+      }
+    } catch (e) {}
 
-  /* ---------- Canvas 2D: deterministic per-profile noise ---------- */
-  function addCanvasNoise(d) {
-    for (var i = 0; i < d.length; i += 4) {
+    try {
+      if (window.CanvasRenderingContext2D) {
+        patchMethod(CanvasRenderingContext2D.prototype, 'measureText', function (original) {
+          return function (text) {
+            var metrics = original.call(this, text);
+            if (!metrics || typeof metrics.width !== 'number') return metrics;
+            try {
+              // Same direction and magnitude class as the element metrics above, so a page that
+              // cross-checks canvas against DOM sees one consistent story, never a contradiction.
+              Object.defineProperty(metrics, 'width', {
+                value: metrics.width + FONT_FRACTION, configurable: true, enumerable: true
+              });
+            } catch (e) {}
+            return metrics;
+          };
+        });
+      }
+    } catch (e) {}
+  }
+  installFontMetricLayer();
+
+  /* ---------------------------------------------------------------- canvas */
+  function addCanvasNoise(data) {
+    if (!data || !data.length) return data;
+    for (var i = 0; i < data.length; i += 4) {
       var px = i >>> 2;
-      d[i] = clamp8(d[i] + noiseAt(px, 11));
-      d[i + 1] = clamp8(d[i + 1] + noiseAt(px, 23));
-      d[i + 2] = clamp8(d[i + 2] + noiseAt(px, 47));
+      data[i] = clamp8(data[i] + noiseAt(px, 11));
+      data[i + 1] = clamp8(data[i + 1] + noiseAt(px, 23));
+      data[i + 2] = clamp8(data[i + 2] + noiseAt(px, 47));
     }
+    return data;
   }
-  if (JB.canvasNoise && window.CanvasRenderingContext2D) {
-    var origGetImageData = CanvasRenderingContext2D.prototype.getImageData;
-    CanvasRenderingContext2D.prototype.getImageData = function () {
-      var img = origGetImageData.apply(this, arguments);
-      try { if (img && img.data) addCanvasNoise(img.data); } catch (e) {}
-      return img;
-    };
-    var origToDataURL = HTMLCanvasElement.prototype.toDataURL;
-    HTMLCanvasElement.prototype.toDataURL = function () {
-      try {
-        var w = this.width, h = this.height;
-        if (w > 0 && h > 0 && w <= 4096 && h <= 4096) {
-          var scratch = document.createElement('canvas');
-          scratch.width = w; scratch.height = h;
-          var ctx = scratch.getContext('2d');
-          ctx.drawImage(this, 0, 0);
-          var img = ctx.getImageData(0, 0, w, h);
-          addCanvasNoise(img.data);
-          ctx.putImageData(img, 0, 0);
-          return origToDataURL.apply(scratch, arguments);
-        }
-      } catch (e) {}
-      return origToDataURL.apply(this, arguments);
-    };
-    var origToBlob = HTMLCanvasElement.prototype.toBlob;
-    HTMLCanvasElement.prototype.toBlob = function (callback) {
-      try {
-        var w = this.width, h = this.height;
-        if (w > 0 && h > 0 && w <= 4096 && h <= 4096) {
-          var scratch = document.createElement('canvas');
-          scratch.width = w; scratch.height = h;
-          var ctx = scratch.getContext('2d');
-          ctx.drawImage(this, 0, 0);
-          var img = ctx.getImageData(0, 0, w, h);
-          addCanvasNoise(img.data);
-          ctx.putImageData(img, 0, 0);
-          return origToBlob.apply(scratch, arguments);
-        }
-      } catch (e) {}
-      return origToBlob.apply(this, arguments);
-    };
+  if (JB.canvasNoise) {
+    try {
+      if (window.CanvasRenderingContext2D) {
+        patchMethod(CanvasRenderingContext2D.prototype, 'getImageData', function (original) {
+          return function () {
+            var img = original.apply(this, arguments);
+            try { if (img && img.data) addCanvasNoise(img.data); } catch (e) {}
+            return img;
+          };
+        });
+      }
+      if (window.HTMLCanvasElement) {
+        patchMethod(HTMLCanvasElement.prototype, 'toDataURL', function (original) {
+          return function () {
+            try {
+              var w = this.width, h = this.height;
+              if (w > 0 && h > 0 && w <= 4096 && h <= 4096) {
+                var scratch = document.createElement('canvas');
+                scratch.width = w; scratch.height = h;
+                var ctx = scratch.getContext('2d');
+                ctx.drawImage(this, 0, 0);
+                var img = ctx.getImageData(0, 0, w, h);
+                addCanvasNoise(img.data);
+                ctx.putImageData(img, 0, 0);
+                return original.apply(scratch, arguments);
+              }
+            } catch (e) {}
+            return original.apply(this, arguments);
+          };
+        });
+        patchMethod(HTMLCanvasElement.prototype, 'toBlob', function (original) {
+          return function () {
+            var self = this, args = arguments;
+            try {
+              var w = self.width, h = self.height;
+              if (w > 0 && h > 0 && w <= 4096 && h <= 4096) {
+                var scratch = document.createElement('canvas');
+                scratch.width = w; scratch.height = h;
+                var ctx = scratch.getContext('2d');
+                ctx.drawImage(self, 0, 0);
+                var img = ctx.getImageData(0, 0, w, h);
+                addCanvasNoise(img.data);
+                ctx.putImageData(img, 0, 0);
+                return original.apply(scratch, args);
+              }
+            } catch (e) {}
+            return original.apply(self, args);
+          };
+        });
+      }
+    } catch (e) {}
   }
 
-  /* ---------- WebGL: parameter + readPixels spoofing ---------- */
+  /* ----------------------------------------------------------------- WebGL */
   var GL_VENDOR = JB.webglVendor;
   var GL_RENDERER = JB.webglRenderer;
-  function isWindowsANGLE() { return /Direct3D|D3D11/i.test(GL_RENDERER); }
-  var GL_VERSION = isWindowsANGLE() ? 'WebGL 1.0 (OpenGL ES 2.0 Chromium)' : 'WebGL 1.0 (OpenGL ES 2.0 Chromium)';
+  var GL_VERSION = 'WebGL 1.0 (OpenGL ES 2.0 Chromium)';
   var GL_SL_VERSION = 'WebGL GLSL ES 1.0 (OpenGL ES GLSL ES 1.0 Chromium)';
-  function patchWebGL(proto) {
+  function patchGL(proto) {
     if (!proto) return;
-    var origGetParameter = proto.getParameter;
-    proto.getParameter = function (param) {
-      if (param === 37445 || param === 7936) return GL_VENDOR;   // UNMASKED_VENDOR / VENDOR
-      if (param === 37446 || param === 7937) return GL_RENDERER; // UNMASKED_RENDERER / RENDERER
-      if (param === 7938) return GL_VERSION;                     // VERSION
-      if (param === 35724) return GL_SL_VERSION;                 // SHADING_LANGUAGE_VERSION
-      return origGetParameter.apply(this, arguments);
-    };
-    var origGetExtension = proto.getExtension;
-    proto.getExtension = function (name) {
-      var ext = origGetExtension.apply(this, arguments);
-      if (name === 'WEBGL_debug_renderer_info') {
-        return { UNMASKED_VENDOR_WEBGL: 37445, UNMASKED_RENDERER_WEBGL: 37446 };
-      }
-      return ext;
-    };
-    var origReadPixels = proto.readPixels;
-    proto.readPixels = function (x, y, w, h, format, type, pixels) {
-      origReadPixels.apply(this, arguments);
-      try {
-        if (pixels && pixels.length) {
-          for (var i = 0; i < pixels.length; i += 4) {
-            pixels[i] = clamp8(pixels[i] + noiseAt((i >>> 2) + (x | 0), 101));
-            pixels[i + 1] = clamp8(pixels[i + 1] + noiseAt((i >>> 2) + (y | 0), 103));
-            pixels[i + 2] = clamp8(pixels[i + 2] + noiseAt(i >>> 2, 107));
+    patchMethod(proto, 'getParameter', function (original) {
+      return function (param) {
+        try {
+          if (param === 37445 || param === 7936) return GL_VENDOR;
+          if (param === 37446 || param === 7937) return GL_RENDERER;
+          if (param === 7938) return GL_VERSION;
+          if (param === 35724) return GL_SL_VERSION;
+        } catch (e) {}
+        return original.apply(this, arguments);
+      };
+    });
+    patchMethod(proto, 'getExtension', function (original) {
+      return function (name) {
+        var ext = original.apply(this, arguments);
+        try {
+          if (String(name).toLowerCase() === 'webgl_debug_renderer_info') {
+            return {
+              UNMASKED_VENDOR_WEBGL: 37445,
+              UNMASKED_RENDERER_WEBGL: 37446
+            };
           }
-        }
-      } catch (e) {}
-    };
-  }
-  if (window.WebGLRenderingContext) patchWebGL(WebGLRenderingContext.prototype);
-  if (window.WebGL2RenderingContext) patchWebGL(WebGL2RenderingContext.prototype);
-
-  /* ---------- Audio: deterministic sample noise ---------- */
-  if (JB.audioNoise && window.AudioBuffer && AudioBuffer.prototype.getChannelData) {
-    var origGetChannelData = AudioBuffer.prototype.getChannelData;
-    AudioBuffer.prototype.getChannelData = function (channel) {
-      var data = origGetChannelData.call(this, channel);
-      try {
-        for (var i = 0; i < data.length; i++) {
-          data[i] = data[i] + noiseAt(i, 1009) * 1e-7;
-        }
-      } catch (e) {}
-      return data;
-    };
-  }
-
-  /* ---------- Navigator ---------- */
-  var navProto = Navigator.prototype;
-  def(navProto, 'userAgent', function () { return JB.ua; });
-  def(navProto, 'appVersion', function () { return JB.ua.replace(/^Mozilla\//, ''); });
-  def(navProto, 'platform', function () { return JB.platform; });
-  def(navProto, 'vendor', function () { return JB.vendor; });
-  def(navProto, 'hardwareConcurrency', function () { return JB.cores; });
-  def(navProto, 'deviceMemory', function () { return JB.memory; });
-  def(navProto, 'maxTouchPoints', function () { return JB.touch; });
-  def(navProto, 'language', function () { return JB.language; });
-  def(navProto, 'languages', function () { return Object.freeze(JB.languages.slice()); });
-  def(navProto, 'webdriver', function () { return undefined; });
-  def(navProto, 'productSub', function () { return '20030107'; });
-  def(navProto, 'cookieEnabled', function () { return true; });
-  def(navProto, 'pdfViewerEnabled', function () { return !!JB.pdfViewer; });
-  def(navProto, 'doNotTrack', function () { return JB.doNotTrack ? '1' : null; });
-  try {
-    Object.defineProperty(navProto, 'webdriver', { get: function () { return undefined; }, configurable: true });
-  } catch (e) {}
-
-  /* Plugins / mimeTypes: full PDF set on desktop identities, empty on mobile. */
-  function makePlugins() {
-    if (typeof PluginArray === 'undefined') return null;
-    var pa = Object.create(PluginArray.prototype);
-    var pd = 'Portable Document Format';
-    var specs = [
-      ['PDF Viewer', 'internal-pdf-viewer', pd],
-      ['Chrome PDF Viewer', 'internal-pdf-viewer', pd],
-      ['Chromium PDF Viewer', 'internal-pdf-viewer', pd],
-      ['Microsoft Edge PDF Viewer', 'internal-pdf-viewer', pd],
-      ['WebKit built-in PDF', 'internal-pdf-viewer', pd]
-    ];
-    var count = 0;
-    specs.forEach(function (s, i) {
-      var p = (typeof Plugin !== 'undefined') ? Object.create(Plugin.prototype) : {};
-      try {
-        Object.defineProperty(p, 'name', { value: s[0], enumerable: true });
-        Object.defineProperty(p, 'filename', { value: s[1], enumerable: true });
-        Object.defineProperty(p, 'description', { value: s[2], enumerable: true });
-        Object.defineProperty(p, 'length', { value: 1 });
-      } catch (e) {}
-      Object.defineProperty(pa, i, { value: p, enumerable: true });
-      count++;
+        } catch (e) {}
+        return ext;
+      };
     });
-    Object.defineProperty(pa, 'length', { value: count });
-    pa.item = function (i) { return this[i] || null; };
-    pa.namedItem = function (n) { for (var i = 0; i < this.length; i++) { if (this[i].name === n) return this[i]; } return null; };
-    pa.refresh = function () {};
-    return pa;
-  }
-  function makeMimeTypes() {
-    if (typeof MimeTypeArray === 'undefined') return null;
-    var ma = Object.create(MimeTypeArray.prototype);
-    var specs = [
-      ['application/pdf', 'pdf', 'Portable Document Format'],
-      ['text/pdf', 'pdf', 'Portable Document Format']
-    ];
-    specs.forEach(function (s, i) {
-      var mt = (typeof MimeType !== 'undefined') ? Object.create(MimeType.prototype) : {};
-      try {
-        Object.defineProperty(mt, 'type', { value: s[0], enumerable: true });
-        Object.defineProperty(mt, 'suffixes', { value: s[1], enumerable: true });
-        Object.defineProperty(mt, 'description', { value: s[2], enumerable: true });
-      } catch (e) {}
-      Object.defineProperty(ma, i, { value: mt, enumerable: true });
+    patchMethod(proto, 'getSupportedExtensions', function (original) {
+      return function () {
+        var list = original.apply(this, arguments) || [];
+        try {
+          if (list.indexOf('WEBGL_debug_renderer_info') < 0) list.push('WEBGL_debug_renderer_info');
+        } catch (e) {}
+        return list;
+      };
     });
-    Object.defineProperty(ma, 'length', { value: specs.length });
-    ma.item = function (i) { return this[i] || null; };
-    ma.namedItem = function (n) { for (var i = 0; i < this.length; i++) { if (this[i].type === n) return this[i]; } return null; };
-    return ma;
+    if (JB.hwNoise) {
+      patchMethod(proto, 'readPixels', function (original) {
+        return function (x, y, w, h, format, type, pixels) {
+          var out = original.apply(this, arguments);
+          try {
+            if (pixels && pixels.length) {
+              for (var i = 0; i < pixels.length; i += 4) {
+                pixels[i] = clamp8(pixels[i] + noiseAt((i >>> 2) + (x | 0), 101));
+                pixels[i + 1] = clamp8(pixels[i + 1] + noiseAt((i >>> 2) + (y | 0), 103));
+                pixels[i + 2] = clamp8(pixels[i + 2] + noiseAt(i >>> 2, 107));
+              }
+            }
+          } catch (e) {}
+          return out;
+        };
+      });
+    }
   }
-  if (JB.isDesktop) {
-    var plugins = makePlugins(); if (plugins) def(navProto, 'plugins', function () { return plugins; });
-    var mimeTypes = makeMimeTypes(); if (mimeTypes) def(navProto, 'mimeTypes', function () { return mimeTypes; });
-  } else {
-    var emptyPlugins = { length: 0, item: function () { return null; }, namedItem: function () { return null; }, refresh: function () {} };
-    var emptyMimes = { length: 0, item: function () { return null; }, namedItem: function () { return null; } };
-    def(navProto, 'plugins', function () { return emptyPlugins; });
-    def(navProto, 'mimeTypes', function () { return emptyMimes; });
-  }
+  try { patchGL(window.WebGLRenderingContext && WebGLRenderingContext.prototype); } catch (e) {}
+  try { patchGL(window.WebGL2RenderingContext && WebGL2RenderingContext.prototype); } catch (e) {}
 
-  /* Connection */
-  try {
-    def(navProto, 'connection', function () {
-      return { effectiveType: '4g', downlink: 10, rtt: 50, saveData: false };
-    });
-  } catch (e) {}
-
-  /* ---------- Screen ---------- */
-  var screenProto = Screen.prototype;
-  def(screenProto, 'width', function () { return JB.screenW; });
-  def(screenProto, 'height', function () { return JB.screenH; });
-  def(screenProto, 'availWidth', function () { return JB.availW; });
-  def(screenProto, 'availHeight', function () { return JB.availH; });
-  def(screenProto, 'availLeft', function () { return 0; });
-  def(screenProto, 'availTop', function () { return 0; });
-  def(screenProto, 'colorDepth', function () { return JB.colorDepth; });
-  def(screenProto, 'pixelDepth', function () { return JB.colorDepth; });
-  def(window, 'devicePixelRatio', function () { return JB.dpr; });
-
-  /* ---------- Timezone: Date + Intl agree ---------- */
-  var JB_TZ = JB.timezone;
-  function tzParts(date) {
+  /* ----------------------------------------------------------------- audio */
+  if (JB.audioNoise) {
     try {
-      var fmt = new Intl.DateTimeFormat('en-US', {
-        timeZone: JB_TZ, hour12: false, year: 'numeric', month: '2-digit', day: '2-digit',
-        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      if (window.AudioBuffer && AudioBuffer.prototype.getChannelData) {
+        patchMethod(AudioBuffer.prototype, 'getChannelData', function (original) {
+          return function (channel) {
+            var data = original.call(this, channel);
+            try {
+              for (var i = 0; i < data.length; i++) data[i] = data[i] + noiseAt(i, 1009) * 1e-7;
+            } catch (e) {}
+            return data;
+          };
+        });
+      }
+      if (window.AnalyserNode) {
+        patchMethod(AnalyserNode.prototype, 'getFloatFrequencyData', function (original) {
+          return function (array) {
+            var out = original.apply(this, arguments);
+            try {
+              for (var i = 0; i < array.length; i++) array[i] = array[i] + noiseAt(i, 1201) * 1e-5;
+            } catch (e) {}
+            return out;
+          };
+        });
+      }
+    } catch (e) {}
+  }
+
+  /* ------------------------------------------------------------- navigator */
+  var nav = window.Navigator && Navigator.prototype;
+  if (nav) {
+    patchGetter(nav, 'userAgent', function () { return JB.ua; });
+    patchGetter(nav, 'appVersion', function () { return JB.ua.replace(/^Mozilla\//, ''); });
+    patchGetter(nav, 'platform', function () { return JB.platform; });
+    patchGetter(nav, 'vendor', function () { return JB.vendor; });
+    patchGetter(nav, 'hardwareConcurrency', function () { return JB.cores; });
+    patchGetter(nav, 'deviceMemory', function () { return JB.memory; });
+    patchGetter(nav, 'maxTouchPoints', function () { return JB.touch; });
+    patchGetter(nav, 'language', function () { return JB.language; });
+    patchGetter(nav, 'languages', function () { return Object.freeze(JB.languages.slice()); });
+    // navigator.webdriver is an own property in Blink, so the pair helper is required here.
+    patchOwn(window.navigator, nav, 'webdriver', function () { return undefined; });
+    patchGetter(nav, 'productSub', function () { return '20030107'; });
+    // Belt and braces: if some WebView keeps a locked own descriptor, remove it entirely.
+    try {
+      if (window.navigator && window.navigator.webdriver !== undefined) {
+        delete window.navigator.webdriver;
+      }
+    } catch (e) {}
+    patchGetter(nav, 'cookieEnabled', function () { return true; });
+    patchGetter(nav, 'doNotTrack', function () { return JB.doNotTrack ? '1' : null; });
+    // WebKit (Safari/iOS) does expose this flag and it is true there; Chromium exposes it too.
+    // Only Firefox lacks it, which is handled by the hide-it block below.
+    patchGetter(nav, 'pdfViewerEnabled', function () {
+      if (JB.isFirefox) return undefined;
+      if (JB.safariLike) return true;
+      return !!JB.pdfViewer;
+    });
+    patchGetter(nav, 'appCodeName', function () { return 'Mozilla'; });
+    patchGetter(nav, 'appName', function () { return 'Netscape'; });
+    patchGetter(nav, 'product', function () { return 'Gecko'; });
+
+    /* userAgentData (Chromium only — a Firefox identity must not expose it) */
+    if (JB.chromeLike && window.NavigatorUAData) {
+      try {
+        var uaData = {
+          brands: JB.brands.map(function (b) { return { brand: b.brand, version: b.version }; }),
+          mobile: !!JB.isMobile,
+          platform: JB.platform === 'Win32' ? 'Windows' :
+                    JB.platform === 'MacIntel' ? 'macOS' :
+                    JB.platform === 'iPhone' || JB.platform === 'iPad' ? 'iOS' :
+                    JB.isMobile ? 'Android' : 'Linux',
+          getHighEntropyValues: function (hints) {
+            return Promise.resolve({
+              architecture: JB.platform === 'Linux armv81' ? 'arm' : 'x86',
+              bitness: '64',
+              brands: this.brands,
+              fullVersionList: JB.brands.map(function (b) {
+                return { brand: b.brand, version: b.version + '.0.0.0' };
+              }),
+              mobile: this.mobile,
+              model: JB.androidModel || '',
+              platform: this.platform,
+              platformVersion: JB.platformVersion || '',
+              uaFullVersion: JB.ua.indexOf('Firefox') >= 0 ? '' : majorVersion(),
+              wow64: false
+            });
+          }
+        };
+        function majorVersion() {
+          var m = JB.ua.match(/(?:Chrome|CriOS|Edg|EdgA)\/([0-9]+)/);
+          return m ? m[1] + '.0.0.0' : '';
+        }
+        patchGetter(nav, 'userAgentData', function () { return uaData; });
+      } catch (e) {}
+    }
+
+    /* plugins / mimeTypes: full PDF set on desktop, empty on mobile */
+    if (JB.isDesktop) {
+      try {
+        var pluginSpecs = [
+          ['PDF Viewer', 'internal-pdf-viewer'],
+          ['Chrome PDF Viewer', 'internal-pdf-viewer'],
+          ['Chromium PDF Viewer', 'internal-pdf-viewer'],
+          ['Microsoft Edge PDF Viewer', 'internal-pdf-viewer'],
+          ['WebKit built-in PDF', 'internal-pdf-viewer']
+        ];
+        var pluginArray = {};
+        for (var pi = 0; pi < pluginSpecs.length; pi++) {
+          pluginArray[pi] = {
+            name: pluginSpecs[pi][0],
+            filename: pluginSpecs[pi][1],
+            description: 'Portable Document Format',
+            length: 1
+          };
+        }
+        pluginArray.length = pluginSpecs.length;
+        pluginArray.item = function (i) { return this[i] || null; };
+        pluginArray.namedItem = function (n) {
+          for (var i = 0; i < this.length; i++) if (this[i].name === n) return this[i];
+          return null;
+        };
+        pluginArray.refresh = function () {};
+        var mimeArray = {
+          0: { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
+          1: { type: 'text/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
+          length: 2
+        };
+        mimeArray.item = function (i) { return this[i] || null; };
+        mimeArray.namedItem = function (n) {
+          for (var i = 0; i < this.length; i++) if (this[i].type === n) return this[i];
+          return null;
+        };
+        patchGetter(nav, 'plugins', function () { return pluginArray; });
+        patchGetter(nav, 'mimeTypes', function () { return mimeArray; });
+      } catch (e) {}
+    } else {
+      try {
+        var emptyPlugins = { length: 0, item: function () { return null; }, namedItem: function () { return null; }, refresh: function () {} };
+        patchGetter(nav, 'plugins', function () { return emptyPlugins; });
+        patchGetter(nav, 'mimeTypes', function () { return emptyPlugins; });
+      } catch (e) {}
+    }
+
+    /*
+     * Surfaces a WebKit browser does not have.
+     *
+     * A page can check for these in one line, so leaving them present under an iPhone/iPad
+     * identity (or under a Firefox identity) contradicts the user agent the page was served.
+     * Hiding them is not "emulating Safari" — the app never claims to render with WebKit — but it
+     * does stop the identity from refuting itself.
+     */
+    if (JB.safariLike || JB.isFirefox) {
+      ['userAgentData', 'deviceMemory', 'connection'].forEach(function (prop) {
+        try {
+          if (prop in navigator || Object.getOwnPropertyDescriptor(window.Navigator.prototype, prop)) {
+            Object.defineProperty(window.Navigator.prototype, prop, {
+              get: function () { return undefined; }, configurable: true, enumerable: false
+            });
+            Object.defineProperty(navigator, prop, {
+              get: function () { return undefined; }, configurable: true, enumerable: false
+            });
+          }
+        } catch (e) {}
       });
-      var parts = fmt.formatToParts(date);
-      var map = {};
-      for (var i = 0; i < parts.length; i++) map[parts[i].type] = parts[i].value;
-      var hour = parseInt(map.hour, 10) % 24;
-      return Date.UTC(+map.year, +map.month - 1, +map.day, hour, +map.minute, +map.second);
-    } catch (e) {
-      return null;
     }
-  }
-  Date.prototype.getTimezoneOffset = function () {
-    var t = this.getTime();
-    if (isNaN(t)) return 0;
-    var asUTC = tzParts(this);
-    if (asUTC == null) return 0;
-    var utc = Math.floor(t / 1000) * 1000;
-    return Math.round((asUTC - utc) / 60000);
-  };
-  var origResolvedOptions = Intl.DateTimeFormat.prototype.resolvedOptions;
-  Intl.DateTimeFormat.prototype.resolvedOptions = function () {
-    var out = origResolvedOptions.call(this);
-    try { out.timeZone = JB_TZ; } catch (e) {}
-    return out;
-  };
+    // Firefox exposes neither the Chromium UA-Data API nor WebKit's pdfViewerEnabled flag.
+    if (JB.isFirefox) {
+      try {
+        Object.defineProperty(navigator, 'pdfViewerEnabled', {
+          get: function () { return undefined; }, configurable: true, enumerable: false
+        });
+      } catch (e) {}
+    }
 
-  /* ---------- WebRTC: relay-only or off ---------- */
-  (function () {
-    if (JB.webrtcMode === 'off') {
-      window.RTCPeerConnection = undefined;
-      window.webkitRTCPeerConnection = undefined;
-      return;
-    }
-    if (JB.webrtcMode !== 'proxy') return;
-    var Orig = window.RTCPeerConnection || window.webkitRTCPeerConnection;
-    if (!Orig) return;
-    function Patched(config) {
-      config = config || {};
-      config.iceTransportPolicy = 'relay';
-      return new Orig(config);
-    }
-    Patched.prototype = Orig.prototype;
-    try { Object.setPrototypeOf(Patched, Orig); } catch (e) {}
-    window.RTCPeerConnection = Patched;
-    window.webkitRTCPeerConnection = Patched;
-  })();
-
-  /* ---------- Geolocation ---------- */
-  if (window.navigator && navigator.geolocation) {
-    var geo = navigator.geolocation;
-    if (JB.geoMode === 'block') {
-      geo.getCurrentPosition = function (success, error) {
-        if (error) error({ code: 1, message: 'User denied geolocation', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
-      };
-      geo.watchPosition = function (success, error) {
-        if (error) error({ code: 1, message: 'User denied geolocation', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
-        return 0;
-      };
-    } else if (JB.geoMode === 'custom') {
-      var fake = {
-        coords: {
-          latitude: JB.geoLat, longitude: JB.geoLng, accuracy: 25,
-          altitude: null, altitudeAccuracy: null, heading: null, speed: null
-        },
-        timestamp: Date.now()
-      };
-      geo.getCurrentPosition = function (success) { if (success) success(fake); };
-      geo.watchPosition = function (success) { if (success) success(fake); return 1; };
-    }
+    /* connection */
+    try {
+      if (window.NetworkInformation && NetworkInformation.prototype) {
+        patchGetter(NetworkInformation.prototype, 'effectiveType', function () { return '4g'; });
+        patchGetter(NetworkInformation.prototype, 'rtt', function () { return 50; });
+        patchGetter(NetworkInformation.prototype, 'downlink', function () { return 10; });
+        patchGetter(NetworkInformation.prototype, 'saveData', function () { return false; });
+      }
+    } catch (e) {}
   }
 
-  /* ---------- Battery ---------- */
-  if (JB.spoofBattery && navigator.getBattery) {
-    navigator.getBattery = function () {
-      return Promise.resolve({
-        charging: true, chargingTime: 0, dischargingTime: Infinity, level: 0.87,
-        addEventListener: function () {}, removeEventListener: function () {}
-      });
-    };
-  }
-
-  /* ---------- window.chrome for Chromium identities ---------- */
-  if (JB.chromeLike) {
-    window.chrome = window.chrome || {};
-    window.chrome.app = window.chrome.app || {
-      isInstalled: false,
-      InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
-      RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' }
-    };
-    window.chrome.csi = window.chrome.csi || function () {
-      return { startE: Date.now(), onloadT: Date.now(), pageT: Date.now() % 97, tran: 15 };
-    };
-    window.chrome.loadTimes = window.chrome.loadTimes || function () {
-      var now = Date.now() / 1000;
-      return {
-        commitLoadTime: now, connectionInfo: 'h2', finishDocumentLoadTime: now,
-        finishLoadTime: now, firstPaintAfterLoadTime: 0, firstPaintTime: now,
-        navigationType: 'Other', wasAlternateProtocolAvailable: false,
-        wasFetchedViaSpdy: true, wasNpnNegotiated: true
-      };
-    };
-    window.chrome.runtime = window.chrome.runtime || {};
-  }
-
-  /* ---------- Automation markers cleanup ---------- */
+  /* ---------------------------------------------------------------- screen */
   try {
-    for (var key in window) {
-      if (Object.prototype.hasOwnProperty.call(window, key) &&
-          (key.indexOf('cdc_') === 0 || key.indexOf('__cdc_') === 0 || key.indexOf('selenium') === 0)) {
-        try { delete window[key]; } catch (e) {}
+    if (window.Screen && Screen.prototype) {
+      patchGetter(Screen.prototype, 'width', function () { return JB.screenW; });
+      patchGetter(Screen.prototype, 'height', function () { return JB.screenH; });
+      patchGetter(Screen.prototype, 'availWidth', function () { return JB.availW; });
+      patchGetter(Screen.prototype, 'availHeight', function () { return JB.availH; });
+      patchGetter(Screen.prototype, 'availLeft', function () { return 0; });
+      patchGetter(Screen.prototype, 'availTop', function () { return 0; });
+      patchGetter(Screen.prototype, 'colorDepth', function () { return JB.colorDepth; });
+      patchGetter(Screen.prototype, 'pixelDepth', function () { return JB.colorDepth; });
+    }
+    patchGetter(window, 'devicePixelRatio', function () { return JB.dpr; });
+    patchMethod(window, 'matchMedia', function (original) {
+      return function (query) {
+        try {
+          var q = String(query);
+          var m = q.match(/device-pixel-ratio\s*:\s*([0-9.]+)/);
+          if (m) {
+            var target = parseFloat(m[1]);
+            var matches = Math.abs(target - JB.dpr) < 0.01 || Math.abs(target - 1) < 0.01;
+            return {
+              matches: matches, media: q,
+              addEventListener: function () {}, removeEventListener: function () {},
+              addListener: function () {}, removeListener: function () {}, onchange: null
+            };
+          }
+        } catch (e) {}
+        return original.apply(this, arguments);
+      };
+    });
+  } catch (e) {}
+
+  /* -------------------------------------------------------------- timezone */
+  var JB_TZ = JB.timezone;
+  try {
+    var tzParts = function (date) {
+      try {
+        var fmt = new Intl.DateTimeFormat('en-US', {
+          timeZone: JB_TZ, hour12: false, year: 'numeric', month: '2-digit',
+          day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit'
+        });
+        var parts = fmt.formatToParts(date);
+        var map = {};
+        for (var i = 0; i < parts.length; i++) { map[parts[i].type] = parts[i].value; }
+        var hour = parseInt(map.hour, 10) % 24;
+        return Date.UTC(+map.year, +map.month - 1, +map.day, hour, +map.minute, +map.second);
+      } catch (e) {
+        return null;
+      }
+    };
+    var originalOffset = Date.prototype.getTimezoneOffset;
+    patchMethod(Date.prototype, 'getTimezoneOffset', function () {
+      return function () {
+        var t = this.getTime();
+        if (isNaN(t)) return 0;
+        var asUTC = tzParts(this);
+        if (asUTC == null) { return originalOffset.apply(this, arguments); }
+        var utc = Math.floor(t / 1000) * 1000;
+        /*
+         * getTimezoneOffset() is defined as (UTC - local) in minutes, so a zone ahead of UTC
+         * reports a negative number: Europe/Berlin is -60 in winter and -120 in summer.
+         * Returning (local - UTC) inverted the sign for every positive-offset zone - the spoof
+         * said a Berlin profile was 60 minutes *behind* UTC, which no browser ever reports and
+         * any timezone probe flags immediately.
+         */
+        return Math.round((utc - asUTC) / 60000);
+      };
+    });
+    if (window.Intl && Intl.DateTimeFormat) {
+      patchMethod(Intl.DateTimeFormat.prototype, 'resolvedOptions', function (original) {
+        return function () {
+          var out = original.apply(this, arguments);
+          try { out.timeZone = JB_TZ; } catch (e) {}
+          return out;
+        };
+      });
+    }
+  } catch (e) {}
+
+  /* ---------------------------------------------------------------- WebRTC */
+  try {
+    var OrigPC = window.RTCPeerConnection || window.webkitRTCPeerConnection;
+    if (JB.webrtcMode === 'off') {
+      if (OrigPC) {
+        window.RTCPeerConnection = undefined;
+        window.webkitRTCPeerConnection = undefined;
+      }
+    } else if (JB.webrtcMode === 'proxy' && OrigPC) {
+      var PatchedPC = function (config) {
+        var next = config ? JSON.parse(JSON.stringify(config)) : {};
+        next.iceTransportPolicy = 'relay';
+        return new OrigPC(next);
+      };
+      PatchedPC.prototype = OrigPC.prototype;
+      nativeToString(PatchedPC, OrigPC);
+      try { Object.setPrototypeOf(PatchedPC, OrigPC); } catch (e) {}
+      window.RTCPeerConnection = PatchedPC;
+      window.webkitRTCPeerConnection = PatchedPC;
+    }
+  } catch (e) {}
+
+  /* ----------------------------------------------------------- geolocation */
+  /*
+   * Geolocation is a singleton in every engine, but the patch is installed through the accessor
+   * anyway: if a provider ever hands back a fresh object per access, patching only the returned
+   * instance would leave the *next* call unpatched. Pinning the same object on the instance keeps
+   * the two views identical.
+   */
+  try {
+    if (navigator.geolocation) {
+      var geo = navigator.geolocation;
+      try {
+        Object.defineProperty(navigator, 'geolocation', {
+          get: function () { return geo; }, configurable: true, enumerable: true
+        });
+      } catch (e) {}
+      if (JB.geoMode === 'block') {
+        var deny = function (success, error) {
+          if (typeof error === 'function') {
+            error({ code: 1, message: 'User denied geolocation', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+          }
+        };
+        geo.getCurrentPosition = deny;
+        geo.watchPosition = function (success, error) { deny(success, error); return 0; };
+      } else if (JB.geoMode === 'custom') {
+        /*
+         * A custom location with no usable coordinates must not fall through to 0,0: that point
+         * is in the Gulf of Guinea, where no real user sits, so the fake location itself gives
+         * the profile away. Without coordinates the honest answer is 'unavailable'.
+         */
+        var hasCoords = typeof JB.geoLat === 'number' && typeof JB.geoLng === 'number' &&
+          isFinite(JB.geoLat) && isFinite(JB.geoLng) &&
+          !(JB.geoLat === 0 && JB.geoLng === 0) &&
+          Math.abs(JB.geoLat) <= 90 && Math.abs(JB.geoLng) <= 180;
+        if (hasCoords) {
+          var fakePosition = function () {
+            return {
+              coords: {
+                latitude: JB.geoLat, longitude: JB.geoLng, accuracy: 25,
+                altitude: null, altitudeAccuracy: null, heading: null, speed: null
+              },
+              timestamp: Date.now()
+            };
+          };
+          geo.getCurrentPosition = function (success) { if (typeof success === 'function') success(fakePosition()); };
+          geo.watchPosition = function (success) { if (typeof success === 'function') success(fakePosition()); return 1; };
+        } else {
+          var unavailable = function (success, error) {
+            if (typeof error === 'function') {
+              error({ code: 2, message: 'Position unavailable', PERMISSION_DENIED: 1, POSITION_UNAVAILABLE: 2, TIMEOUT: 3 });
+            }
+          };
+          geo.getCurrentPosition = unavailable;
+          geo.watchPosition = function (success, error) { unavailable(success, error); return 0; };
+        }
       }
     }
   } catch (e) {}
 
-  /* ---------- Built-in: unlock selection / context menu on hostile pages ---------- */
+  /* --------------------------------------------------------------- battery */
+  /*
+   * Battery Status API. Two bugs lived here: the property is `navigator.getBattery()` (a method
+   * on navigator), not something to overwrite as a plain value, and it was assigned without the
+   * nativeToString wrapper — so the patched function announced itself. The level is also derived
+   * from the profile seed now, because a constant 0.87 across every profile is its own signal.
+   */
+  if (JB.spoofBattery && navigator.getBattery) {
+    try {
+      var originalBattery = navigator.getBattery;
+      var seededLevel = 0.35 + (ihash(0, 0, 907) % 60) / 100;
+      var batteryWrapper = function () {
+        return Promise.resolve({
+          charging: true,
+          chargingTime: 0,
+          dischargingTime: Infinity,
+          level: seededLevel,
+          onchargingchange: null,
+          onchargingtimechange: null,
+          ondischargingtimechange: null,
+          onlevelchange: null,
+          addEventListener: function () {},
+          removeEventListener: function () {},
+          dispatchEvent: function () { return true; }
+        });
+      };
+      nativeToString(batteryWrapper, originalBattery);
+      Object.defineProperty(navigator, 'getBattery', {
+        value: batteryWrapper, configurable: true, writable: true, enumerable: false
+      });
+    } catch (e) {}
+  }
+
+  /* ------------------------------------------------------- media devices */
+  if (JB.mediaNoise) {
+    try {
+      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        patchMethod(navigator.mediaDevices, 'enumerateDevices', function (original) {
+          return function () {
+            return original.apply(this, arguments).then(function (list) {
+              try {
+                var hasAudio = list.some(function (d) { return d.kind === 'audioinput'; });
+                var out = list.slice();
+                if (!hasAudio) {
+                  out.push({ deviceId: '', kind: 'audioinput', label: '', groupId: '' });
+                  out.push({ deviceId: '', kind: 'audiooutput', label: '', groupId: '' });
+                  out.push({ deviceId: '', kind: 'videoinput', label: '', groupId: '' });
+                }
+                return out;
+              } catch (e) { return list; }
+            });
+          };
+        });
+      }
+    } catch (e) {}
+  }
+
+  /* ----------------------------------------------------------- window.chrome */
+  if (JB.chromeLike) {
+    try {
+      window.chrome = window.chrome || {};
+      if (!window.chrome.app) {
+        window.chrome.app = {
+          isInstalled: false,
+          InstallState: { DISABLED: 'disabled', INSTALLED: 'installed', NOT_INSTALLED: 'not_installed' },
+          RunningState: { CANNOT_RUN: 'cannot_run', READY_TO_RUN: 'ready_to_run', RUNNING: 'running' },
+          getDetails: function () { return null; },
+          getIsInstalled: function () { return false; }
+        };
+      }
+      if (!window.chrome.csi) {
+        window.chrome.csi = function () {
+          return { startE: Date.now(), onloadT: Date.now(), pageT: Date.now() % 97, tran: 15 };
+        };
+      }
+      if (!window.chrome.loadTimes) {
+        window.chrome.loadTimes = function () {
+          var now = Date.now() / 1000;
+          return {
+            commitLoadTime: now, connectionInfo: 'h2', finishDocumentLoadTime: now,
+            finishLoadTime: now, firstPaintAfterLoadTime: 0, firstPaintTime: now,
+            navigationType: 'Other', wasAlternateProtocolAvailable: false,
+            wasFetchedViaSpdy: true, wasNpnNegotiated: true
+          };
+        };
+      }
+      if (!window.chrome.runtime) {
+        window.chrome.runtime = {
+          OnInstalledReason: { CHROME_UPDATE: 'chrome_update', INSTALL: 'install', SHARED_MODULE_UPDATE: 'shared_module_update', UPDATE: 'update' },
+          OnRestartRequiredReason: { APP_UPDATE: 'app_update', OS_UPDATE: 'os_update', PERIODIC: 'periodic' },
+          PlatformArch: { ARM: 'arm', ARM64: 'arm64', MIPS: 'mips', MIPS64: 'mips64', X86_32: 'x86-32', X86_64: 'x86-64' },
+          PlatformOs: { ANDROID: 'android', CROS: 'cros', LINUX: 'linux', MAC: 'mac', OPENBSD: 'openbsd', WIN: 'win' },
+          id: undefined
+        };
+      }
+    } catch (e) {}
+  } else if (JB.isFirefox) {
+    try { delete window.chrome; } catch (e) { window.chrome = undefined; }
+  }
+
+  /* ------------------------------------------------ automation fingerprints */
+  try {
+    var markers = ['cdc_adoQpoasnfa76pfcZLmcfl_', '__webdriver_evaluate', '__selenium_evaluate',
+      '__webdriver_script_function', '__webdriver_script_func', '__webdriver_script_fn',
+      '__fxdriver_evaluate', '__driver_unwrapped', '__webdriver_unwrapped', '__driver_evaluate',
+      '_Selenium_IDE_Recorder', '_selenium', 'calledSelenium', 'webdriver', '__nightmare'];
+    for (var mi = 0; mi < markers.length; mi++) {
+      try { if (markers[mi] in document) delete document[markers[mi]]; } catch (e) {}
+      try { if (markers[mi] in window) delete window[markers[mi]]; } catch (e) {}
+    }
+    var cdc = Object.keys(window).filter(function (k) { return /^cdc_|^\$?chrome_asyncScriptInfo/.test(k); });
+    for (var ci = 0; ci < cdc.length; ci++) { try { delete window[cdc[ci]]; } catch (e) {} }
+  } catch (e) {}
+
+  /* --------------------------------------- built-in: unlock selection/copy */
   if (JB.unlockSelection) {
     try {
-      var style = document.createElement('style');
-      style.textContent = '*{user-select:text !important;-webkit-user-select:text !important;}';
-      (document.head || document.documentElement).appendChild(style);
-      ['contextmenu', 'selectstart', 'copy', 'cut', 'dragstart'].forEach(function (t) {
-        window.addEventListener(t, function (e) { e.stopImmediatePropagation(); }, true);
-        document.addEventListener(t, function (e) { e.stopImmediatePropagation(); }, true);
+      var injectStyle = function () {
+        try {
+          var style = document.createElement('style');
+          style.textContent = '*{user-select:text !important;-webkit-user-select:text !important;}';
+          (document.head || document.documentElement).appendChild(style);
+        } catch (e) {}
+      };
+      if (document.head) { injectStyle(); } else {
+        document.addEventListener('DOMContentLoaded', injectStyle, { once: true });
+      }
+      ['contextmenu', 'selectstart', 'copy', 'cut', 'dragstart'].forEach(function (type) {
+        var stop = function (event) {
+          try {
+            if (event.__jbAllowed) return;
+            event.stopImmediatePropagation();
+            event.stopPropagation();
+          } catch (e) {}
+        };
+        window.addEventListener(type, stop, true);
+        document.addEventListener(type, stop, true);
       });
     } catch (e) {}
   }
 })();
 """.trimIndent()
-    }
 }

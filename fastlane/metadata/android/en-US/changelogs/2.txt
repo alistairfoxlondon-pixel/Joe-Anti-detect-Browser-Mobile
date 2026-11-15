@@ -1,0 +1,10 @@
+1.1.0 — correctness and honesty pass.
+
+• Editing a profile's identity now reaches its open tab: the fingerprint layer swaps (old rule removed, no stacking) and the page reloads only when the values actually changed.
+• Duplicated profiles are no longer fingerprint twins — the copy is re-seeded and starts with no opens and no inherited proxy measurement.
+• Tracker count is on the toolbar as N req · M trk · it opens the per-host sheet, and the sheet's summary now uses true totals instead of the 150 rows it can show.
+• Home's counters show what their labels say (Alerts is alerts; Open windows has its own card).
+• Clearing history with a profile filter no longer claims the other profiles' history is gone.
+• The proxy monitor honours each target's own check interval instead of throttling it to the global one.
+• A proxy check made in the editor is saved instead of being thrown away when you leave without pressing Save.
+• Every tab now updates live instead of only when you switch to it.

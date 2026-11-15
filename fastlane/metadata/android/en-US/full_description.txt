@@ -13,15 +13,17 @@ PROXY LIBRARY
 
 EVERYDAY TOOLS
 • Paste as Human: types clipboard text with human timing into any field
-• Built-in tracker counter: see which requests and known trackers each page fires
-• History with soft-delete trash, JSON backup export, one-tap fingerprint checks (BrowserScan, IPHey, PixelScan, IPFighter, Whoer)
+• Built-in tracker counter: the toolbar shows how many requests each page fires and how many reach known tracker hosts, and taps through to the full per-host list
+• History with search, per-profile filters and soft-delete trash; JSON backup export and restore (with or without passwords)
+• One-tap fingerprint checks that open BrowserScan, IPHey, PixelScan, IPFighter or Whoer inside the profile, so the site sees the profile's identity and not your device
+• Engines tab to see which identity families and browser builds each profile can use, and Tools tab for every setting in one place
 
 PRIVATE BY DESIGN
 • All data local to the device; backups and device transfer excluded by default
-• Proxy passwords encrypted with the Android Keystore (AES-256-GCM)
+• Proxy passwords encrypted at rest with the Android Keystore (AES-256-GCM); a full backup writes them in plain text inside the file, so the app offers a no-passwords export too
 • No ads, no analytics, no account required
 
 HONEST LIMITATIONS
-Joe Browser is not an anonymity cloak. Sites can still correlate accounts by IP address, logins and behavior. Firefox identities are UA-level only (rendering is the system WebView). Some very old WebViews share storage between profiles and the app says so on screen when that happens. The Extensions tab keeps store links for your profiles — Android WebViews cannot execute browser extensions.
+Joe Browser is not an anonymity cloak. Sites can still correlate accounts by IP address, logins and behavior. Firefox identities are UA-level only (rendering is the system WebView). Some very old WebViews share storage between profiles and the app says so on screen when that happens. Android WebViews cannot execute browser extensions, so Joe Browser does not pretend to install them: everything a page receives comes from the fingerprint layer or the page itself.
 
 For power users managing multiple client accounts, social profiles, QA personas and scraping identities — without renting a cloud anti-detect subscription.

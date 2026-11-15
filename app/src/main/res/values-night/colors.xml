@@ -1,29 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Joe Browser — dark theme tokens.
+
+  Every token that exists in the light palette exists here with the same name, so a screen
+  cannot be "half dark". Contrast targets: text ≥ 12:1, text_dim ≥ 7:1, text_muted ≥ 4.5:1
+  against the surface it sits on.
+-->
 <resources>
-    <!-- Joe Browser dark palette (mirrors the desktop build) -->
-    <color name="bg">#17181B</color>
-    <color name="bg_soft">#1C1D21</color>
-    <color name="sidebar">#141518</color>
-    <color name="card">#232529</color>
-    <color name="panel">#2A2C31</color>
-    <color name="panel_hover">#313339</color>
-    <color name="panel2">#2D2F34</color>
-    <color name="input">#1B1C20</color>
-    <color name="line">#33353B</color>
-    <color name="line_soft">#282A2F</color>
-    <color name="text">#F2F3F5</color>
-    <color name="text_dim">#C3C6CC</color>
-    <color name="text_faint">#9A9EA6</color>
-    <color name="accent">#5B9BF7</color>
-    <color name="accent_hover">#74ADFF</color>
-    <color name="accent_pressed">#4485E0</color>
-    <color name="on_accent">#FFFFFF</color>
-    <color name="success">#4EC38A</color>
-    <color name="danger">#F26D76</color>
-    <color name="warning">#E8B34B</color>
-    <color name="accent_soft">#265B9BF7</color>
-    <color name="success_soft">#264EC38A</color>
-    <color name="danger_soft">#26F26D76</color>
-    <color name="warning_soft">#26E8B34B</color>
-    <color name="scrim">#8C000000</color>
+
+    <!-- Layered surfaces -->
+    <color name="bg">#0C1016</color>
+    <color name="surface">#141A21</color>
+    <color name="surface_muted">#1C242E</color>
+    <color name="surface_raised">#1A222C</color>
+    <color name="scrim">#99000000</color>
+
+    <!-- Lines -->
+    <color name="line">#26303B</color>
+    <color name="line_soft">#1E262F</color>
+
+    <!-- Type -->
+    <color name="text">#F1F4F8</color>
+    <color name="text_dim">#BCC4CF</color>
+    <color name="text_muted">#8B95A2</color>
+    <color name="text_on_accent">#0B1220</color>
+
+    <!-- Accents -->
+    <color name="accent">#6FA0FF</color>
+    <color name="accent_pressed">#4E83EE</color>
+    <color name="accent_soft">#266FA0FF</color>
+    <color name="on_accent">#08111F</color>
+
+    <color name="success">#48C79A</color>
+    <color name="success_soft">#2648C79A</color>
+    <color name="warning">#E7B455</color>
+    <color name="warning_soft">#26E7B455</color>
+    <color name="danger">#FF7B72</color>
+    <color name="danger_soft">#26FF7B72</color>
+    <color name="neutral">#8B95A2</color>
+
+    <!-- Hero gradient stops -->
+    <color name="hero_start">#1B3F9E</color>
+    <color name="hero_end">#0E1F52</color>
+    <color name="hero_text">#FFFFFF</color>
+    <color name="hero_text_dim">#C6D6F5</color>
+
+    <!-- Legacy aliases -->
+    <color name="bg_soft">@color/surface</color>
+    <color name="sidebar">@color/bg</color>
+    <color name="card">@color/surface</color>
+    <color name="panel">@color/surface_muted</color>
+    <color name="panel_hover">@color/surface_muted</color>
+    <color name="panel2">@color/surface_muted</color>
+    <color name="input">@color/surface_muted</color>
+    <color name="text_faint">@color/text_muted</color>
+    <color name="accent_hover">@color/accent</color>
+    <color name="danger_soft_legacy">@color/danger_soft</color>
 </resources>

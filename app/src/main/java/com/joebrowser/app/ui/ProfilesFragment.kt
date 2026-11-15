@@ -1,17 +1,13 @@
 package com.joebrowser.app.ui
 
-import android.app.AlertDialog
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
-import android.graphics.drawable.GradientDrawable
+import android.content.res.ColorStateList
 import android.os.Bundle
-import android.text.Editable
-import android.text.TextWatcher
 import android.view.LayoutInflater
-import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
-import android.widget.ImageButton
-import android.widget.TextView
 import androidx.appcompat.widget.PopupMenu
 import androidx.core.content.ContextCompat
 import androidx.core.widget.doAfterTextChanged
@@ -19,25 +15,52 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.GridLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.chip.Chip
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.BrowserActivity
-import com.joebrowser.app.data.Database
+import com.joebrowser.app.core.Async
 import com.joebrowser.app.data.Prefs
 import com.joebrowser.app.data.Profile
+import com.joebrowser.app.data.ProfileRepository
+import com.joebrowser.app.data.ProfileStorage
 import com.joebrowser.app.databinding.FragmentProfilesBinding
 import com.joebrowser.app.databinding.ItemProfileCardBinding
 
+/**
+ * Profiles tab.
+ *
+ * Behaviour:
+ *  - Search filters on name, group, tags, status, OS and engine; group chips filter on group.
+ *  - Sort order is persisted in [Prefs] and applied to the already-loaded list, so changing
+ *    it never re-queries the database.
+ *  - Every card action is wired: launch, edit, duplicate, clear data, delete. Nothing on the
+ *    card is decorative.
+ *  - Deletion honours the trash preference and erases the profile's isolated directory.
+ */
 class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
     private var _binding: FragmentProfilesBinding? = null
     private val binding get() = _binding!!
+
     private val adapter = ProfileAdapter(
-        onLaunch = { p -> BrowserActivity.launch(requireContext(), p.id) },
-        onMenu = { p, anchor -> showCardMenu(p, anchor) }
+        onLaunch = { profile -> BrowserActivity.launch(requireContext(), profile.id) },
+        onEdit = { profile -> (activity as? MainActivity)?.openProfileEditor(profile.id) },
+        onMenu = { profile, anchor -> showMenu(profile, anchor) },
+        onDelete = { profile -> confirmDelete(profile) }
     )
-    private var selectedGroup: String? = null
+
+    private var allProfiles: List<Profile> = emptyList()
     private var query: String = ""
+    private var selectedGroup: String? = null
+
+    private val receiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            // Each row carries a live proxy dot, so proxy-state changes belong here too.
+            val action = intent?.action ?: return
+            if (action in TRACKED_ACTIONS) refresh()
+        }
+    }
 
     override fun onCreateView(inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?): View {
         _binding = FragmentProfilesBinding.inflate(inflater, container, false)
@@ -45,37 +68,33 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
-        val span = resources.getInteger(R.integer.profiles_grid_span)
-        binding.profileList.layoutManager = GridLayoutManager(requireContext(), span)
+        val spanCount = resources.getInteger(R.integer.profiles_grid_span).coerceAtLeast(1)
+        binding.profileList.layoutManager = GridLayoutManager(requireContext(), spanCount)
         binding.profileList.adapter = adapter
+        binding.profileList.setHasFixedSize(false)
+        binding.profileList.itemAnimator?.changeDuration = 0
 
-        binding.fabNewProfile.setOnClickListener { startActivity(Intent(requireContext(), ProfileEditorActivity::class.java)) }
-        binding.emptyCreate.setOnClickListener { startActivity(Intent(requireContext(), ProfileEditorActivity::class.java)) }
+        binding.fabNewProfile.setOnClickListener { (activity as? MainActivity)?.openProfileEditor() }
+        binding.emptyCreate.setOnClickListener { (activity as? MainActivity)?.openProfileEditor() }
 
-        binding.profileSearch.doAfterTextChanged { s ->
-            query = s?.toString()?.trim().orEmpty()
+        binding.profileSearch.doAfterTextChanged { editable ->
+            query = editable?.toString()?.trim().orEmpty()
             binding.clearSearch.visibility = if (query.isEmpty()) View.GONE else View.VISIBLE
             applyFilters()
         }
         binding.clearSearch.setOnClickListener { binding.profileSearch.setText("") }
-
-        binding.sortProfiles.setOnClickListener { view ->
-            val popup = PopupMenu(requireContext(), view)
-            popup.menu.add(0, 0, 0, "Recently used").isCheckable = true
-            popup.menu.add(0, 1, 0, "Name A–Z").isCheckable = true
-            popup.menu.add(0, 2, 0, "Newest first").isCheckable = true
-            popup.menu.add(0, 3, 0, "Operating system").isCheckable = true
-            popup.menu.add(0, 4, 0, "Group").isCheckable = true
-            popup.menu.setGroupCheckable(0, true, true)
-            popup.menu.findItem(Prefs.profileSort(requireContext()))?.isChecked = true
-            popup.setOnMenuItemClickListener { item ->
-                Prefs.setProfileSort(requireContext(), item.itemId)
-                applyFilters()
-                true
-            }
-            popup.show()
-        }
+        binding.sortProfiles.setOnClickListener { anchor -> showSortMenu(anchor) }
         refresh()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        AppEvents.register(requireContext().applicationContext, receiver, TRACKED_ACTIONS)
+    }
+
+    override fun onStop() {
+        runCatching { context?.applicationContext?.let { AppEvents.unregister(it, receiver) } }
+        super.onStop()
     }
 
     override fun onResume() {
@@ -83,131 +102,204 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         refresh()
     }
 
-    private fun showCardMenu(profile: Profile, anchor: View) {
+    // ------------------------------------------------------------------ sorting
+
+    private fun showSortMenu(anchor: View) {
         val popup = PopupMenu(requireContext(), anchor)
-        popup.menu.add(0, 1, 0, "Launch")
-        popup.menu.add(0, 2, 0, "Edit profile")
-        popup.menu.add(0, 3, 0, "Duplicate")
-        popup.menu.add(0, 4, 0, "Clear browsing data")
-        popup.menu.add(0, 5, 0, "Delete")
+        val options = listOf(
+            "Recently used", "Name A–Z", "Newest first", "Operating system", "Group"
+        )
+        options.forEachIndexed { index, label ->
+            popup.menu.add(0, index, index, label).isCheckable = true
+        }
+        popup.menu.setGroupCheckable(0, true, true)
+        runCatching { popup.menu.findItem(Prefs.profileSort(requireContext()))?.isChecked = true }
+        popup.setOnMenuItemClickListener { item ->
+            Prefs.setProfileSort(requireContext(), item.itemId)
+            applyFilters()
+            true
+        }
+        popup.show()
+    }
+
+    // ------------------------------------------------------------------- menus
+
+    private fun showMenu(profile: Profile, anchor: View) {
+        val popup = PopupMenu(requireContext(), anchor)
+        popup.menu.add(0, ACTION_EDIT, 0, getString(R.string.action_edit))
+        popup.menu.add(0, ACTION_DUPLICATE, 1, getString(R.string.action_duplicate))
+        popup.menu.add(0, ACTION_CLEAR, 2, getString(R.string.profiles_clear_data))
+        popup.menu.add(0, ACTION_DELETE, 3, getString(R.string.action_delete))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
-                1 -> BrowserActivity.launch(requireContext(), profile.id)
-                2 -> startActivity(Intent(requireContext(), ProfileEditorActivity::class.java).putExtra(ProfileEditorActivity.EXTRA_PROFILE_ID, profile.id))
-                3 -> duplicateProfile(profile)
-                4 -> confirmClearData(profile)
-                5 -> confirmDelete(profile)
+                ACTION_EDIT -> (activity as? MainActivity)?.openProfileEditor(profile.id)
+                ACTION_DUPLICATE -> duplicate(profile)
+                ACTION_CLEAR -> confirmClearData(profile)
+                ACTION_DELETE -> confirmDelete(profile)
             }
             true
         }
         popup.show()
     }
 
-    private fun duplicateProfile(profile: Profile) {
-        val copy = profile.copy(freshId = true).apply { name = "${profile.name} copy" }
-        Database.get(requireContext()).saveProfile(copy)
-        AppEvents.emitProfilesChanged(requireContext())
-        refresh()
+    private fun duplicate(profile: Profile) {
+        ProfileRepository.duplicateProfile(requireContext(), profile) { copy ->
+            if (copy != null) Async.toast(requireContext(), getString(R.string.editor_created))
+            refresh()
+        }
     }
 
     private fun confirmClearData(profile: Profile) {
-        AlertDialog.Builder(requireContext())
-            .setTitle("Clear browsing data?")
-            .setMessage("Cookies, site data, cache and history for “${profile.name}” will be erased. Identity is kept.")
-            .setPositiveButton("Clear") { _, _ ->
-                try {
-                    Database.get(requireContext()).clearHistory(profile.id)
-                    if (androidx.webkit.WebViewFeature.isFeatureSupported(androidx.webkit.WebViewFeature.MULTI_PROFILE)) {
-                        androidx.webkit.ProfileStore.getInstance().deleteProfile("jb-${profile.id}")
-                    }
-                } catch (_: Exception) {}
-                android.widget.Toast.makeText(requireContext(), "Browsing data cleared", android.widget.Toast.LENGTH_SHORT).show()
-            }
-            .setNegativeButton("Cancel", null)
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.profiles_clear_data)
+            .setMessage(getString(R.string.profiles_clear_data_body, profile.displayName()))
+            .setPositiveButton(R.string.action_clear) { _, _ -> clearData(profile) }
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
+    }
+
+    private fun clearData(profile: Profile) {
+        val app = requireContext().applicationContext
+        Async.bg {
+            runCatching {
+                ProfileStorage.erase(app, profile.id)
+                ProfileStorage.ensure(app, profile.id)
+            }
+            ProfileRepository.clearHistory(app, profile.id)
+            Async.toast(app, getString(R.string.browser_cleared))
+            refresh()
+        }
     }
 
     private fun confirmDelete(profile: Profile) {
-        val keep = Prefs.trashEnabled(requireContext())
-        AlertDialog.Builder(requireContext())
-            .setTitle("Delete “${profile.name}”?")
-            .setMessage(if (keep) "The profile will be kept in the trash (Settings → Empty trash to discard). History is removed." else "This permanently deletes the profile and its history.")
-            .setPositiveButton("Delete") { _, _ ->
-                Database.get(requireContext()).deleteProfile(profile, keep)
-                AppEvents.emitProfilesChanged(requireContext())
-                refresh()
+        val keepTrash = Prefs.trashEnabled(requireContext())
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(getString(R.string.profiles_delete_title, profile.displayName()))
+            .setMessage(
+                getString(
+                    if (keepTrash) R.string.profiles_delete_body_trash else R.string.profiles_delete_body_forever
+                )
+            )
+            .setPositiveButton(R.string.action_delete) { _, _ ->
+                ProfileRepository.deleteProfile(requireContext(), profile, keepTrash) {
+                    AppEvents.emitDataChanged(requireContext().applicationContext, "profile-deleted")
+                    if (_binding != null) refresh()
+                }
             }
-            .setNegativeButton("Cancel", null)
+            .setNegativeButton(R.string.action_cancel, null)
             .show()
     }
 
+    // ----------------------------------------------------------------- refresh
+
     override fun refresh() {
-        if (_binding == null) return
-        val profiles = Database.get(requireContext()).getAllProfiles()
-        rebuildGroupChips(profiles)
-        applyFilters()
-    }
-
-    private fun rebuildGroupChips(profiles: List<Profile>) {
-        val groupChips = binding.groupChips
-        val previous = selectedGroup
-        groupChips.removeAllViews()
-
-        fun chip(label: String, value: String?) {
-            groupChips.addView(Chip(requireContext()).apply {
-                text = label
-                isCheckable = true
-                isChecked = (value == previous) || (value == null && previous == null)
-                setOnClickListener { selectedGroup = value; applyFilters() }
-            })
-        }
-        chip("All", null)
-        val groups = profiles.map { it.groupOrUngrouped() }.distinct().sorted()
-        groups.forEach { g -> chip(g, g) }
-        // Ensure at least one chip is checked visually.
-        if (groupChips.checkedChipId == View.NO_ID && groupChips.childCount > 0) {
-            (groupChips.getChildAt(0) as? Chip)?.isChecked = true
+        if (_binding == null || !isAdded) return
+        val app = requireContext().applicationContext
+        ProfileRepository.profiles(app) { profiles ->
+            if (_binding == null) return@profiles
+            allProfiles = profiles
+            rebuildGroupChips()
+            applyFilters()
         }
     }
+
+    private fun rebuildGroupChips() {
+        val group = binding.groupChips
+        group.removeAllViews()
+
+        val groups = allProfiles.map { it.groupOrUngrouped() }.distinct().sorted()
+        if (selectedGroup != null && groups.none { it == selectedGroup }) selectedGroup = null
+
+        group.addView(
+            filterChip(getString(R.string.profiles_filter_all), selectedGroup == null) {
+                selectedGroup = null
+                rebuildGroupChips()
+                applyFilters()
+            }
+        )
+        groups.forEach { name ->
+            group.addView(
+                filterChip(name, selectedGroup == name) {
+                    selectedGroup = name
+                    rebuildGroupChips()
+                    applyFilters()
+                }
+            )
+        }
+    }
+
+    private fun filterChip(label: String, checked: Boolean, onSelect: () -> Unit): Chip =
+        Chip(requireContext()).apply {
+            text = label
+            isCheckable = true
+            isChecked = checked
+            setOnClickListener { onSelect() }
+        }
 
     private fun applyFilters() {
-        val db = Database.get(requireContext())
-        var profiles = db.getAllProfiles()
-        val q = query.lowercase()
-        if (q.isNotEmpty()) {
-            profiles = profiles.filter { p ->
-                listOf(p.name, p.tags, p.group, p.status, p.fp.os, p.browserKind, p.notes)
-                    .any { it.lowercase().contains(q) }
+        if (_binding == null) return
+        val needle = query.lowercase()
+        var filtered = allProfiles
+
+        if (needle.isNotEmpty()) {
+            filtered = filtered.filter { profile ->
+                listOf(
+                    profile.name, profile.tags, profile.group, profile.status,
+                    profile.fp.os, profile.engine.title, profile.notes
+                ).any { it.lowercase().contains(needle) }
             }
         }
-        selectedGroup?.let { g -> profiles = profiles.filter { it.groupOrUngrouped() == g } }
-
-        profiles = when (Prefs.profileSort(requireContext())) {
-            1 -> profiles.sortedBy { it.name.lowercase() }
-            2 -> profiles.sortedByDescending { it.created }
-            3 -> profiles.sortedBy { it.fp.os }
-            4 -> profiles.sortedBy { it.groupOrUngrouped() }
-            else -> profiles.sortedByDescending { maxOf(it.lastOpened, it.created) }
+        selectedGroup?.let { groupName ->
+            filtered = filtered.filter { it.groupOrUngrouped() == groupName }
         }
 
-        adapter.submit(profiles)
-        val total = Database.get(requireContext()).countProfiles()
-        binding.profilesCount.text = if (selectedGroup != null || q.isNotEmpty())
-            "${profiles.size} of $total profiles" else "$total profiles"
-        val empty = profiles.isEmpty()
-        binding.emptyState.visibility = if (empty && q.isEmpty() && selectedGroup == null) View.VISIBLE else View.GONE
+        filtered = when (Prefs.profileSort(requireContext())) {
+            1 -> filtered.sortedBy { it.name.lowercase() }
+            2 -> filtered.sortedByDescending { it.created }
+            3 -> filtered.sortedBy { it.fp.os }
+            4 -> filtered.sortedBy { it.groupOrUngrouped().lowercase() }
+            else -> filtered.sortedByDescending { maxOf(it.lastOpened, it.created) }
+        }
+
+        adapter.submit(filtered)
+
+        val filtering = needle.isNotEmpty() || selectedGroup != null
+        binding.profilesCount.text = if (filtering) {
+            getString(R.string.profiles_count_filtered, filtered.size, allProfiles.size)
+        } else {
+            getString(R.string.profiles_count, filtered.size)
+        }
+
+        val empty = filtered.isEmpty()
+        binding.emptyState.visibility = if (empty) View.VISIBLE else View.GONE
         binding.profileList.visibility = if (empty) View.INVISIBLE else View.VISIBLE
-        binding.fabNewProfile.visibility = if (empty && q.isEmpty() && selectedGroup == null) View.GONE else View.VISIBLE
+        binding.fabNewProfile.visibility = if (empty) View.GONE else View.VISIBLE
+
+        // Distinguish "no profiles at all" from "nothing matched the filter".
+        if (empty) {
+            binding.emptyTitle.setText(
+                if (filtering) R.string.profiles_no_match_title else R.string.profiles_empty_title
+            )
+            binding.emptyBody.setText(
+                if (filtering) R.string.profiles_no_match_body else R.string.profiles_empty_body
+            )
+            binding.emptyCreate.visibility = if (filtering) View.GONE else View.VISIBLE
+        }
     }
 
     override fun onDestroyView() {
-        super.onDestroyView()
+        binding.profileList.adapter = null
         _binding = null
+        super.onDestroyView()
     }
 
-    class ProfileAdapter(
+    // ----------------------------------------------------------------- adapter
+
+    private class ProfileAdapter(
         private val onLaunch: (Profile) -> Unit,
-        private val onMenu: (Profile, View) -> Unit
+        private val onEdit: (Profile) -> Unit,
+        private val onMenu: (Profile, View) -> Unit,
+        private val onDelete: (Profile) -> Unit
     ) : RecyclerView.Adapter<ProfileAdapter.Holder>() {
 
         private var items: List<Profile> = emptyList()
@@ -217,49 +309,87 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
             notifyDataSetChanged()
         }
 
-        override fun getItemCount() = items.size
+        override fun getItemCount(): Int = items.size
 
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): Holder =
             Holder(ItemProfileCardBinding.inflate(LayoutInflater.from(parent.context), parent, false))
 
         override fun onBindViewHolder(holder: Holder, position: Int) = holder.bind(items[position])
 
-        inner class Holder(private val binding: ItemProfileCardBinding) : RecyclerView.ViewHolder(binding.root) {
-            fun bind(p: Profile) {
-                val ctx = binding.root.context
-                binding.profileAvatar.text = p.initials()
-                binding.profileAvatar.background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(UiKit.avatarColor(p.id))
-                }
-                binding.profileName.text = p.name.ifBlank { "Untitled profile" }
-                if (p.status.isNotBlank()) {
-                    binding.profileStatus.visibility = View.VISIBLE
-                    binding.profileStatus.text = p.status
+        inner class Holder(private val view: ItemProfileCardBinding) :
+            RecyclerView.ViewHolder(view.root) {
+
+            fun bind(profile: Profile) {
+                val context = view.root.context
+
+                view.profileAvatar.text = profile.initials()
+                view.profileAvatar.background = UiKit.avatarBackground(profile.id)
+                view.profileName.text = profile.displayName()
+
+                if (profile.status.isBlank()) {
+                    view.profileStatus.visibility = View.GONE
                 } else {
-                    binding.profileStatus.visibility = View.GONE
+                    view.profileStatus.visibility = View.VISIBLE
+                    view.profileStatus.text = profile.status
                 }
-                binding.profileOsIcon.setImageResource(UiKit.osIconRes(p.fp.os))
-                val engine = p.browserKind.replaceFirstChar { it.uppercase() }
-                binding.profileMeta.text = "${p.fp.os} · $engine ${p.fp.browserVersion.substringBefore('.')}"
-                binding.proxyText.text = when {
-                    p.proxy.enabled -> "${p.proxy.label()} · ${p.proxy.host}:${p.proxy.port}"
-                    else -> "Direct connection"
+
+                view.profileOsIcon.setImageResource(UiKit.osIconRes(profile.fp.os))
+
+                val engine = profile.engine
+                view.profileMeta.text = listOf(
+                    profile.fp.os,
+                    engine.title,
+                    "v" + profile.browserVersion.substringBefore('.')
+                ).joinToString(" · ")
+
+                view.profileOpened.text = if (profile.openCount > 0) profile.lastOpenedText() else ""
+
+                // Proxy state line: the dot is the semantic signal, the text names the endpoint.
+                val proxy = profile.proxy
+                view.proxyDot.setBackgroundResource(
+                    when {
+                        !proxy.enabled -> R.drawable.bg_dot
+                        proxy.online -> R.drawable.bg_dot_good
+                        proxy.checked -> R.drawable.bg_dot_bad
+                        else -> R.drawable.bg_dot_warn
+                    }
+                )
+                view.proxyText.text = when {
+                    !proxy.enabled -> context.getString(R.string.direct)
+                    proxy.online -> proxy.label() + " · " + proxy.authority()
+                    proxy.checked -> proxy.label() + " · " + context.getString(R.string.proxies_failed)
+                    else -> proxy.label() + " · " + context.getString(R.string.proxies_never_checked)
                 }
-                binding.proxyDot.background = GradientDrawable().apply {
-                    shape = GradientDrawable.OVAL
-                    setColor(
-                        when {
-                            !p.proxy.enabled -> ContextCompat.getColor(ctx, R.color.text_faint)
-                            p.proxy.lastIp.isNotBlank() -> ContextCompat.getColor(ctx, R.color.success)
-                            else -> ContextCompat.getColor(ctx, R.color.warning)
-                        }
-                    )
-                }
-                binding.lastOpened.text = p.lastOpenedText()
-                binding.root.setOnClickListener { onLaunch(p) }
-                binding.profileMore.setOnClickListener { onMenu(p, it) }
+                view.proxyLatency.text = if (proxy.online) UiKit.formatLatency(proxy.latencyMs) else ""
+                view.proxyLatency.setTextColor(
+                    ContextCompat.getColor(context, if (proxy.online) R.color.success else R.color.text_muted)
+                )
+
+                // Fresh-session marker doubles as the "cleared on close" badge.
+                view.profileBadge.visibility = if (profile.freshSession) View.VISIBLE else View.GONE
+                view.profileBadge.imageTintList = ColorStateList.valueOf(
+                    ContextCompat.getColor(context, R.color.accent)
+                )
+
+                view.profileLaunch.setOnClickListener { onLaunch(profile) }
+                view.profileEdit.setOnClickListener { onEdit(profile) }
+                view.profileMore.setOnClickListener { onMenu(profile, it) }
+                view.profileDelete.setOnClickListener { onDelete(profile) }
+                view.root.setOnClickListener { onLaunch(profile) }
             }
         }
+    }
+
+    companion object {
+        private val TRACKED_ACTIONS = listOf(
+            AppEvents.ACTION_DATA_CHANGED,
+            AppEvents.ACTION_PROXY_STATE,
+            AppEvents.ACTION_MONITOR_ALERT
+        )
+
+        private const val ACTION_EDIT = 101
+        private const val ACTION_DUPLICATE = 102
+        private const val ACTION_CLEAR = 103
+        private const val ACTION_DELETE = 104
     }
 }

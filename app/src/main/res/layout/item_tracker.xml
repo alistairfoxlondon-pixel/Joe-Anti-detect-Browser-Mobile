@@ -1,35 +1,41 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  One requested host inside the tracker sheet: status dot, host (weight=1), request count.
+  The host is middle-ellipsized because CDN hostnames differ at both ends and the count is
+  what matters most.
+-->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
-    android:orientation="horizontal"
     android:gravity="center_vertical"
-    android:paddingTop="8dp"
-    android:paddingBottom="8dp">
+    android:minHeight="40dp"
+    android:orientation="horizontal"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
 
     <View
         android:id="@+id/trackerDot"
-        android:layout_width="8dp"
-        android:layout_height="8dp"
+        android:layout_width="@dimen/dot_size"
+        android:layout_height="@dimen/dot_size"
         android:background="@drawable/bg_dot" />
 
     <TextView
         android:id="@+id/trackerHost"
+        style="@style/Text.Jb.BodyMedium"
         android:layout_width="0dp"
-        android:layout_weight="1"
+        android:layout_height="wrap_content"
         android:layout_marginStart="10dp"
-        android:text="example.com"
-        android:textSize="13sp"
-        android:singleLine="true"
+        android:layout_weight="1"
         android:ellipsize="middle"
-        android:textColor="@color/text" />
+        android:maxLines="1" />
 
     <TextView
         android:id="@+id/trackerCount"
+        style="@style/Text.Jb.Label"
         android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
         android:layout_marginStart="8dp"
-        android:text="×3"
-        android:textSize="12sp"
-        android:textStyle="bold"
-        android:textColor="@color/text_faint" />
+        android:ellipsize="end"
+        android:maxLines="1"
+        android:textColor="@color/text_muted" />
 </LinearLayout>

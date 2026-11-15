@@ -31,6 +31,26 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Verify fingerprint layer
+        shell: bash
+        run: node tools/verify-fingerprint.js
+
+      - name: Verify proxy relay
+        shell: bash
+        run: node tools/test-relay.js
+
+      - name: Verify tracker classifier
+        shell: bash
+        run: node tools/test-trackers.js
+
+      - name: Verify human typing engine
+        shell: bash
+        run: node tools/test-human-paste.js
+
+      - name: Verify user-agent matrix
+        shell: bash
+        run: node tools/test-user-agent.js
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
