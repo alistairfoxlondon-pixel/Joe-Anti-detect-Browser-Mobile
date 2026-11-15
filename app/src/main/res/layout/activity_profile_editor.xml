@@ -218,7 +218,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:hint="@string/editor_start_url">
+                    android:hint="@string/tools_start_url">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editorStartUrl"
@@ -791,7 +791,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:maxLines="2"
-                        android:text="@string/editor_proxy_idle" />
+                        android:text="@string/not_checked" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -1111,7 +1111,7 @@
                     style="@style/Widget.Jb.Button.Outlined"
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/button_height"
-                    android:text="@string/profiles_clear_data" />
+                    android:text="@string/browser_clear_data" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>

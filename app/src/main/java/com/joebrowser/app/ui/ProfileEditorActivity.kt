@@ -234,7 +234,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         configureSwitch(binding.rowMedia, R.string.editor_media_noise) { profile.fp.mediaNoise = it }
         configureSwitch(binding.rowDnt, R.string.editor_dnt) { profile.fp.doNotTrack = it }
         configureSwitch(binding.rowBattery, R.string.editor_battery) { profile.fp.spoofBattery = it }
-        configureSwitch(binding.rowUnlock, R.string.editor_unlock) { profile.tools.unlockSelection = it }
+        configureSwitch(binding.rowUnlock, R.string.tools_unlock) { profile.tools.unlockSelection = it }
         configureSwitch(binding.rowFresh, R.string.editor_fresh, R.string.editor_fresh_hint) {
             profile.freshSession = it
         }
@@ -354,7 +354,7 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.editorPasteSpeed.setText(HumanPaste.speedById(profile.tools.humanPasteSpeed).label, false)
             binding.watchIntervalValue.text =
                 getString(R.string.editor_interval_value, intervalLabel(profile.tools.proxyWatchIntervalSec))
-            binding.proxyStatus.setText(R.string.editor_proxy_idle)
+            binding.proxyStatus.setText(R.string.not_checked)
 
             populateIdentityFields()
         } finally {
@@ -604,11 +604,11 @@ class ProfileEditorActivity : AppCompatActivity() {
     }
 
     private fun describeProxyState(config: ProxyConfig): String = when {
-        !config.enabled -> getString(R.string.editor_proxy_idle)
+        !config.enabled -> getString(R.string.not_checked)
         config.online -> config.lastIp + " · " + config.latencyMs + " ms" +
             if (config.lastCountryCode.isNotBlank()) " · " + config.lastCountry else ""
         config.checked -> config.lastError.ifBlank { getString(R.string.proxies_failed) }
-        else -> getString(R.string.editor_proxy_idle)
+        else -> getString(R.string.not_checked)
     }
 
     private fun updateGeoVisibility() {
@@ -715,7 +715,7 @@ class ProfileEditorActivity : AppCompatActivity() {
             val labels = saved.map { item ->
                 val config = item.config
                 val state = if (config.online) config.latencyMs.toString() + " ms"
-                else getString(R.string.proxies_untested)
+                else getString(R.string.not_checked)
                 item.displayName() + "\n" + config.type.uppercase() + " " + config.authority() + " · " + state
             }.toTypedArray()
 
@@ -759,8 +759,8 @@ class ProfileEditorActivity : AppCompatActivity() {
 
     private fun confirmClearData() {
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.profiles_clear_data)
-            .setMessage(getString(R.string.profiles_clear_data_body, profile.displayName()))
+            .setTitle(R.string.browser_clear_data)
+            .setMessage(getString(R.string.browser_clear_data_body, profile.displayName()))
             .setPositiveButton(R.string.action_clear) { _, _ ->
                 val app = applicationContext
                 val id = profile.id
@@ -854,7 +854,7 @@ class ProfileEditorActivity : AppCompatActivity() {
             // They also refresh on resume; this makes the change visible immediately for the
             // "save and open" path, which leaves the editor on screen over the list.
             AppEvents.emitDataChanged(app, "profile-saved")
-            Async.toast(this, getString(if (wasNew) R.string.editor_created else R.string.editor_saved))
+            Async.toast(this, getString(if (wasNew) R.string.editor_created else R.string.status_saved))
             if (thenLaunch) {
                 BrowserActivity.launch(this, saved.id)
                 finish()

@@ -39,20 +39,9 @@
             android:padding="18dp">
 
             <TextView
-                android:id="@+id/heroGreeting"
-                style="@style/Text.Jb.Overline"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:ellipsize="end"
-                android:maxLines="1"
-                android:text="@string/home_hero_over"
-                android:textColor="@color/hero_text_dim" />
-
-            <TextView
                 android:id="@+id/heroHeadline"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="6dp"
                 android:ellipsize="end"
                 android:maxLines="2"
                 android:text="@string/home_hero_idle"
@@ -105,6 +94,21 @@
                     android:textColor="@color/hero_text_dim"
                     android:textSize="12sp" />
             </LinearLayout>
+
+            <!-- Verify: the five detectors users actually check, one tap from the dashboard. -->
+            <View
+                android:layout_width="match_parent"
+                android:layout_height="1dp"
+                android:layout_marginTop="14dp"
+                android:background="@color/hero_line" />
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/verifyChips"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                app:chipSpacingHorizontal="8dp"
+                app:chipSpacingVertical="8dp" />
         </LinearLayout>
 
         <!-- =========================================================== metrics -->
@@ -166,7 +170,7 @@
                 android:layout_height="@dimen/button_height"
                 android:layout_marginEnd="5dp"
                 android:layout_weight="1"
-                android:text="@string/home_new_profile"
+                android:text="@string/profiles_new"
                 app:icon="@drawable/ic_plus" />
 
             <com.google.android.material.button.MaterialButton
@@ -213,7 +217,7 @@
                     android:clickable="true"
                     android:focusable="true"
                     android:padding="18dp"
-                    android:text="@string/home_empty_recent" />
+                    android:text="@string/profiles_empty_title" />
             </LinearLayout>
         </LinearLayout>
 
@@ -245,23 +249,5 @@
                 android:text="@string/home_empty_alerts" />
         </LinearLayout>
 
-        <!-- ============================================================ verify -->
-        <LinearLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/gap_m"
-            android:orientation="vertical">
-
-            <include
-                android:id="@+id/verifyHeader"
-                layout="@layout/item_section_header" />
-
-            <com.google.android.material.chip.ChipGroup
-                android:id="@+id/verifyChips"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                app:chipSpacingHorizontal="8dp"
-                app:chipSpacingVertical="8dp" />
-        </LinearLayout>
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

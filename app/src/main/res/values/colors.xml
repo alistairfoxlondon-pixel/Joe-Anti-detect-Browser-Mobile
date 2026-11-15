@@ -51,6 +51,7 @@
     <color name="brand_ivory">#F4F7F5</color>
     <color name="hero_text">#FFFFFF</color>
     <color name="hero_text_dim">#A8D8BE</color>
+    <color name="hero_line">#2A6B50</color>
     <color name="brand_scrim">#0C7A521F</color>
 
     <!-- Legacy aliases kept so old references resolve; new code uses the names above. -->

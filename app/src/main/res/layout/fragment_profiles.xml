@@ -85,17 +85,13 @@
                 android:contentDescription="@string/profiles_bulk_new"
                 android:src="@drawable/ic_layers" />
 
-            <ImageButton
+            <ImageView
                 android:id="@+id/sortProfiles"
-                android:layout_width="@dimen/touch_target"
-                android:layout_height="@dimen/touch_target"
+                style="@style/Widget.Jb.IconButton"
                 android:layout_gravity="center_vertical"
-                android:layout_marginStart="6dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_marginStart="2dp"
                 android:contentDescription="@string/profiles_sort"
-                android:padding="13dp"
-                android:src="@drawable/ic_sort"
-                app:tint="@color/text_dim" />
+                android:src="@drawable/ic_sort" />
         </LinearLayout>
 
         <!-- Group filter -->

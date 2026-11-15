@@ -152,7 +152,7 @@ class BrowserActivity : AppCompatActivity() {
             // Missing WebView provider or unusable identity: flag the dot, never crash.
             binding.browserKernelDot.visibility = View.VISIBLE
             binding.browserKernelDot.setBackgroundResource(R.drawable.bg_dot_warn)
-            binding.browserKernelDot.contentDescription = getString(R.string.browser_kernel_shared)
+            binding.browserKernelDot.contentDescription = getString(R.string.home_kernel_shared)
         }
 
         // Chrome is wired before the WebView exists so the error state is still navigable
@@ -322,7 +322,7 @@ class BrowserActivity : AppCompatActivity() {
             if (isolated) R.drawable.bg_dot_good else R.drawable.bg_dot_warn
         )
         binding.browserKernelDot.contentDescription =
-            getString(if (isolated) R.string.browser_kernel_ok else R.string.browser_kernel_shared)
+            getString(if (isolated) R.string.browser_kernel_ok else R.string.home_kernel_shared)
         if (!isolated) {
             Async.toast(this, getString(R.string.browser_kernel_shared_toast))
         } else if (status.warning != null && status.injection == BrowserKernel.InjectionMode.EARLY_FALLBACK) {

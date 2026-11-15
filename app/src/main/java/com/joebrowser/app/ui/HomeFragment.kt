@@ -73,10 +73,10 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
         binding.alertsHeader.sectionAction.setText(R.string.action_see_all)
         binding.alertsHeader.sectionAction.setOnClickListener { main?.setSelectedTab(R.id.nav_proxies) }
 
-        binding.verifyHeader.sectionTitle.setText(R.string.home_section_checks)
+        // Verify chips live inside the hero card; no separate section header to keep in sync.
 
         // Metric captions never change; setting them once keeps refresh() cheap.
-        binding.statProfiles.statCaption.setText(R.string.home_metric_profiles)
+        binding.statProfiles.statCaption.setText(R.string.nav_profiles)
         binding.statProfiles.statIcon.setImageResource(R.drawable.ic_nav_profiles)
         binding.statProxies.statCaption.setText(R.string.home_metric_proxies)
         binding.statProxies.statIcon.setImageResource(R.drawable.ic_nav_proxies)
@@ -197,9 +197,6 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
             }
         }
         target.heroHeadline.text = text
-        target.heroGreeting.setText(
-            if (profiles.isEmpty()) R.string.home_hero_over else R.string.home_hero_last
-        )
     }
 
     private fun bindProxyMetric(target: FragmentHomeBinding, proxies: List<SavedProxy>) {

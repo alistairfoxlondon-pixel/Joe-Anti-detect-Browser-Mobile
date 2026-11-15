@@ -139,7 +139,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         // Proxy options: Direct + every saved proxy, loaded off the main thread.
         var proxyIndex = 0
         val proxyIds = mutableListOf<String?>(null)
-        val proxyLabels = mutableListOf(getString(R.string.bulk_proxy_none))
+        val proxyLabels = mutableListOf(getString(R.string.direct))
         sheet.bulkProxy.setText(proxyLabels.first(), false)
         UiKit.bindDropdown(sheet.bulkProxy, proxyLabels.toList()) { proxyIndex = it }
         ProfileRepository.proxies(requireContext()) { proxies ->
@@ -196,7 +196,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         popup.menu.add(0, ACTION_NEW_FINGERPRINT, 3, getString(R.string.profiles_new_fingerprint))
         popup.menu.add(0, ACTION_DUPLICATE, 4, getString(R.string.action_duplicate))
         popup.menu.add(0, ACTION_SELECT, 5, getString(R.string.profiles_batch_select))
-        popup.menu.add(0, ACTION_CLEAR, 6, getString(R.string.profiles_clear_data))
+        popup.menu.add(0, ACTION_CLEAR, 6, getString(R.string.browser_clear_data))
         popup.menu.add(0, ACTION_DELETE, 7, getString(R.string.action_delete))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
@@ -393,8 +393,8 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
     private fun confirmClearData(profile: Profile) {
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.profiles_clear_data)
-            .setMessage(getString(R.string.profiles_clear_data_body, profile.displayName()))
+            .setTitle(R.string.browser_clear_data)
+            .setMessage(getString(R.string.browser_clear_data_body, profile.displayName()))
             .setPositiveButton(R.string.action_clear) { _, _ -> clearData(profile) }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
@@ -611,7 +611,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                     !proxy.enabled -> context.getString(R.string.direct)
                     proxy.online -> proxy.label() + " · " + proxy.authority()
                     proxy.checked -> proxy.label() + " · " + context.getString(R.string.proxies_failed)
-                    else -> proxy.label() + " · " + context.getString(R.string.proxies_never_checked)
+                    else -> proxy.label() + " · " + context.getString(R.string.not_checked)
                 }
                 view.proxyLatency.text = if (proxy.online) UiKit.formatLatency(proxy.latencyMs) else ""
                 view.proxyLatency.setTextColor(

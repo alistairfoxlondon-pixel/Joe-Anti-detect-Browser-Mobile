@@ -67,7 +67,7 @@
                     android:layout_height="wrap_content"
                     android:ellipsize="end"
                     android:maxLines="1"
-                    android:text="@string/proxies_device_idle"
+                    android:text="@string/not_checked"
                     android:textAppearance="@style/Text.Jb.Caption" />
             </LinearLayout>
 

@@ -118,7 +118,7 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
                     if (result.countryCode.isNotBlank()) append(" · ").append(result.country)
                     if (result.latencyMs >= 0) append(" · ").append(result.latencyMs).append(" ms")
                 }
-                else -> result.error.ifBlank { getString(R.string.proxies_device_idle) }
+                else -> result.error.ifBlank { getString(R.string.not_checked) }
             }
         }
     }
@@ -400,7 +400,7 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
                         append(" · ").append(config.latencyMs).append(" ms")
                     }
                     config.checked -> config.lastError.ifBlank { context.getString(R.string.proxies_failed) }
-                    else -> context.getString(R.string.proxies_never_checked)
+                    else -> context.getString(R.string.not_checked)
                 }
                 view.proxyDetail.setTextColor(
                     ContextCompat.getColor(
