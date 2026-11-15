@@ -70,8 +70,10 @@ Google Maven + Maven Central.
 The fingerprint layer can be checked without Android at all:
 
 ```bash
-node tools/verify-fingerprint.js   # fingerprint layer, 30 assertions
+node tools/verify-fingerprint.js   # fingerprint layer
 node tools/test-relay.js           # proxy relay over real sockets
+node tools/test-trackers.js        # tracker blocklist + host parsing
+node tools/test-human-paste.js     # typing engine against a DOM mock
 ```
 
 Both run in CI before Gradle, so a regression fails the build rather than the APK.
@@ -106,6 +108,12 @@ Being straight about what was and wasn't tested:
   Blink-shaped mock (values as prototype getters, `webdriver` as an own property) and asserts
   the resulting `navigator`, `screen`, timezone and canvas output, plus that two profiles never
   collide.
+- ✅ **Human-typing engine executed** — `node tools/test-human-paste.js` runs the real injected
+  script against a DOM mock: caret insertion, selection replacement, keydown/input/keyup per
+  character, real timers, the busy guard, `no-target`, and newline handling in inputs vs textareas.
+- ✅ **Tracker classifier executed** — `node tools/test-trackers.js` reads the blocklist out of
+  `TrackerMonitor.kt` and checks both directions (12 tracker hosts flagged, 11 non-trackers left
+  alone, including the `notdoubleclick.net` lookalike).
 - ✅ **Proxy relay exercised end to end** — `node tools/test-relay.js` runs a faithful port of
   `LocalProxyRelay` against real loopback sockets: plain HTTP must reach the proxy in absolute
   form with credentials, CONNECT tunnels must deliver a 512 KB body byte-exact, bad credentials

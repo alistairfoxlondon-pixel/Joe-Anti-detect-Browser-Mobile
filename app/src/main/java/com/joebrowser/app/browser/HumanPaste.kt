@@ -274,15 +274,27 @@ object HumanPaste {
     return true;
   }
 
+  /*
+   * Single-line controls cannot hold a newline: a browser turns Enter there into a form
+   * submit, and inserting '\n' leaves a value the control itself would never produce. The
+   * progressive path folds newlines to spaces; the instant path has to do the same, or a
+   * pasted multi-line address ends up as one unreadable value with invisible breaks in it.
+   */
+  function instantText() {
+    if (el.isContentEditable || el.tagName === 'TEXTAREA') return CFG.text;
+    return CFG.text.replace(/\r?\n/g, ' ');
+  }
+
   if (CFG.instant || !CFG.text.length) {
+    var payload = instantText();
     if (el.isContentEditable) {
-      try { document.execCommand('insertText', false, CFG.text); } catch (e) {}
+      try { document.execCommand('insertText', false, payload); } catch (e) {}
     } else {
       var base = el.value != null ? el.value : '';
       var s = el.selectionStart != null ? el.selectionStart : base.length;
       var e = el.selectionEnd != null ? el.selectionEnd : base.length;
-      setNativeValue(el, base.slice(0, s) + CFG.text + base.slice(e));
-      try { el.selectionStart = el.selectionEnd = s + CFG.text.length; } catch (err) {}
+      setNativeValue(el, base.slice(0, s) + payload + base.slice(e));
+      try { el.selectionStart = el.selectionEnd = s + payload.length; } catch (err) {}
     }
     try { el.dispatchEvent(new Event('input', { bubbles: true })); } catch (e) {}
     try { el.dispatchEvent(new Event('change', { bubbles: true })); } catch (e) {}

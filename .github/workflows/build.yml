@@ -43,6 +43,10 @@ jobs:
         shell: bash
         run: node tools/test-trackers.js
 
+      - name: Verify human typing engine
+        shell: bash
+        run: node tools/test-human-paste.js
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
