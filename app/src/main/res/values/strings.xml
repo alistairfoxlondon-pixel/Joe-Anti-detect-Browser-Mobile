@@ -276,6 +276,7 @@
     <string name="browser_tracker_title">HTTP tracker</string>
     <string name="browser_tracker_empty">No requests recorded yet</string>
     <string name="browser_tracker_summary">%1$d requests · %2$d trackers</string>
+    <string name="browser_tracker_badge">%1$d req · %2$d trk</string>
     <string name="browser_proxy_ok">Proxy %1$s · %2$d ms</string>
     <string name="browser_proxy_failed">Proxy unreachable — loading may fail</string>
     <string name="notify_enabled">Proxy alerts turned on</string>

@@ -165,9 +165,13 @@ class BrowserActivity : AppCompatActivity() {
         kernel?.install(web)
         HumanPaste.attachBridge(web) { message -> onPasteMessage(message) }
 
-        tracker = TrackerMonitor { _, trackers ->
-            // Counts feed the tracker sheet; the chip only nudges once, never per request.
-            if (trackers > 0 && ::binding.isInitialized) showTrackerHint()
+        // One click target for both jobs: the badge reports the live count while checking a
+        // relay, then shows the tracker line once requests arrive. It reuses the same corner of
+        // the chrome either way, and the count is visible without opening the sheet.
+        binding.browserProxyBadge.setOnClickListener { showTrackerSheet() }
+        binding.browserProxyBadge.isClickable = true
+        tracker = TrackerMonitor { total, trackers ->
+            if (::binding.isInitialized) updateTrackerBadge(total, trackers)
         }
 
         // Session bookkeeping happens at launch, not at exit: a window the user swipes away
@@ -333,10 +337,9 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun bindProxyResult(result: ProxyTestResult) {
         binding.browserProxyBadge.visibility = View.VISIBLE
-        // The badge is only actionable when the probe failed; a healthy badge must not look
-        // tappable, or a tap that does nothing reads as a broken control.
-        binding.browserProxyBadge.setOnClickListener(null)
-        binding.browserProxyBadge.isClickable = false
+        // Always tappable: the badge is the entry point to the tracker sheet, so it must never
+        // be left looking inert.
+        binding.browserProxyBadge.isClickable = true
         if (result.ok) {
             binding.browserProxyBadge.text =
                 getString(R.string.browser_proxy_ok, result.country.ifBlank { result.ip }, result.latencyMs)
@@ -675,10 +678,21 @@ class BrowserActivity : AppCompatActivity() {
 
     // ------------------------------------------------------------------ tracker
 
-    private fun showTrackerHint() {
-        // Non-blocking cue only; the sheet opens from the menu on demand.
-        if (binding.browserProxyBadge.visibility == View.VISIBLE) return
+    /**
+     * Turns the chrome badge into the live tracker readout.
+     *
+     * The badge previously only announced itself the first time a tracker appeared and never
+     * counted anything, while the summary it advertised lived behind a menu item — so the one
+     * number the feature exists to show was the one number kept off screen.
+     */
+    private fun updateTrackerBadge(total: Int, trackers: Int) {
+        if (total <= 0) return
         binding.browserProxyBadge.visibility = View.VISIBLE
+        binding.browserProxyBadge.text =
+            getString(R.string.browser_tracker_badge, total, trackers)
+        binding.browserProxyBadge.setTextColor(
+            ContextCompat.getColor(this, if (trackers > 0) R.color.warning else R.color.text_muted)
+        )
     }
 
     private fun showTrackerSheet() {

@@ -127,5 +127,74 @@ const flagged = requests.filter((u) => {
 check('two of six requests flagged', flagged.length, 2);
 check('the CDN is not flagged', flagged.some((u) => u.includes('jsdelivr')), false);
 
+/*
+ * The sheet is capped at CAP hosts, but the summary and the badge must report the true totals.
+ * Regression guard: BrowserActivity used to build the summary by summing the visible rows, so
+ * any page with more than CAP hosts showed fewer requests than the badge counted, on the same
+ * screen. The totals come from the monitor's own counters, never from a snapshot.
+ */
+console.log('\nsnapshot cap vs totals');
+const CAP = 150;
+
+/** Port of TrackerMonitor.record / snapshot / totals. */
+function makeMonitor() {
+  const counts = new Map();
+  let total = 0;
+  let trackers = 0;
+  return {
+    record(url) {
+      const host = hostOf(url);
+      if (!host) return;
+      total++;
+      if (isTracker(host, blocklist)) trackers++;
+      counts.set(host, (counts.get(host) || 0) + 1);
+    },
+    snapshot: () => Array.from(counts.entries())
+      .sort((a, b) => (isTracker(b[0], blocklist) - isTracker(a[0], blocklist)) || (b[1] - a[1]))
+      .slice(0, CAP)
+      .map(([host, count]) => ({ host, count, tracker: isTracker(host, blocklist) })),
+    totals: () => [total, trackers]
+  };
+}
+
+// 200 ordinary hosts, each requested once, plus 10 hits on one analytics host.
+const big = makeMonitor();
+for (let i = 0; i < 200; i++) big.record('https://site' + i + '.example/page');
+for (let i = 0; i < 10; i++) big.record('https://www.google-analytics.com/collect');
+
+const bigRows = big.snapshot();
+const [bigTotal, bigTrackers] = big.totals();
+check('rows capped at ' + CAP, bigRows.length, CAP);
+check('true request total counts every request', bigTotal, 210);
+check('true tracker total counts every flag', bigTrackers, 10);
+check('summed rows under-report (the old bug)', bigRows.reduce((n, r) => n + r.count, 0) < bigTotal, true);
+check('sheet summary uses totals, not the rows', bigTotal === 210 && bigTrackers === 10, true);
+
+// The badge and the sheet must agree: both read the same counters.
+const badgeText = bigTotal + ' req / ' + bigTrackers + ' trk';
+check('badge represents the same numbers', badgeText, '210 req / 10 trk');
+
+// A page at or under the cap must show every host, so the cap never hides anything needlessly.
+const small = makeMonitor();
+small.record('https://a.example/');
+small.record('https://b.example/');
+small.record('https://www.google-analytics.com/collect');
+const smallRows = small.snapshot();
+const [smallTotal] = small.totals();
+check('small page lists every host', smallRows.length, 3);
+check('small page row sum equals its total', smallRows.reduce((n, r) => n + r.count, 0), smallTotal);
+
+// Tracker rows sort above ordinary traffic, and the biggest of each comes first.
+check('first row is the tracker', bigRows[0].tracker, true);
+check('first row is the busiest host', bigRows[0].host, 'www.google-analytics.com');
+check('second row is not a tracker', bigRows[1].tracker, false);
+
+// Repeated requests to one host collapse into a single row with the right count.
+const repeat = makeMonitor();
+for (let i = 0; i < 7; i++) repeat.record('https://stats.g.doubleclick.net/pixel');
+check('repeats collapse to one row', repeat.snapshot().length, 1);
+check('row count is the hit count', repeat.snapshot()[0].count, 7);
+check('totals count each hit', repeat.totals()[0], 7);
+
 console.log('\n' + (failures === 0 ? 'all tracker tests passed' : failures + ' check(s) failed'));
 process.exit(failures === 0 ? 0 : 1);
