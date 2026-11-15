@@ -220,7 +220,9 @@ class ProfileEditorActivity : AppCompatActivity() {
         configureSwitch(binding.rowDnt, R.string.editor_dnt) { profile.fp.doNotTrack = it }
         configureSwitch(binding.rowBattery, R.string.editor_battery) { profile.fp.spoofBattery = it }
         configureSwitch(binding.rowUnlock, R.string.editor_unlock) { profile.tools.unlockSelection = it }
-        configureSwitch(binding.rowFresh, R.string.editor_fresh) { profile.freshSession = it }
+        configureSwitch(binding.rowFresh, R.string.editor_fresh, R.string.editor_fresh_hint) {
+            profile.freshSession = it
+        }
         configureSwitch(binding.rowHuman, R.string.editor_human_paste) { profile.tools.humanPaste = it }
         configureSwitch(binding.rowJitter, R.string.editor_human_jitter) { profile.tools.humanPasteJitter = it }
         configureSwitch(binding.rowWatch, R.string.editor_watch) {

@@ -847,6 +847,9 @@ class BrowserActivity : AppCompatActivity() {
         runCatching { kernel?.flushCookies() ?: CookieManager.getInstance().flush() }
         if (!loaded.freshSession) return
         Async.bg {
+            // Cookies, site data and cache only. History is deliberately not touched: the
+            // History screen has its own per-profile clear, and wiping it here meant a profile
+            // with 'clear data on close' never accumulated any history to look at.
             runCatching { kernel?.wipeData(web) }
             ProfileStorage.sessionDirs(app, loaded.id)
                 .forEach { dir -> runCatching { dir.deleteRecursively() } }
@@ -920,7 +923,9 @@ class BrowserActivity : AppCompatActivity() {
             updateNavButtons()
             val loaded = profile
             if (loaded != null && url != null && !url.startsWith("about:")) {
-                ProfileRepository.addHistory(this@BrowserActivity, loaded, url, view?.title.orEmpty())
+                ProfileRepository.addHistory(
+                    this@BrowserActivity, loaded, url, view?.title.orEmpty()
+                )
             }
             val query = binding.browserFindInput.text?.toString().orEmpty()
             if (binding.browserFindBar.visibility == View.VISIBLE && query.isNotBlank()) {

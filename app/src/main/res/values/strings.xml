@@ -129,6 +129,7 @@
     <string name="editor_webrtc">WebRTC</string>
     <string name="editor_geo">Geolocation</string>
     <string name="editor_fresh">Clear data on close</string>
+    <string name="editor_fresh_hint">Cookies, site data and cache are erased when the session ends. History is kept.</string>
     <string name="editor_unlock">Allow selection and copy</string>
     <string name="editor_watch">Watch this proxy</string>
     <string name="editor_watch_interval">Watch interval</string>
