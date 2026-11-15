@@ -691,10 +691,13 @@ class BrowserActivity : AppCompatActivity() {
         val sheetBinding = BottomSheetTrackerBinding.inflate(layoutInflater)
         val dialog = BottomSheetDialog(this, R.style.ThemeOverlay_Jb_BottomSheet)
         dialog.setContentView(sheetBinding.root)
+        // Use the monitor's own totals, not a sum over the visible rows: the list is capped at
+        // 150 hosts, so summing it under-reported every busy page and disagreed with the badge.
+        val (requestTotal, trackerTotal) = monitor.totals()
         sheetBinding.trackerSummary.text = getString(
             R.string.browser_tracker_summary,
-            entries.sumOf { it.count },
-            entries.count { it.tracker }
+            requestTotal,
+            trackerTotal
         )
         sheetBinding.trackerEmpty.visibility = View.GONE
         sheetBinding.trackerList.layoutManager = LinearLayoutManager(this)

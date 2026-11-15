@@ -54,18 +54,29 @@ class TrackerMonitor(private val onChange: (total: Int, trackers: Int) -> Unit) 
         scheduleNotify(force = true)
     }
 
-    /** Plain-text report for the clipboard. */
+    /**
+     * Plain-text report for the clipboard.
+     *
+     * Says so when the host list is truncated (the sheet shows at most 150 hosts), because a
+     * report that quietly drops rows reads as the complete picture.
+     */
     fun report(profileName: String): String = buildString {
         val (requests, flagged) = totals()
+        val rows = snapshot()
+        val hostTotal = synchronized(this@TrackerMonitor) { counts.size }
         appendLine("Joe Browser HTTP Tracker")
         appendLine("Profile: $profileName")
-        appendLine("Requests: $requests · Trackers: $flagged")
+        appendLine("Requests: $requests · Trackers: $flagged · Hosts: $hostTotal")
         appendLine()
-        snapshot().forEach {
+        rows.forEach {
             append(if (it.tracker) "[tracker] " else "[ok]      ")
             append(it.host)
             append("  ×")
             appendLine(it.count)
+        }
+        if (hostTotal > rows.size) {
+            appendLine()
+            appendLine("Showing the top " + rows.size + " of " + hostTotal + " hosts.")
         }
     }
 
