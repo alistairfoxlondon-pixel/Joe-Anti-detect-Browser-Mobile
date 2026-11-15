@@ -79,7 +79,15 @@ class ProxyMonitorService : Service() {
      * own interval has not elapsed) and re-arm. Any failure is swallowed so the timer survives
      * a bad network, a corrupt row or a database lock.
      */
-    private val cycleRunnable: Runnable = Runnable {
+    /**
+     * The tick. Declared as a function-backed Runnable so the re-arm can reference it without
+     * the "must be initialized" problem of a val referring to itself during construction.
+     */
+    private val cycleRunnable: Runnable = object : Runnable {
+        override fun run() = tick()
+    }
+
+    private fun tick() {
         var keepGoing = true
         try {
             val watched = ProxyMonitorEngine.watchedCount(this)
