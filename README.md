@@ -70,10 +70,11 @@ Google Maven + Maven Central.
 The fingerprint layer can be checked without Android at all:
 
 ```bash
-node tools/verify-fingerprint.js   # fingerprint layer
+node tools/verify-fingerprint.js   # fingerprint layer + identity coherence
 node tools/test-relay.js           # proxy relay over real sockets
 node tools/test-trackers.js        # tracker blocklist + host parsing
 node tools/test-human-paste.js     # typing engine against a DOM mock
+node tools/test-user-agent.js      # 98-identity user-agent matrix
 ```
 
 Both run in CI before Gradle, so a regression fails the build rather than the APK.
@@ -111,6 +112,10 @@ Being straight about what was and wasn't tested:
 - ✅ **Human-typing engine executed** — `node tools/test-human-paste.js` runs the real injected
   script against a DOM mock: caret insertion, selection replacement, keydown/input/keyup per
   character, real timers, the busy guard, `no-target`, and newline handling in inputs vs textareas.
+- ✅ **User-agent matrix executed** — `node tools/test-user-agent.js` builds 98 identities
+  (7 OSes × 5 engines × their builds) and checks for the tells that have actually shipped here:
+  no desktop Chromium build on an iOS identity, no Gecko token in a WebKit UA, no iOS token on a
+  Windows profile, and platform strings that match the UA (`Linux armv8l`, not the invented `armv81`).
 - ✅ **Tracker classifier executed** — `node tools/test-trackers.js` reads the blocklist out of
   `TrackerMonitor.kt` and checks both directions (12 tracker hosts flagged, 11 non-trackers left
   alone, including the `notdoubleclick.net` lookalike).
