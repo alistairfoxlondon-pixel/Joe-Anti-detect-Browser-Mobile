@@ -409,7 +409,7 @@ class BrowserActivity : AppCompatActivity() {
             }
         }
         runCatching {
-            val locale = android.os.Locale.forLanguageTag(fp.language)
+            val locale = java.util.Locale.forLanguageTag(fp.language)
             val list = android.os.LocaleList(locale)
             settings.javaClass.getMethod("setLocaleList", android.os.LocaleList::class.java)
                 .invoke(settings, list)

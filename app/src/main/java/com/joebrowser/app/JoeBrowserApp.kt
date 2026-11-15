@@ -62,9 +62,11 @@ class JoeBrowserApp : Application() {
                     buildString {
                         append("time=").append(stamp).append('\n')
                         append("thread=").append(thread.name).append(" (id=").append(thread.id).append(")\n")
-                        append("appVersion=").append(runCatching {
+                        append("appVersion=")
+                        .append(runCatching {
                             packageManager.getPackageInfo(packageName, 0).versionName
-                        }.getOrDefault("unknown")).append('\n\n')
+                        }.getOrDefault("unknown"))
+                        .append("\n\n")
                         append(android.util.Log.getStackTraceString(throwable))
                     }
                 )
