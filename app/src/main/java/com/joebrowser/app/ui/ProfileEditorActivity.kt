@@ -132,6 +132,9 @@ class ProfileEditorActivity : AppCompatActivity() {
         return fresh
     }
 
+    /** Labels offered by the Status picker; index 0 means "no explicit status" (Active). */
+    private var statusOptions: List<String> = emptyList()
+
     // -------------------------------------------------------------- dropdowns
 
     private fun setupDropdowns() {
@@ -140,6 +143,12 @@ class ProfileEditorActivity : AppCompatActivity() {
         }
         bindDropdown(binding.editorOs, OsCatalog.all) { position ->
             applyOs(OsCatalog.all[position])
+        }
+        // Status is a label, not a behaviour: it drives the chip on the profile card and search,
+        // so one picker is enough and "Active" is the sensible default for a new profile.
+        statusOptions = resources.getStringArray(R.array.editor_status_options).toList()
+        bindDropdown(binding.editorStatus, statusOptions) { position ->
+            profile.status = if (position == 0) "" else statusOptions[position]
         }
         bindDropdown(
             binding.editorDevicePreset,
@@ -306,6 +315,10 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.editorStartUrl.setText(profile.startUrl)
             binding.editorEngine.setText(profile.engine.title, false)
             binding.editorOs.setText(fp.os, false)
+            binding.editorStatus.setText(
+                profile.status.takeIf { it.isNotBlank() } ?: statusOptions.firstOrNull().orEmpty(),
+                false
+            )
 
             binding.editorCores.setText(fp.cores.toString(), false)
             binding.editorMemory.setText(fp.memory.toString() + " GB", false)

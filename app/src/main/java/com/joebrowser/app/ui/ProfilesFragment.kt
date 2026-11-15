@@ -589,6 +589,16 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 } else {
                     view.profileStatus.visibility = View.VISIBLE
                     view.profileStatus.text = statusChipText
+                    // A status nobody can see at a glance is decoration. Banned and paused
+                    // profiles are exactly the ones a user needs to spot while scrolling.
+                    val (bg, fg) = when (profile.status.lowercase()) {
+                        "banned" -> R.drawable.bg_chip_danger to R.color.danger
+                        "paused" -> R.drawable.bg_chip_warning to R.color.warning
+                        "warm-up" -> R.drawable.bg_chip to R.color.accent
+                        else -> R.drawable.bg_chip_neutral to R.color.text_dim
+                    }
+                    view.profileStatus.setBackgroundResource(bg)
+                    view.profileStatus.setTextColor(ContextCompat.getColor(view.root.context, fg))
                 }
 
                 view.profileOsIcon.setImageResource(UiKit.osIconRes(profile.fp.os))

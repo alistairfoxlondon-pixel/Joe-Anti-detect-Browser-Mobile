@@ -102,6 +102,13 @@
     <string name="editor_notes">Notes</string>
     <string name="editor_group">Group</string>
     <string name="editor_tags">Tags</string>
+    <string name="editor_status">Status</string>
+    <string-array name="editor_status_options">
+        <item>Active</item>
+        <item>Warm-up</item>
+        <item>Paused</item>
+        <item>Banned</item>
+    </string-array>
     <string name="editor_engine">Browser</string>
     <string name="editor_os">Operating system</string>
     <string name="editor_section_fingerprint">Fingerprint</string>

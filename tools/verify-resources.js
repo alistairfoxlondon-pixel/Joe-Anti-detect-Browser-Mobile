@@ -61,7 +61,10 @@ for (const file of resFiles) {
     // <plurals> also generates R.plurals.* entries with the same name.
     let m;
     while ((m = re.exec(text))) {
-      add(m[1], m[2], file);
+      // A `string-array` is `R.array.name`; `plurals` is `R.plurals.name`; everything else
+      // keeps its XML tag as the R type.
+      const rType = m[1] === 'string-array' ? 'array' : m[1];
+      add(rType, m[2], file);
     }
   } else {
     const type = typeDir.split('-')[0];
