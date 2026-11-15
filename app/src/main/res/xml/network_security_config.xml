@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Network security policy.
+
+  Base policy: cleartext traffic is denied everywhere. Every endpoint the app or the
+  fingerprinted WebView talks to for its own purposes (detector check sites, proxy
+  health checks, IP echo) is HTTPS, and pages loaded over plain HTTP would defeat the
+  point of an anti-detect browser anyway.
+
+  The only exception is the loopback interface, where the in-app proxy relay binds its
+  CONNECT socket. WebView never navigates to loopback URLs itself, but allowing cleartext
+  there keeps local device diagnostics usable without opening the policy for the LAN.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="false">127.0.0.1</domain>
+        <domain includeSubdomains="false">localhost</domain>
+    </domain-config>
+</network-security-config>

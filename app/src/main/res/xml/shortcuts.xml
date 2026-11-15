@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Long-press shortcuts on the launcher icon. Each maps to a joe:// route handled by
+     MainActivity (see handleDeepLink); nothing here costs a network round trip. -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="new_profile"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_new"
+        android:shortcutShortLabel="@string/shortcut_new_short"
+        android:shortcutLongLabel="@string/shortcut_new_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="joe://new"
+            android:targetPackage="${applicationId}"
+            android:targetClass="com.joebrowser.app.ui.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="profiles"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_profiles"
+        android:shortcutShortLabel="@string/shortcut_profiles_short"
+        android:shortcutLongLabel="@string/shortcut_profiles_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="joe://profiles"
+            android:targetPackage="${applicationId}"
+            android:targetClass="com.joebrowser.app.ui.MainActivity" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="proxies"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_proxies"
+        android:shortcutShortLabel="@string/shortcut_proxies_short"
+        android:shortcutLongLabel="@string/shortcut_proxies_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="joe://proxies"
+            android:targetPackage="${applicationId}"
+            android:targetClass="com.joebrowser.app.ui.MainActivity" />
+    </shortcut>
+</shortcuts>

@@ -1,0 +1,8 @@
+1.3.0 — premium redesign + fingerprint hardening.
+
+• New emerald design system: deeper greens, rounder cards and inputs, crisper Material icon set, refined dark theme, emerald launcher and store art.
+• Browser chrome rebuilt: profile + engine caption on one line, icon-only proxy and tracker actions (status dot on the avatar), floating paste-progress pill — no more text overflow, clipping or overlapping chips.
+• Fingerprint layer deepened: webdriver now reads false, UA-CH brands derive from the pinned build with the rotating GREASE token (Chrome/Chromium/Brave/Edge) plus a correct fullVersionList, plugins/mimeTypes carry real PluginArray/MimeTypeArray tags with linked MimeType→Plugin references, permissions.query matches Notification.permission, resolvedOptions reports the profile locale, and the HTTP Accept-Language header is aligned with the identity where the WebView allows it.
+• Crash diagnostics: the last uncaught stack trace is written to a private log file before the process exits — no analytics, nothing leaves the device.
+• Install and download hygiene: cleartext traffic denied app-wide (loopback excepted), explicit network security config.
+• Launcher shortcuts: long-press for New profile, Profiles and Proxies (joe:// routes).

@@ -1,15 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Thin 2dp page-load bar: accent on a transparent track, so it never tints the WebView. -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
-    <item android:id="@android:id/background">
-        <shape android:shape="rectangle">
+    <item>
+        <shape>
             <solid android:color="@color/line_soft" />
         </shape>
     </item>
-    <item android:id="@android:id/progress">
+    <item>
         <clip>
-            <shape android:shape="rectangle">
-                <solid android:color="@color/accent" />
+            <shape>
+                <gradient
+                    android:type="linear"
+                    android:angle="0"
+                    android:startColor="@color/accent"
+                    android:endColor="@color/success" />
             </shape>
         </clip>
     </item>

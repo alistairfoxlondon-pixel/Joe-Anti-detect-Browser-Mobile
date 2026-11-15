@@ -36,6 +36,12 @@
     <string name="action_rename">Rename</string>
     <string name="action_duplicate">Duplicate</string>
     <string name="action_see_all">See all</string>
+    <string name="shortcut_new_short">New profile</string>
+    <string name="shortcut_new_long">Create a new isolated profile</string>
+    <string name="shortcut_profiles_short">Profiles</string>
+    <string name="shortcut_profiles_long">Browse your isolated profiles</string>
+    <string name="shortcut_proxies_short">Proxies</string>
+    <string name="shortcut_proxies_long">Proxy library and monitor</string>
 
     <!-- Dashboard -->
     <string name="home_title">Dashboard</string>
@@ -292,6 +298,7 @@
     <string name="browser_paste_progress">Typing %1$d of %2$d</string>
     <string name="browser_paste_done">Typed %1$d characters</string>
     <string name="browser_tracker_title">HTTP tracker</string>
+    <string name="browser_proxy">Proxy</string>
     <string name="browser_tracker_empty">No requests recorded yet</string>
     <string name="browser_tracker_summary">%1$d requests · %2$d trackers</string>
     <string name="browser_tracker_badge">%1$d req · %2$d trk</string>

@@ -56,10 +56,7 @@ function sampleConfig(overrides) {
     webglRenderer: 'ANGLE (ARM, Mali-G720, OpenGL ES 3.2)',
     isDesktop: false, chromeLike: true, isFirefox: false,
     pdfViewer: true, unlockSelection: true,
-    brands: [
-      { brand: 'Not(A:Brand', version: '24', out: 'Not(A:Brand', raw: '"Not(A:Brand";v="24"' },
-      { brand: 'Google Chrome', version: '134', out: 'Google Chrome', raw: '"Google Chrome";v="134"' }
-    ],
+    brandEngine: 'chrome', fullVersion: '134.0.6998.89',
     isMobile: true
   };
   return Object.assign(base, overrides || {});
@@ -113,6 +110,13 @@ function makeEnvironment(cfg) {
   };
   Object.defineProperty(navProto, 'geolocation', {
     get: function () { return geolocationSingleton; },
+    configurable: true, enumerable: true
+  });
+  var permissionsSingleton = {
+    query: function (descriptor) { return Promise.resolve({ state: 'default', onchange: null }); }
+  };
+  Object.defineProperty(navProto, 'permissions', {
+    get: function () { return permissionsSingleton; },
     configurable: true, enumerable: true
   });
   Object.defineProperty(navProto, 'connection', {
@@ -192,6 +196,7 @@ function makeEnvironment(cfg) {
   env.clearInterval = function () {};
   env.setTimeout = function () { return 0; };
   env.Intl = Intl;
+  env.Notification = { permission: 'default' };
   env.Math = Math;
   env.JSON = JSON;
   env.Object = Object;
@@ -231,12 +236,12 @@ function run(script, env) {
   const args = [
     'window', 'self', 'navigator', 'screen', 'document', 'location', 'devicePixelRatio',
     'performance', 'Intl', 'globalThis', 'Navigator', 'Screen', 'top',
-    'CanvasRenderingContext2D', 'HTMLCanvasElement'
+    'CanvasRenderingContext2D', 'HTMLCanvasElement', 'Notification'
   ];
   const values = [
     env, env, env.navigator, env.screen, env.document, env.location, env.devicePixelRatio,
     env.performance, env.Intl, env, env.Navigator, env.Screen, env.top,
-    env.CanvasRenderingContext2D, env.HTMLCanvasElement
+    env.CanvasRenderingContext2D, env.HTMLCanvasElement, env.Notification
   ];
   const Factory = Function.bind.apply(Function, [null].concat(args, [script]));
   const factory = new Factory();
@@ -285,7 +290,7 @@ check('deviceMemory', nav.deviceMemory, cfg.memory);
 check('maxTouchPoints', nav.maxTouchPoints, cfg.touch);
 check('language', nav.language, cfg.language);
 check('languages', JSON.stringify(nav.languages), JSON.stringify(cfg.languages));
-check('webdriver removed', nav.webdriver, 'undefined');
+check('webdriver is false, as on real Chrome', nav.webdriver, 'false');
 check('pdfViewerEnabled', nav.pdfViewerEnabled, 'true');
 check('doNotTrack null when off', nav.doNotTrack, 'null');
 
@@ -444,6 +449,7 @@ const win = identity({
   ua: 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) ' +
       'Chrome/134.0.6998.89 Safari/537.36',
   chromeLike: true, safariLike: false, isIos: false, isFirefox: false, pdfViewer: true,
+  isDesktop: true, brandEngine: 'chrome', fullVersion: '134.0.6998.89',
   language: 'en-US', languages: ['en-US', 'en']
 });
 check('Chrome/Windows: deviceMemory present', win.nav.deviceMemory, 8);
@@ -466,9 +472,44 @@ const androidEntropy = await android.nav.userAgentData.getHighEntropyValues([
 check('Android UA-CH: architecture is arm (not x86)', androidEntropy.architecture, 'arm');
 check('Android UA-CH: model matches', androidEntropy.model, 'Pixel 8');
 check('Android UA-CH: uaFullVersion matches full build', androidEntropy.uaFullVersion, '134.0.6998.89');
+const androidBrands = android.nav.userAgentData.brands.map(function (b) { return b.brand + '@' + b.version; });
+check('Android UA-CH: GREASE brand present for M134', androidBrands.join(',').indexOf('Not?A_Brand@99') >= 0, true);
+check('Android UA-CH: Chromium token present', androidBrands.join(',').indexOf('Chromium@134') >= 0, true);
+check('Android UA-CH: Google Chrome token present', androidBrands.join(',').indexOf('Google Chrome@134') >= 0, true);
+check('Android UA-CH: three brands, like real Chrome', android.nav.userAgentData.brands.length, 3);
+const androidBrandsFull = (await android.nav.userAgentData.getHighEntropyValues(['fullVersionList'])).fullVersionList
+  .map(function (b) { return b.brand + '@' + b.version; });
+check('Android UA-CH: GREASE fullVersionList keeps 99.0.0.0', androidBrandsFull.join(',').indexOf('Not?A_Brand@99.0.0.0') >= 0, true);
+check('Android UA-CH: fullVersionList uses the full build', androidBrandsFull.join(',').indexOf('Google Chrome@134.0.6998.89') >= 0, true);
 
 const winEntropy = await win.nav.userAgentData.getHighEntropyValues(['architecture']);
 check('Windows UA-CH: architecture is x86', winEntropy.architecture, 'x86');
+
+console.log('\nplugins / mimeTypes');
+check('mobile: plugins is an empty PluginArray', Object.prototype.toString.call(nav.plugins), '[object PluginArray]');
+check('mobile: plugins.length is 0', nav.plugins.length, 0);
+check('mobile: mimeTypes is an empty MimeTypeArray', Object.prototype.toString.call(nav.mimeTypes), '[object MimeTypeArray]');
+const winPlugins = win.nav.plugins;
+check('desktop: five PDF viewer plugins', winPlugins.length, 5);
+check('desktop: plugins tags as PluginArray', Object.prototype.toString.call(winPlugins), '[object PluginArray]');
+check('desktop: named lookup works', winPlugins.namedItem('Chrome PDF Viewer').name, 'Chrome PDF Viewer');
+check('desktop: plugin.item(0) carries the PDF mime type', winPlugins.item(0).item(0).type, 'application/pdf');
+check('desktop: plugin exposes both mime types', winPlugins.item(0).length, 2);
+check('desktop: plugin tags as Plugin', Object.prototype.toString.call(winPlugins.item(0)), '[object Plugin]');
+const winMimes = win.nav.mimeTypes;
+check('desktop: two MIME types', winMimes.length, 2);
+check('desktop: mimeTypes tags as MimeTypeArray', Object.prototype.toString.call(winMimes), '[object MimeTypeArray]');
+check('desktop: application/pdf is named', winMimes.namedItem('application/pdf').suffixes, 'pdf');
+check('desktop: MimeType tags correctly', Object.prototype.toString.call(winMimes.item(0)), '[object MimeType]');
+check('desktop: MimeType links back to its plugin', winMimes.namedItem('application/pdf').enabledPlugin.name, 'PDF Viewer');
+
+console.log('\npermissions / locale');
+const notifyState = await nav.permissions.query({ name: 'notifications' });
+check('permissions.query notifications maps to prompt', notifyState.state, 'prompt');
+const otherPerm = await nav.permissions.query({ name: 'geolocation' });
+check('permissions.query passthrough for other names', otherPerm.state, 'default');
+check('resolvedOptions reports the profile locale', Intl.DateTimeFormat().resolvedOptions().locale, 'de-DE');
+check('resolvedOptions reports the profile timezone', Intl.DateTimeFormat().resolvedOptions().timeZone, cfg.timezone);
 
 console.log('\nper-profile separation');
 check('cores differ per profile', otherEnv.navigator.hardwareConcurrency, otherCfg.cores);

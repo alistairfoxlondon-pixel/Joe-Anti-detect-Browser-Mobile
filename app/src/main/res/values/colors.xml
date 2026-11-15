@@ -8,47 +8,49 @@
    * Text colours come in exactly three weights (text / text_dim / text_muted) plus the
      semantic accents; anything else is a bug in the design system.
    * Surfaces are layered: bg (page) < surface (card) < surface_muted (inset control).
+   * The brand is a deep emerald ("jade"): primary actions read #0B8A5A on white so they
+     keep AA contrast, and the hero gradient runs emerald → forest for depth.
 -->
 <resources>
 
     <!-- Layered surfaces -->
-    <color name="bg">#F4F6F9</color>
+    <color name="bg">#F0F5F1</color>
     <color name="surface">#FFFFFF</color>
-    <color name="surface_muted">#EDF0F4</color>
+    <color name="surface_muted">#E9EFEB</color>
     <color name="surface_raised">#FFFFFF</color>
-    <color name="scrim">#66090D14</color>
+    <color name="scrim">#66101B14</color>
 
     <!-- Lines -->
-    <color name="line">#DFE3EA</color>
-    <color name="line_soft">#EAEDF2</color>
-    <!-- Fixed on-accent text colour: readable on the brand blue in both themes. -->
+    <color name="line">#DCE5DE</color>
+    <color name="line_soft">#E7EDE9</color>
+    <!-- Fixed on-accent text colour: readable on the brand emerald in both themes. -->
     <color name="white">#FFFFFFFF</color>
 
     <!-- Type -->
-    <color name="text">#0F141A</color>
-    <color name="text_dim">#464E59</color>
-    <color name="text_muted">#78818D</color>
+    <color name="text">#101A14</color>
+    <color name="text_dim">#3E4D44</color>
+    <color name="text_muted">#6C7D71</color>
     <color name="text_on_accent">#FFFFFF</color>
 
     <!-- Accents -->
-    <color name="accent">#2563EB</color>
-    <color name="accent_pressed">#1D4ED8</color>
-    <color name="accent_soft">#1A2563EB</color>
+    <color name="accent">#0B8A5A</color>
+    <color name="accent_pressed">#096F48</color>
+    <color name="accent_soft">#1A0B8A5A</color>
     <color name="on_accent">#FFFFFF</color>
 
-    <color name="success">#11785A</color>
-    <color name="success_soft">#1A11785A</color>
+    <color name="success">#0F7B4F</color>
+    <color name="success_soft">#1A0F7B4F</color>
     <color name="warning">#A65A05</color>
     <color name="warning_soft">#1AA65A05</color>
     <color name="danger">#B42318</color>
     <color name="danger_soft">#1AB42318</color>
-    <color name="neutral">#78818D</color>
+    <color name="neutral">#6C7D71</color>
 
     <!-- Hero gradient stops (dashboard header) -->
-    <color name="hero_start">#1E4FD8</color>
-    <color name="hero_end">#12328F</color>
+    <color name="hero_start">#0E9F6E</color>
+    <color name="hero_end">#053B26</color>
     <color name="hero_text">#FFFFFF</color>
-    <color name="hero_text_dim">#D5E1FF</color>
+    <color name="hero_text_dim">#B9E9CE</color>
 
     <!-- Legacy aliases kept so older references keep resolving after the refactor. -->
     <color name="bg_soft">@color/surface</color>

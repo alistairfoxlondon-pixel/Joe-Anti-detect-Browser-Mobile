@@ -131,28 +131,6 @@ object FingerprintScript {
             if (base != fp.language) put(base)
             if (fp.language != "en" && base != "en") put("en")
         }
-        val brands = JSONArray().apply {
-            when (engine) {
-                BrowserEngine.CHROME -> {
-                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Chromium\""))
-                    put(brandEntry("\"Google Chrome\";v=\"" + major(fp.browserVersion) + "\"", "\"Google Chrome\""))
-                }
-                BrowserEngine.CHROMIUM -> {
-                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Chromium\""))
-                    put(brandEntry("\"Chromium\";v=\"" + major(fp.browserVersion) + "\"", "\"Chromium\""))
-                }
-                BrowserEngine.BRAVE -> {
-                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Brave\""))
-                    put(brandEntry("\"Brave\";v=\"" + major(fp.browserVersion) + "\"", "\"Brave\""))
-                }
-                BrowserEngine.EDGE -> {
-                    put(brandEntry("\"Not(A:Brand\";v=\"24\"", "\"Microsoft Edge\""))
-                    put(brandEntry("\"Microsoft Edge\";v=\"" + major(fp.browserVersion) + "\"", "\"Microsoft Edge\""))
-                }
-                BrowserEngine.FIREFOX -> Unit
-            }
-        }
-
         val cfg = JSONObject().apply {
             put("seed", fp.seed)
             put("ua", FingerprintFactory.userAgent(fp, engine))
@@ -194,7 +172,10 @@ object FingerprintScript {
             put("safariLike", safariLike)
             put("pdfViewer", chromeLike)
             put("unlockSelection", unlockSelection)
-            put("brands", brands)
+            // The UA-CH brand list is computed inside the injected script from the build
+            // number (see jbBrands) so the node verification harness exercises the exact
+            // code the WebView runs — no parallel Kotlin table to drift out of sync.
+            put("brandEngine", engine.id)
             put("fullVersion", fp.browserVersion)
             // Model/platform-version tokens for getHighEntropyValues: they must describe the
             // identity's platform, not this device. An Android identity reporting 'Pixel 9' on a
@@ -212,17 +193,6 @@ object FingerprintScript {
         }
 
         return TEMPLATE.replace("__PATCH_HELPERS__", PATCH_HELPERS).replace("__CFG__", cfg.toString())
-    }
-
-    private val VERSION_PATTERN = Regex("v=\"?([0-9]+)")
-
-    private fun major(build: String): String = build.substringBefore('.')
-
-    private fun brandEntry(brand: String, out: String): JSONObject = JSONObject().apply {
-        put("brand", brand.trim('"').replace("\"", ""))
-        put("version", VERSION_PATTERN.find(brand)?.groupValues?.getOrNull(1).orEmpty())
-        put("out", out.trim('"').replace("\"", ""))
-        put("raw", brand)
     }
 
     // The script is kept as one template with two placeholders so it stays readable and
@@ -486,7 +456,7 @@ __PATCH_HELPERS__
     patchGetter(nav, 'language', function () { return JB.language; });
     patchGetter(nav, 'languages', function () { return Object.freeze(JB.languages.slice()); });
     // navigator.webdriver is an own property in Blink, so the pair helper is required here.
-    patchOwn(window.navigator, nav, 'webdriver', function () { return undefined; });
+    patchOwn(window.navigator, nav, 'webdriver', function () { return false; });
     patchGetter(nav, 'productSub', function () { return '20030107'; });
     // Belt and braces: if some WebView keeps a locked own descriptor, remove it entirely.
     try {
@@ -507,85 +477,135 @@ __PATCH_HELPERS__
     patchGetter(nav, 'appName', function () { return 'Netscape'; });
     patchGetter(nav, 'product', function () { return 'Gecko'; });
 
-    /* userAgentData (Chromium only — a Firefox identity must not expose it) */
+    /*
+     * userAgentData (Chromium only — a Firefox identity must not expose it).
+     *
+     * The brand list is derived from the pinned build number, never stored: real Chromium
+     * ships one deliberately-boring GREASE brand whose token rotates by milestone, and a
+     * hard-coded pair here is exactly the kind of list mismatch that UA-CH validators
+     * flag. Order does not matter to sites; presence and versions do.
+     */
+    function jbGrease(major) {
+      if (major >= 131) return { brand: 'Not?A_Brand', version: '99' };
+      if (major >= 123) return { brand: 'Not:A-Brand', version: '99' };
+      if (major >= 117) return { brand: 'Not;A=Brand', version: '24' };
+      return { brand: 'Not_A Brand', version: '99' };
+    }
+    function jbBrandList(engine, full) {
+      var major = String(full || '0').split('.')[0] || '0';
+      var g = jbGrease(parseInt(major, 10) || 0);
+      var brands = [
+        { brand: g.brand, version: g.version },
+        { brand: 'Chromium', version: major }
+      ];
+      if (engine === 'chrome') brands.push({ brand: 'Google Chrome', version: major });
+      else if (engine === 'brave') brands.push({ brand: 'Brave', version: major });
+      else if (engine === 'edge') brands.push({ brand: 'Microsoft Edge', version: major });
+      // 'chromium' stays at the two GREASE + Chromium pair; Firefox/iOS expose nothing.
+      return brands;
+    }
+    function jbBrandFullList(engine, full) {
+      var major = String(full || '0').split('.')[0] || '0';
+      var g = jbGrease(parseInt(major, 10) || 0);
+      return jbBrandList(engine, full).map(function (b) {
+        return {
+          brand: b.brand,
+          version: b.brand === g.brand ? g.version + '.0.0.0' : (full || (b.version + '.0.0.0'))
+        };
+      });
+    }
     if (JB.chromeLike && window.NavigatorUAData) {
       try {
+        var jbEngine = JB.brandEngine || 'chrome';
+        var jbFull = JB.fullVersion || '0.0.0.0';
+        var jbBrandsOut = jbBrandList(jbEngine, jbFull);
+        var jbBrandsFull = jbBrandFullList(jbEngine, jbFull);
+        var jbPlatform = JB.platform === 'Win32' ? 'Windows' :
+                        JB.platform === 'MacIntel' ? 'macOS' :
+                        JB.isMobile ? 'Android' : 'Linux';
         var uaData = {
-          brands: JB.brands.map(function (b) { return { brand: b.brand, version: b.version }; }),
+          brands: jbBrandsOut,
           mobile: !!JB.isMobile,
-          platform: JB.platform === 'Win32' ? 'Windows' :
-                    JB.platform === 'MacIntel' ? 'macOS' :
-                    JB.platform === 'iPhone' || JB.platform === 'iPad' ? 'iOS' :
-                    JB.isMobile ? 'Android' : 'Linux',
-            getHighEntropyValues: function (hints) {
+          platform: jbPlatform,
+          getHighEntropyValues: function (hints) {
             return Promise.resolve({
               architecture: JB.platform === 'Linux armv8l' ? 'arm' : 'x86',
               bitness: '64',
-              brands: this.brands,
-              fullVersionList: JB.brands.map(function (b) {
-                return { brand: b.brand, version: b.version === '24' ? '24.0.0.0' : (JB.fullVersion || (b.version + '.0.0.0')) };
-              }),
-              mobile: this.mobile,
+              brands: jbBrandsOut,
+              fullVersionList: jbBrandsFull,
+              mobile: !!JB.isMobile,
               model: JB.androidModel || '',
-              platform: this.platform,
+              platform: jbPlatform,
               platformVersion: JB.platformVersion || '',
-              uaFullVersion: JB.isFirefox ? '' : (JB.fullVersion || majorVersion()),
+              uaFullVersion: jbFull,
               wow64: false
             });
           }
         };
-        function majorVersion() {
-          var m = JB.ua.match(/(?:Chrome|CriOS|Edg|EdgA)\/([0-9]+)/);
-          return m ? m[1] + '.0.0.0' : '';
-        }
         patchGetter(nav, 'userAgentData', function () { return uaData; });
       } catch (e) {}
     }
 
-    /* plugins / mimeTypes: full PDF set on desktop, empty on mobile */
+    /*
+     * plugins / mimeTypes. A detector does more than read names: it asks
+     * Object.prototype.toString.call(navigator.plugins), walks plugin.item(i).type, and
+     * cross-checks plugin.length against what item() returns. The fakes below carry the
+     * right Symbol.toStringTag values and the same cross-links the real engine exposes.
+     * Desktop Chrome ships exactly these five PDF viewers, all backed by the same two
+     * MIME types; Android ships an empty-but-properly-tagged PluginArray.
+     */
+    function jbTag(obj, tagName) {
+      try { Object.defineProperty(obj, Symbol.toStringTag, { value: tagName, configurable: true }); } catch (e) {}
+      return obj;
+    }
+    function jbMakeMimeType(type, description) {
+      return jbTag({ type: type, suffixes: 'pdf', description: description || 'Portable Document Format', enabledPlugin: null }, 'MimeType');
+    }
+    function jbMakePlugin(name, mimeTypes) {
+      var p = { name: name, filename: 'internal-pdf-viewer', description: 'Portable Document Format', length: mimeTypes.length };
+      for (var i = 0; i < mimeTypes.length; i++) { p[i] = mimeTypes[i]; p[mimeTypes[i].type] = mimeTypes[i]; }
+      p.item = function (idx) { return this[idx] || null; };
+      p.namedItem = function (t) { for (var i2 = 0; i2 < this.length; i2++) if (this[i2].type === t) return this[i2]; return null; };
+      for (var j = 0; j < mimeTypes.length; j++) { if (!mimeTypes[j].enabledPlugin) mimeTypes[j].enabledPlugin = p; }
+      return jbTag(p, 'Plugin');
+    }
+    function jbMakePluginArray(plugins) {
+      var pa = {};
+      for (var i = 0; i < plugins.length; i++) { pa[i] = plugins[i]; pa[plugins[i].name] = plugins[i]; }
+      pa.length = plugins.length;
+      pa.item = function (idx) { return this[idx] || null; };
+      pa.namedItem = function (n) { for (var i2 = 0; i2 < this.length; i2++) if (this[i2].name === n) return this[i2]; return null; };
+      pa.refresh = function () {};
+      return jbTag(pa, 'PluginArray');
+    }
+    function jbMakeMimeTypeArray(mimes) {
+      var ma = {};
+      for (var i = 0; i < mimes.length; i++) { ma[i] = mimes[i]; ma[mimes[i].type] = mimes[i]; }
+      ma.length = mimes.length;
+      ma.item = function (idx) { return this[idx] || null; };
+      ma.namedItem = function (n) { for (var i2 = 0; i2 < this.length; i2++) if (this[i2].type === n) return this[i2]; return null; };
+      return jbTag(ma, 'MimeTypeArray');
+    }
     if (JB.isDesktop) {
       try {
-        var pluginSpecs = [
-          ['PDF Viewer', 'internal-pdf-viewer'],
-          ['Chrome PDF Viewer', 'internal-pdf-viewer'],
-          ['Chromium PDF Viewer', 'internal-pdf-viewer'],
-          ['Microsoft Edge PDF Viewer', 'internal-pdf-viewer'],
-          ['WebKit built-in PDF', 'internal-pdf-viewer']
-        ];
-        var pluginArray = {};
-        for (var pi = 0; pi < pluginSpecs.length; pi++) {
-          pluginArray[pi] = {
-            name: pluginSpecs[pi][0],
-            filename: pluginSpecs[pi][1],
-            description: 'Portable Document Format',
-            length: 1
-          };
-        }
-        pluginArray.length = pluginSpecs.length;
-        pluginArray.item = function (i) { return this[i] || null; };
-        pluginArray.namedItem = function (n) {
-          for (var i = 0; i < this.length; i++) if (this[i].name === n) return this[i];
-          return null;
-        };
-        pluginArray.refresh = function () {};
-        var mimeArray = {
-          0: { type: 'application/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
-          1: { type: 'text/pdf', suffixes: 'pdf', description: 'Portable Document Format' },
-          length: 2
-        };
-        mimeArray.item = function (i) { return this[i] || null; };
-        mimeArray.namedItem = function (n) {
-          for (var i = 0; i < this.length; i++) if (this[i].type === n) return this[i];
-          return null;
-        };
+        var mimePdf = jbMakeMimeType('application/pdf');
+        var mimeTextPdf = jbMakeMimeType('text/pdf');
+        var bothMimes = [mimePdf, mimeTextPdf];
+        var pdfPlugins = [
+          'PDF Viewer', 'Chrome PDF Viewer', 'Chromium PDF Viewer',
+          'Microsoft Edge PDF Viewer', 'WebKit built-in PDF'
+        ].map(function (n) { return jbMakePlugin(n, bothMimes); });
+        var pluginArray = jbMakePluginArray(pdfPlugins);
+        var mimeArray = jbMakeMimeTypeArray(bothMimes);
         patchGetter(nav, 'plugins', function () { return pluginArray; });
         patchGetter(nav, 'mimeTypes', function () { return mimeArray; });
       } catch (e) {}
     } else {
       try {
-        var emptyPlugins = { length: 0, item: function () { return null; }, namedItem: function () { return null; }, refresh: function () {} };
+        var emptyMimes = jbMakeMimeTypeArray([]);
+        var emptyPlugins = jbMakePluginArray([]);
         patchGetter(nav, 'plugins', function () { return emptyPlugins; });
-        patchGetter(nav, 'mimeTypes', function () { return emptyPlugins; });
+        patchGetter(nav, 'mimeTypes', function () { return emptyMimes; });
       } catch (e) {}
     }
 
@@ -613,11 +633,13 @@ __PATCH_HELPERS__
     }
     // Firefox exposes neither the Chromium UA-Data API nor WebKit's pdfViewerEnabled flag.
     if (JB.isFirefox) {
-      try {
-        Object.defineProperty(navigator, 'pdfViewerEnabled', {
-          get: function () { return undefined; }, configurable: true, enumerable: false
-        });
-      } catch (e) {}
+      ['pdfViewerEnabled', 'getBattery'].forEach(function (prop) {
+        try {
+          Object.defineProperty(navigator, prop, {
+            get: function () { return undefined; }, configurable: true, enumerable: false
+          });
+        } catch (e) {}
+      });
     }
 
     /* connection */
@@ -627,6 +649,35 @@ __PATCH_HELPERS__
         patchGetter(NetworkInformation.prototype, 'rtt', function () { return 50; });
         patchGetter(NetworkInformation.prototype, 'downlink', function () { return 10; });
         patchGetter(NetworkInformation.prototype, 'saveData', function () { return false; });
+      }
+    } catch (e) {}
+
+    /*
+     * permissions.query: pages cross-check it against Notification.permission. A 'default'
+     * permission reported as 'granted' here (or vice versa) is an inconsistency detectors
+     * surface verbatim, so the notifications name is mapped explicitly; everything else
+     * defers to the real implementation untouched.
+     */
+    try {
+      var perms = window.navigator && window.navigator.permissions;
+      if (perms && perms.query) {
+        var jbPermsQuery = perms.query.bind(perms);
+        var jbNotifyState = function () {
+          try {
+            var p = (window.Notification && window.Notification.permission) || 'default';
+            return (p === 'granted' || p === 'denied') ? p : 'prompt';
+          } catch (e) { return 'prompt'; }
+        };
+        var jbQueryWrapper = function (descriptor) {
+          try {
+            if (descriptor && descriptor.name === 'notifications') {
+              return Promise.resolve({ state: jbNotifyState(), onchange: null });
+            }
+          } catch (e) {}
+          return jbPermsQuery(descriptor);
+        };
+        nativeToString(jbQueryWrapper, perms.query);
+        perms.query = jbQueryWrapper;
       }
     } catch (e) {}
   }
@@ -705,6 +756,7 @@ __PATCH_HELPERS__
         return function () {
           var out = original.apply(this, arguments);
           try { out.timeZone = JB_TZ; } catch (e) {}
+          try { out.locale = JB.language; } catch (e) {}
           return out;
         };
       });
