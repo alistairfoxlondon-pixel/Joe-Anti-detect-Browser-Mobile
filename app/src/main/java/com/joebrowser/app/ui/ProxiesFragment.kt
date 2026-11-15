@@ -238,6 +238,9 @@ class ProxiesFragment : Fragment(), MainActivity.Refreshable {
             config = item.config.duplicate().apply { this.watch = watch }
         )
         ProfileRepository.saveProxy(requireContext(), updated) {
+            // Ask for notification permission at the only moment it makes sense: the user has
+            // just asked to be told when this proxy goes down.
+            if (watch) (activity as? MainActivity)?.ensureNotificationPermission()
             ProxyMonitorService.startIfNeeded(requireContext())
             refresh()
         }

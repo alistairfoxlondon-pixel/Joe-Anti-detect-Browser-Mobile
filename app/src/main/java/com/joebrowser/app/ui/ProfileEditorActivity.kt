@@ -1,8 +1,11 @@
 package com.joebrowser.app.ui
 
+import android.Manifest
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
+import android.os.Build
 import android.os.Bundle
 import android.view.View
 import android.widget.ArrayAdapter
@@ -220,6 +223,9 @@ class ProfileEditorActivity : AppCompatActivity() {
         configureSwitch(binding.rowWatch, R.string.editor_watch) {
             profile.tools.proxyWatch = it
             updateWatchVisibility()
+            // Monitoring alerts are notifications: ask for the permission when the user opts in
+            // rather than on app launch.
+            if (it) ensureNotificationPermission()
         }
 
         binding.rowWatchInterval.setOnClickListener {
@@ -532,6 +538,18 @@ class ProfileEditorActivity : AppCompatActivity() {
         markDirty()
     }
 
+    /**
+     * POST_NOTIFICATIONS (API 33+) gates monitor alerts only — the foreground-service
+     * notification keeps working without it, so a denial degrades rather than breaks.
+     */
+    private fun ensureNotificationPermission() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
+        val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        if (granted) return
+        runCatching { requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATIONS) }
+    }
+
     private fun buildProxyFromInputs(): ProxyConfig {
         val type = when (binding.editorProxyType.text?.toString()?.uppercase()) {
             "SOCKS5" -> "socks5"
@@ -762,6 +780,7 @@ class ProfileEditorActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_PROFILE_ID = "profile_id"
         const val EXTRA_ENGINE = "engine"
+        private const val REQ_NOTIFICATIONS = 41
 
         fun launch(context: Context, profileId: String? = null) {
             val intent = Intent(context, ProfileEditorActivity::class.java)

@@ -72,7 +72,6 @@ class MainActivity : AppCompatActivity() {
             showTab(initial)
         }
 
-        requestNotificationPermissionOnce()
         ProxyMonitorService.startIfNeeded(this)
     }
 
@@ -164,16 +163,35 @@ class MainActivity : AppCompatActivity() {
             }
     }
 
-    private fun requestNotificationPermissionOnce() {
+    /**
+     * Asks for POST_NOTIFICATIONS at the moment it can be explained, i.e. when the user has
+     * something to be notified about. Asking on first launch (as this used to) is both a worse
+     * prompt and a worse experience: the dialog appeared before there was any reason to accept.
+     */
+    fun ensureNotificationPermission() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) return
-        if (Prefs.notificationAsked(this)) return
         val granted = ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
             PackageManager.PERMISSION_GRANTED
         if (granted) return
-        Prefs.setNotificationAsked(this, true)
         runCatching {
             requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), REQ_NOTIFICATIONS)
         }
+    }
+
+    override fun onRequestPermissionsResult(requestCode: Int, permissions: Array<out String>, grantResults: IntArray) {
+        super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+        if (requestCode != REQ_NOTIFICATIONS) return
+        val granted = grantResults.firstOrNull() == PackageManager.PERMISSION_GRANTED
+        Prefs.setNotificationAsked(this, true)
+        if (granted) {
+            Async.toast(this, getString(R.string.notify_enabled))
+        } else {
+            // Alerts need the permission; the ongoing monitor notification is a foreground
+            // service notification and keeps working regardless, so say so precisely.
+            Async.toast(this, getString(R.string.notify_denied))
+        }
+        // Monitoring state can now be persisted for real.
+        runCatching { ProxyMonitorService.startIfNeeded(this) }
     }
 
     /** Fragments implement this to re-read their data when the repository changes. */

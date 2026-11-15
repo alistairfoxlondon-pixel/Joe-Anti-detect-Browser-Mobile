@@ -267,6 +267,8 @@
     <string name="browser_tracker_summary">%1$d requests · %2$d trackers</string>
     <string name="browser_proxy_ok">Proxy %1$s · %2$d ms</string>
     <string name="browser_proxy_failed">Proxy unreachable — loading may fail</string>
+    <string name="notify_enabled">Proxy alerts turned on</string>
+    <string name="notify_denied">Alerts need notification permission. The monitor itself keeps running; turn alerts on later in system settings.</string>
     <string name="browser_proxy_checking">Checking proxy…</string>
     <string name="browser_proxy_unsupported">This WebView cannot route proxy traffic — update Android System WebView</string>
     <string name="browser_download_started">Download started</string>
