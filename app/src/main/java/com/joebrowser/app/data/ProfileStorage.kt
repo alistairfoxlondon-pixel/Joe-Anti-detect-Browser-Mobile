@@ -221,9 +221,24 @@ object ProfileStorage {
         JSONObject()
     }
 
+    /**
+     * Writes meta atomically: temp file first, then rename.
+     *
+     * A plain writeText() truncates the file before writing, so a process kill mid-write leaves
+     * a zero-length meta.json — and with it a lost kernel token, i.e. a profile whose bucket is
+     * silently re-created empty on next launch. The rename is atomic on the same filesystem.
+     */
     private fun writeMeta(dir: File, json: JSONObject) {
-        runCatching { File(dir, META).writeText(json.toString()) }
-            .onFailure { Log.w(TAG, "Could not write profile meta", it) }
+        runCatching {
+            val target = File(dir, META)
+            val temp = File(dir, "$META.tmp")
+            temp.writeText(json.toString())
+            if (!temp.renameTo(target)) {
+                // Some providers refuse rename onto an existing file; fall back to a copy.
+                target.writeText(json.toString())
+                temp.delete()
+            }
+        }.onFailure { Log.w(TAG, "Could not write profile meta", it) }
     }
 
     private fun deleteRecursively(file: File) {
