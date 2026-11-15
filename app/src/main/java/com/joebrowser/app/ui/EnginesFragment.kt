@@ -82,13 +82,17 @@ class EnginesFragment : Fragment(), MainActivity.Refreshable {
 
             card.engineLogo.setImageResource(brandLogoRes(engine))
             card.engineName.text = engine.title
-            card.engineCount.text = if (usedBy > 0) {
-                resources.getQuantityString(R.plurals.engines_profile_count, usedBy, usedBy)
-            } else {
-                getString(R.string.engines_unused)
-            }
+            // No count for an engine nobody uses: "Unused" on four of five cards was the
+            // loudest text on the screen and said nothing.
+            card.engineCount.visibility = if (usedBy > 0) View.VISIBLE else View.GONE
+            card.engineCount.text = resources.getQuantityString(
+                R.plurals.engines_profile_count, usedBy, usedBy
+            )
+            // Major versions only: a full four-part build string is noise at a glance, and the
+            // exact build is on the profile card and in the editor.
             card.engineBuild.text = FingerprintFactory.buildsFor(engine)
                 .take(2)
+                .map { it.substringBefore('.') }
                 .joinToString(" · ")
             card.engineCreate.setOnClickListener {
                 ProfileEditorActivity.launchForEngine(requireContext(), engine)

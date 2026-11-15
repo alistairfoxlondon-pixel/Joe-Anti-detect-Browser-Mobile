@@ -78,15 +78,10 @@
             tools:text="134 · 133" />
     </LinearLayout>
 
-    <com.google.android.material.button.MaterialButton
+    <!-- The whole card is the target; a labelled button repeated the same action five times. -->
+    <ImageButton
         android:id="@+id/engineCreate"
-        style="@style/Widget.Jb.Button.Outlined"
-        android:layout_width="wrap_content"
-        android:layout_height="40dp"
-        android:minWidth="0dp"
-        android:paddingStart="14dp"
-        android:paddingEnd="14dp"
-        android:text="@string/engines_new_short"
-        app:icon="@drawable/ic_plus"
-        app:iconPadding="4dp" />
+        style="@style/Widget.Jb.IconButton"
+        android:contentDescription="@string/engines_new_short"
+        android:src="@drawable/ic_plus" />
 </LinearLayout>
