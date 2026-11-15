@@ -30,8 +30,7 @@ pill — eliminating the tiny overlapping chips and clipped labels.
 - the node verifier grew from 66 to **94 assertions** covering all of the above
 
 **Trust & stability** — cleartext traffic is denied app-wide (loopback excepted) with an
-explicit `network_security_config`, the APK declares itself a browser app, the last
-uncaught stack trace is persisted to a private `crash-last.txt` (no analytics, never
+explicit `network_security_config`, the last uncaught stack trace is persisted to a private `crash-last.txt` (no analytics, never
 leaves the device), launcher long-press shortcuts (New profile / Profiles / Proxies),
 and a batch of overflow/crash fixes across the UI.
 
