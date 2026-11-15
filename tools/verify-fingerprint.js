@@ -48,7 +48,7 @@ function sampleConfig(overrides) {
     colorDepth: 24, dpr: 2.625,
     cores: 8, memory: 8, touch: 5,
     canvasNoise: true, audioNoise: true, hwNoise: true,
-    fontNoise: true, mediaNoise: true,
+    fontNoise: true, fontEpsilon: 55, mediaNoise: true,
     doNotTrack: false, spoofBattery: true,
     webrtcMode: 'proxy', geoMode: 'proxy',
     geoLat: 52.52, geoLng: 13.4,
@@ -116,6 +116,10 @@ function makeEnvironment(cfg) {
   function CanvasRenderingContext2D() {}
   CanvasRenderingContext2D.prototype.getImageData = function (x, y, w, h) {
     return { data: rawPixels(w * h * 4), width: w, height: h };
+  };
+  CanvasRenderingContext2D.prototype.measureText = function (text) {
+    // Native Blink returns a TextMetrics whose width is a plain, writable data property.
+    return { width: String(text || '').length * 7.31 };
   };
   function HTMLCanvasElement() {}
   HTMLCanvasElement.prototype.getContext = function () { return new CanvasRenderingContext2D(); };
@@ -206,6 +210,14 @@ function check(label, actual, expected) {
 
 console.log('Joe Browser — fingerprint layer verification\n');
 
+// Second profile, used by the separation and font checks below.
+const otherCfg = sampleConfig({
+  seed: 0xbeef, language: 'fr-FR', languages: ['fr-FR', 'fr', 'en'],
+  timezone: 'Europe/Paris', cores: 6, fontEpsilon: 91
+});
+const otherEnv = run(build(otherCfg), makeEnvironment(otherCfg));
+const otherCtx = new otherEnv.CanvasRenderingContext2D();
+
 // ---------------------------------------------------------------- syntax / idempotence
 const cfg = sampleConfig();
 const script = build(cfg);
@@ -256,18 +268,23 @@ const untouched = Array.from((function () {
 check('stable across probes (same profile = same machine)', first.join() === second.join(), true);
 check('noise actually applied', first.join() !== untouched.join(), true);
 
+console.log('\nfont metrics');
+const nativeWidth = 'fingerprint me'.length * 7.31;
+const measured = ctx.measureText('fingerprint me').width;
+check('measureText carries a sub-pixel offset', Math.abs(measured - nativeWidth - cfg.fontEpsilon / 1000) < 1e-9, true);
+check('offset stays under one pixel', Math.abs(measured - nativeWidth) < 1, true);
+const otherMeasured = otherCtx.measureText('fingerprint me').width;
+check('two profiles measure text differently', measured !== otherMeasured, true);
+check('both profiles stay within a pixel of native', Math.abs(otherMeasured - nativeWidth) < 1, true);
+
 console.log('\nstability');
 check('userAgent stable on repeat read', nav.userAgent === cfg.ua, true);
 check('languages array is frozen', Object.isFrozen(nav.languages), true);
 
-// ------------------------------------------------------------ second profile isolation
-const otherCfg = sampleConfig({ seed: 0xbeef, language: 'fr-FR', languages: ['fr-FR', 'fr', 'en'], timezone: 'Europe/Paris', cores: 6 });
-const otherEnv = run(build(otherCfg), makeEnvironment(otherCfg));
-const otherCtx = new otherEnv.CanvasRenderingContext2D();
-const otherPixels = Array.from(otherCtx.getImageData(0, 0, 8, 8).data);
 console.log('\nper-profile separation');
 check('cores differ per profile', otherEnv.navigator.hardwareConcurrency, otherCfg.cores);
 check('locale differs per profile', otherEnv.navigator.language, otherCfg.language);
+const otherPixels = Array.from(otherCtx.getImageData(0, 0, 8, 8).data);
 check('canvas differs between profiles', first.join() !== otherPixels.join(), true);
 
 console.log('\n' + (failures === 0

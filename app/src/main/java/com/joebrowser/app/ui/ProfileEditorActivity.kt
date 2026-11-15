@@ -212,7 +212,9 @@ class ProfileEditorActivity : AppCompatActivity() {
         configureSwitch(binding.rowCanvas, R.string.editor_canvas) { profile.fp.canvasNoise = it }
         configureSwitch(binding.rowAudio, R.string.editor_audio) { profile.fp.audioNoise = it }
         configureSwitch(binding.rowWebgl, R.string.editor_hardware_noise) { profile.fp.hardwareNoise = it }
-        configureSwitch(binding.rowFont, R.string.editor_font_noise) { profile.fp.fontNoise = it }
+        configureSwitch(binding.rowFont, R.string.editor_font_noise, R.string.editor_font_noise_hint) {
+            profile.fp.fontNoise = it
+        }
         configureSwitch(binding.rowMedia, R.string.editor_media_noise) { profile.fp.mediaNoise = it }
         configureSwitch(binding.rowDnt, R.string.editor_dnt) { profile.fp.doNotTrack = it }
         configureSwitch(binding.rowBattery, R.string.editor_battery) { profile.fp.spoofBattery = it }
@@ -250,8 +252,17 @@ class ProfileEditorActivity : AppCompatActivity() {
         rowSwitch.isChecked = checked
     }
 
-    private fun configureSwitch(row: RowSwitchBinding, labelRes: Int, onChange: (Boolean) -> Unit) {
+    private fun configureSwitch(
+        row: RowSwitchBinding,
+        labelRes: Int,
+        hintRes: Int? = null,
+        onChange: (Boolean) -> Unit
+    ) {
         row.rowLabel.setText(labelRes)
+        if (hintRes != null) {
+            row.rowHint.setText(hintRes)
+            row.rowHint.visibility = View.VISIBLE
+        }
         row.rowSwitch.isChecked = false
         row.rowSwitch.setOnCheckedChangeListener { _, checked ->
             onChange(checked)

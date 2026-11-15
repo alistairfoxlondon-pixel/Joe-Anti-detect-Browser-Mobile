@@ -167,6 +167,10 @@ object FingerprintScript {
             put("canvasNoise", fp.canvasNoise)
             put("audioNoise", fp.audioNoise)
             put("hwNoise", fp.hardwareNoise)
+        // A stable per-profile offset (in 1/1000 px) applied to text measurements when font
+        // noise is on: measurements and getBoundingClientRect answers must agree with each other,
+        // which is why one shared value is used rather than independent jitter per call.
+        put("fontEpsilon", if (fp.fontNoise) 40 + Math.floorMod(fp.seed, 37) else 0)
             put("fontNoise", fp.fontNoise)
             put("mediaNoise", fp.mediaNoise)
             put("doNotTrack", fp.doNotTrack)
@@ -224,6 +228,75 @@ __PATCH_HELPERS__
   }
   function noiseAt(i, salt) { return (ihash(i | 0, 0, salt) % 5) - 2; }
   function clamp8(v) { return v < 0 ? 0 : (v > 255 ? 255 : v); }
+
+  /* ------------------------------------------------------------------ fonts */
+  /*
+   * Font-metric defence. Text measurement is one of the cheapest fingerprinting signals: a page
+   * renders a hidden string and reads its width. Nothing here changes layout — the page still
+   * renders with the device's real fonts — it only shifts the *numbers handed to scripts* by a
+   * stable per-profile amount, so two profiles on one device do not report identical metrics.
+   *
+   * The original accessors are captured before patching; reading them back afterwards would
+   * recurse into this layer.
+   */
+  /*
+   * Two numbers, because the two surfaces have different precision:
+   *  - canvas measureText returns a float, so a sub-pixel offset is enough to make two profiles
+   *    on the same device disagree, with no visible effect at all;
+   *  - offsetWidth and friends are integers by definition, so a fractional offset would be
+   *    rounded away and every profile would look identical. There the offset is 0 or exactly
+   *    one pixel, chosen per profile: never enough to break a layout, enough to differ.
+   */
+  var FONT_FRACTION = (JB.fontEpsilon | 0) / 1000;
+  var FONT_SHIFT_PX = (JB.fontEpsilon | 0) >= 60 ? 1 : 0;
+  var FONT_TARGETS = ['offsetWidth', 'offsetHeight', 'scrollWidth', 'scrollHeight',
+    'clientWidth', 'clientHeight'];
+
+  function shiftMeasurement(value) {
+    if (!FONT_SHIFT_PX || typeof value !== 'number' || !isFinite(value) || value < 0) return value;
+    return value + FONT_SHIFT_PX;
+  }
+
+  function installFontMetricLayer() {
+    if (!FONT_FRACTION && !FONT_SHIFT_PX) return;
+    try {
+      if (window.HTMLElement) {
+        FONT_TARGETS.forEach(function (prop) {
+          try {
+            var descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, prop);
+            var nativeGet = descriptor && descriptor.get;
+            if (!nativeGet) return;
+            var wrapper = nativeToString(function () {
+              return shiftMeasurement(nativeGet.call(this));
+            }, nativeGet);
+            Object.defineProperty(HTMLElement.prototype, prop, {
+              get: wrapper, configurable: true, enumerable: descriptor.enumerable
+            });
+          } catch (e) {}
+        });
+      }
+    } catch (e) {}
+
+    try {
+      if (window.CanvasRenderingContext2D) {
+        patchMethod(CanvasRenderingContext2D.prototype, 'measureText', function (original) {
+          return function (text) {
+            var metrics = original.call(this, text);
+            if (!metrics || typeof metrics.width !== 'number') return metrics;
+            try {
+              // Same direction and magnitude class as the element metrics above, so a page that
+              // cross-checks canvas against DOM sees one consistent story, never a contradiction.
+              Object.defineProperty(metrics, 'width', {
+                value: metrics.width + FONT_FRACTION, configurable: true, enumerable: true
+              });
+            } catch (e) {}
+            return metrics;
+          };
+        });
+      }
+    } catch (e) {}
+  }
+  installFontMetricLayer();
 
   /* ---------------------------------------------------------------- canvas */
   function addCanvasNoise(data) {

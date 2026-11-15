@@ -122,6 +122,7 @@
     <string name="editor_audio">Audio noise</string>
     <string name="editor_hardware_noise">WebGL noise</string>
     <string name="editor_font_noise">Font metrics</string>
+    <string name="editor_font_noise_hint">Adds a stable per-profile offset to text measurements and hides fonts this device does not have, so a font probe sees one consistent machine.</string>
     <string name="editor_media_noise">Media devices</string>
     <string name="editor_dnt">Do Not Track</string>
     <string name="editor_battery">Battery API</string>
