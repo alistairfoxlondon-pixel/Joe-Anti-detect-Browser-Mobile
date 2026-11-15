@@ -27,7 +27,7 @@ No account. No cloud. No telemetry. Everything lives on the device.
 | **Engines tab** | Catalogue of the five identity families (Chrome, Chromium, Brave, Edge, Firefox) with the pinned build list each profile can take, how many profiles already use it, and a one-tap "create profile with this engine" action. |
 | **Tools tab** | Every real setting in one place: background monitor on/off + cadence, human-typing defaults and rhythm, default start page, history/tracker/selection switches, theme, trash, storage use, JSON backup (with or without passwords) and a full reset. |
 | **History & trash** | Per-profile history (capped), soft-delete "trash" for profiles with empty-trash in the Tools tab. |
-| **Backups** | JSON export (full, or shared without credentials) via the system share sheet, e.g. into a password manager. Proxy passwords are stored AES-256-GCM encrypted with a device-bound Keystore key and decrypt only on this device; the *full* export writes them in plain text inside the file, because a Keystore key cannot leave the device — use the no-passwords export if the file leaves your control. |
+| **Backups** | JSON export (full, or shared without credentials) via the system share sheet, e.g. into a password manager, and a matching **restore** from the file picker (tolerant per item, reports skipped rows, restored profiles start with empty cookies). Proxy passwords are stored AES-256-GCM encrypted with a device-bound Keystore key and decrypt only on this device; the *full* export writes them in plain text inside the file, because a Keystore key cannot leave the device — use the no-passwords export if the file leaves your control. |
 
 ## Honest limitations (please read)
 
