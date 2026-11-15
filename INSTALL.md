@@ -112,3 +112,14 @@ That is a reputation problem, and reputation only improves with distribution. Tw
 - It will not run with root, and it cannot read other apps' data.
 - Its "fingerprint" features change what *web pages* see. They do not hide the app from your
   device's security software, and they are not a licence to break a site's terms.
+
+
+---
+
+## For maintainers: why this build is (or is not) signed
+
+A release APK is only installable when it carries a signature, and only trustworthy to Windows
+when that signature is stable across versions. The keystore that produces it is **not** in this
+repository. If a release page offers `joe-browser-<version>-release.apk`, signing was configured;
+if it only offers `-debug`, the release keystore was missing for that run — see
+[`tools/make-keystore.md`](tools/make-keystore.md) for the one-time setup and the four CI secrets.

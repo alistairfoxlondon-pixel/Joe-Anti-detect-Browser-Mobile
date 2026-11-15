@@ -138,7 +138,18 @@ jobs:
             echo "signed=yes" >> "$GITHUB_OUTPUT"
           else
             echo "signed=no" >> "$GITHUB_OUTPUT"
-            echo "::warning::No signing secrets configured — shipping the debug-signed APK only."
+            # An unsigned release APK cannot be installed on Android at all, and it is the exact
+            # artefact Windows scanners quarantine. Publishing it (or silently substituting a
+            # debug build) is what made 1.4.0 "fail to install"; say so on the run summary
+            # instead of leaving a green tick over an uninstallable download.
+            {
+              echo "### ⚠ Release APK is unsigned"
+              echo ""
+              echo "No keystore secrets are configured, so only the debug-signed APK was published."
+              echo "An unsigned APK cannot be installed and will be quarantined by Windows."
+              echo "See \`tools/make-keystore.md\` to create and register the release keystore."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Release unsigned — only the debug APK is installable. See tools/make-keystore.md"
           fi
 
           ls -la "$out"
