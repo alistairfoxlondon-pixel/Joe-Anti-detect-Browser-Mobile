@@ -23,7 +23,6 @@
     <color name="text">#ECF3EE</color>
     <color name="text_dim">#B7C6BC</color>
     <color name="text_muted">#8C9C91</color>
-    <color name="text_on_accent">#04160D</color>
 
     <!-- Brand -->
     <color name="accent">#2FBF8F</color>

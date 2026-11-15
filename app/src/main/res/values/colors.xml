@@ -22,13 +22,11 @@
     <!-- Borders -->
     <color name="line">#DFE6E1</color>
     <color name="line_soft">#EAF0EB</color>
-    <color name="white">#FFFFFFFF</color>
 
     <!-- Text -->
     <color name="text">#0E1B15</color>
     <color name="text_dim">#3B4A42</color>
     <color name="text_muted">#6B7C72</color>
-    <color name="text_on_accent">#FFFFFF</color>
 
     <!-- Brand: one deep green, flat -->
     <color name="accent">#0C7A52</color>

@@ -32,7 +32,7 @@
         <item name="colorOutline">@color/line</item>
         <item name="colorOutlineVariant">@color/line_soft</item>
         <item name="colorError">@color/danger</item>
-        <item name="colorOnError">@color/text_on_accent</item>
+        <item name="colorOnError">@color/on_accent</item>
         <item name="colorControlHighlight">@color/accent_soft</item>
 
         <item name="android:textColorPrimary">@color/text</item>

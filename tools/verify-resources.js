@@ -363,6 +363,34 @@ function bindingToLayout(bindingName) {
   return snake;
 }
 
+// ------------------------------------------------------------ palette parity
+
+/**
+ * Light and night palettes must define the same names, and no layout may hard-code white.
+ *
+ * The dark-mode bug this catches: `@color/white` was used for text sitting on the accent, which
+ * is bright green in the night palette — white-on-bright-green is ~1.9:1. The semantic role
+ * (`@color/on_accent`) is dark in night mode precisely so that cannot happen.
+ */
+{
+  const readColors = (file) =>
+    new Set([...fs.readFileSync(file, 'utf8').matchAll(/<color name="(\w+)"/g)].map((m) => m[1]));
+  const light = readColors(path.join(RES, 'values/colors.xml'));
+  const night = readColors(path.join(RES, 'values-night/colors.xml'));
+  for (const name of light) {
+    if (!night.has(name)) fail(`color "${name}" is defined for light but missing from values-night`);
+  }
+  for (const name of night) {
+    if (!light.has(name)) fail(`color "${name}" is defined for night but missing from values`);
+  }
+  for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml'))) {
+    const text = fs.readFileSync(file, 'utf8');
+    if (/@color\/white|@android:color\/white/.test(text)) {
+      fail(`${path.relative(ROOT, file)}: literal white — use @color/on_accent or a text role`);
+    }
+  }
+}
+
 // ------------------------------------------------------------- touch targets
 
 /**
