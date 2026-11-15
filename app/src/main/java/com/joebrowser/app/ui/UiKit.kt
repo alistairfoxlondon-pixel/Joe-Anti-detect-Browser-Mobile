@@ -279,9 +279,15 @@ object UiKit {
         setOnClickListener { onClick() }
     }
 
-    /** Small text button used inside cards ("Check", "Edit", "See all"). */
+    /**
+     * Small text button used inside cards ("Check", "Edit", "See all").
+     *
+     * Styled by hand rather than by pointing at a Material attribute: the attribute name for
+     * the text-button style is not part of the public R surface, so referencing it does not
+     * compile. Setting the colours directly is both stable and explicit.
+     */
     fun textButton(context: Context, label: String, onClick: () -> Unit): MaterialButton =
-        MaterialButton(context, null, com.google.android.material.R.attr.materialButtonTextButtonStyle).apply {
+        MaterialButton(context).apply {
             text = label
             isAllCaps = false
             textSize = 12.5f
@@ -289,7 +295,9 @@ object UiKit {
             minimumWidth = 0
             insetTop = 0
             insetBottom = 0
-            setPadding(dp(context, 8), 0, dp(context, 8), 0)
+            backgroundTintList = android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(context, android.R.color.transparent)
+            )
             setTextColor(ContextCompat.getColor(context, R.color.accent))
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT, dp(context, 40)
