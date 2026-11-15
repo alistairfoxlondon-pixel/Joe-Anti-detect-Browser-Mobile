@@ -3,6 +3,7 @@ package com.joebrowser.app.proxy
 import android.content.Context
 import com.joebrowser.app.core.Async
 import com.joebrowser.app.data.Database
+import com.joebrowser.app.data.Profile
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.data.ProxyConfig
 import com.joebrowser.app.data.SavedProxy
@@ -129,6 +130,20 @@ object ProxyTester {
         val profile = database.getProfile(profileId) ?: return null
         if (!profile.proxy.enabled) return ProxyTestResult(ok = false, error = "No proxy configured")
         val result = test(profile.proxy, timeoutMs)
+        applyResult(profile, result)
+        database.saveProfile(profile)
+        return result
+    }
+
+    /**
+     * Folds a finished measurement into a profile: IP, latency, error, failure streak, rotation
+     * count and — when the profile asked for it — the locale, so a check can never leave the
+     * identity pointing at the previous exit country.
+     *
+     * Shared by the saved-profile path above and the editor's "Check" button, so a check made in
+     * the editor and one made by the monitor produce exactly the same record.
+     */
+    fun applyResult(profile: Profile, result: ProxyTestResult) {
         profile.proxy = profile.proxy.duplicate().apply {
             lastCheckedAt = System.currentTimeMillis()
             latencyMs = result.latencyMs
@@ -143,11 +158,11 @@ object ProxyTester {
                 lastTimezone = result.timezone
             }
         }
-        if (result.ok && profile.fp.autoMatchProxy && profile.tools.autoSyncLocale) {
+        if (result.ok && profile.fp.autoMatchProxy && profile.tools.autoSyncLocale &&
+            result.countryCode.isNotBlank()
+        ) {
             FingerprintFactory.applyProxyLocale(profile.fp, result.countryCode)
         }
-        database.saveProfile(profile)
-        return result
     }
 
     /**

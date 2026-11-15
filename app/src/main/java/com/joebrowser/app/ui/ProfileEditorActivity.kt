@@ -540,28 +540,22 @@ class ProfileEditorActivity : AppCompatActivity() {
     }
 
     private fun bindProxyResult(candidate: ProxyConfig, result: ProxyTestResult) {
-        profile.proxy = candidate.apply {
-            lastCheckedAt = System.currentTimeMillis()
-            latencyMs = result.latencyMs
-            lastError = if (result.ok) "" else result.error
-            failStreak = if (result.ok) 0 else failStreak + 1
-            if (result.ok) {
-                if (lastIp.isNotBlank() && result.ip.isNotBlank() && lastIp != result.ip) rotations += 1
-                lastIp = result.ip
-                lastCountry = result.country
-                lastCountryCode = result.countryCode
-                lastCity = result.city
-                lastTimezone = result.timezone
-            }
-        }
+        profile.proxy = candidate
+        // One code path for "what a finished check means", shared with the saved-profile and
+        // monitor paths so the editor can never record a different story.
+        ProxyTester.applyResult(profile, result)
         binding.proxyStatus.text = describeProxyState(profile.proxy)
         binding.proxyStatus.setTextColor(ContextCompat.getColor(this, proxyStateColor(profile.proxy)))
 
-        // Keep the locale glued to the exit country, which is the point of matching a proxy.
-        if (result.ok && profile.fp.autoMatchProxy && result.countryCode.isNotBlank()) {
-            FingerprintFactory.applyProxyLocale(profile.fp, result.countryCode)
-            profile.fp.autoMatchProxy = true
-            populateIdentityFields()
+        populateIdentityFields()
+        // A check is a real measurement, not a draft: persist it for an existing profile so
+        // leaving the editor without pressing Save does not throw the probe away. Identity edits
+        // still need Save, which is what the unsaved-changes guard is for.
+        val id = editingId
+        if (id != null) {
+            ProfileRepository.saveProfile(applicationContext, profile) {
+                AppEvents.emitDataChanged(applicationContext, "proxy-checked")
+            }
         }
         markDirty()
     }
