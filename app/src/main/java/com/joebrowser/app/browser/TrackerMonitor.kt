@@ -71,13 +71,20 @@ class TrackerMonitor(private val onChange: (total: Int, trackers: Int) -> Unit) 
 
     private fun scheduleNotify(force: Boolean = false) {
         val now = System.currentTimeMillis()
-        if (!force && now - lastNotify < 400L) {
+        // force (reset / user action) must never be dropped or delayed behind a pending post.
+        if (force) {
+            lastNotify = now
+            dispatch()
+            return
+        }
+        if (now - lastNotify < NOTIFY_THROTTLE_MS) {
             if (pendingNotify) return
             pendingNotify = true
             mainHandler.postDelayed({
                 pendingNotify = false
+                lastNotify = System.currentTimeMillis()
                 dispatch()
-            }, 400L)
+            }, NOTIFY_THROTTLE_MS)
             return
         }
         lastNotify = now
@@ -103,15 +110,24 @@ class TrackerMonitor(private val onChange: (total: Int, trackers: Int) -> Unit) 
     }
 
     fun isTracker(host: String): Boolean {
-        val h = host.lowercase()
-        return KNOWN_TRACKER_HOSTS.any { h == it || h.endsWith("." + it) }
+        val h = host.lowercase().trim('.')
+        if (h.isEmpty()) return false
+        return KNOWN_TRACKER_HOSTS.any { known ->
+            // Exact host or a real subdomain. A bare endsWith() would also match
+            // 'notdoubleclick.net', which is not the tracker it looks like.
+            h == known || h.endsWith("." + known)
+        }
     }
 
     companion object {
+        private const val NOTIFY_THROTTLE_MS = 400L
+
         /** Known collection / analytics hosts. Suffix-matched, so subdomains are covered. */
         private val KNOWN_TRACKER_HOSTS = listOf(
+            // Hosts only. Entries previously included path fragments ('facebook.com/tr',
+            // 'youtube.com/api/stats/ads') which never match a host and silently did nothing.
             "doubleclick.net", "google-analytics.com", "googletagmanager.com", "googlesyndication.com",
-            "googleadservices.com", "google-analytics.cn", "connect.facebook.net", "facebook.com/tr",
+            "googleadservices.com", "google-analytics.cn", "connect.facebook.net",
             "analytics.tiktok.com", "bat.bing.com", "clarity.ms", "scorecardresearch.com", "quantserve.com",
             "hotjar.com", "hotjar.io", "mixpanel.com", "segment.com", "segment.io", "criteo.com", "criteo.net",
             "adsrvr.org", "taboola.com", "outbrain.com", "fullstory.com", "amplitude.com", "branch.io",
@@ -120,10 +136,12 @@ class TrackerMonitor(private val onChange: (total: Int, trackers: Int) -> Unit) 
             "analytics.yahoo.com", "adnxs.com", "rubiconproject.com", "pubmatic.com", "casalemedia.com",
             "moatads.com", "serving-sys.com", "mathtag.com", "bluekai.com", "exelator.com", "demdex.net",
             "omtrdc.net", "2o7.net", "everesttech.net", "krxd.net", "tidaltv.com", "innovid.com",
-            "ytimg.com/api/stats", "youtube.com/api/stats/ads", "sentry.io", "bugsnag.com",
-            "newrelic.com", "nr-data.net", "optimizely.com", "vwo.com", "heapanalytics.com",
-            "statcounter.com", "yandex.ru/metrika", "mc.yandex.ru", "top-fwz1.mail.ru",
-            "counter.yadro.ru", "histats.com", "liveinternet.ru", "quantserve.com"
+            "sentry.io", "bugsnag.com", "newrelic.com", "nr-data.net", "optimizely.com", "vwo.com",
+            "heapanalytics.com", "statcounter.com",
+            // Analytics subdomains only: 'yandex.ru' itself is the search engine, not an
+            // analytics endpoint, and flagging it would mislabel normal browsing.
+            "mc.yandex.ru", "top-fwz1.mail.ru",
+            "ads.mail.ru", "ad.mail.ru", "counter.yadro.ru", "histats.com", "liveinternet.ru"
         )
     }
 }
