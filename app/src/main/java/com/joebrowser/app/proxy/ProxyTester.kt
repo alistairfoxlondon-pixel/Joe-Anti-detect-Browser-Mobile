@@ -45,15 +45,17 @@ object ProxyTester {
     private const val IP_ECHO = "https://api.ipify.org?format=json"
     private const val IP_GEO = "http://ip-api.com/json/?fields=status,country,countryCode,city,timezone,org,query"
     private const val DEFAULT_TIMEOUT = 12_000
+    private const val MAX_BODY_CHARS = 64 * 1024
 
     /** Checks the machine's own public IP (no proxy) — used by the "This device" card. */
     fun checkDirectDevice(timeoutMs: Int = DEFAULT_TIMEOUT): ProxyTestResult {
         val started = System.currentTimeMillis()
         return try {
-            val body = httpGet(IP_ECHO, Proxy.NO_PROXY, timeoutMs)
-                ?: return fail("IP echo did not answer", started)
+            val outcome = httpGet(IP_ECHO, Proxy.NO_PROXY, timeoutMs)
+            val body = outcome.bodyOrNull()
+                ?: return fail(outcome.errorOrBlank(), started)
             val ip = runCatching { JSONObject(body).optString("ip") }.getOrDefault("")
-            if (ip.isBlank()) return fail("Exit IP could not be parsed", started)
+            if (ip.isBlank()) return fail("Upstream answered with an unexpected body (no exit IP)", started)
             val latency = (System.currentTimeMillis() - started).toInt()
             val geo = geoFor(ip, timeoutMs)
             ProxyTestResult(
@@ -73,10 +75,11 @@ object ProxyTester {
         return try {
             relay = LocalProxyRelay.start(config)
             val local = Proxy(Proxy.Type.HTTP, InetSocketAddress("127.0.0.1", relay.port))
-            val body = httpGet(IP_ECHO, local, timeoutMs)
-                ?: return fail("Proxy did not return an exit IP", started)
+            val outcome = httpGet(IP_ECHO, local, timeoutMs)
+            val body = outcome.bodyOrNull()
+                ?: return fail(outcome.errorOrBlank(), started)
             val ip = runCatching { JSONObject(body).optString("ip") }.getOrDefault("")
-            if (ip.isBlank()) return fail("Exit IP could not be parsed", started)
+            if (ip.isBlank()) return fail("Upstream answered with an unexpected body (no exit IP)", started)
             val latency = (System.currentTimeMillis() - started).toInt()
             val geo = geoForVia(local, timeoutMs).takeIf { it.second.isNotBlank() }
                 ?: geoFor(ip, timeoutMs)
@@ -187,7 +190,11 @@ object ProxyTester {
 
     private fun geoFor(ip: String, timeoutMs: Int): Quadruple {
         return try {
-            val body = httpGet("http://ip-api.com/json/$ip?fields=status,country,countryCode,city,timezone,org", Proxy.NO_PROXY, timeoutMs)
+            val body = httpGet(
+                "http://ip-api.com/json/$ip?fields=status,country,countryCode,city,timezone,org",
+                Proxy.NO_PROXY,
+                timeoutMs
+            ).bodyOrNull()
             if (body == null) Quadruple("", "", "", "")
             else {
                 val json = JSONObject(body)
@@ -206,7 +213,8 @@ object ProxyTester {
 
     private fun geoForVia(proxy: Proxy, timeoutMs: Int): Quadruple {
         return try {
-            val body = httpGet(IP_GEO, proxy, timeoutMs) ?: return Quadruple("", "", "", "")
+            val body = httpGet(IP_GEO, proxy, timeoutMs).bodyOrNull()
+                ?: return Quadruple("", "", "", "")
             val json = JSONObject(body)
             if (json.optString("status") != "success") Quadruple("", "", "", "")
             else Quadruple(
@@ -225,7 +233,15 @@ object ProxyTester {
     private fun fail(message: String, started: Long): ProxyTestResult =
         ProxyTestResult(ok = false, latencyMs = (System.currentTimeMillis() - started).toInt(), error = message)
 
-    private fun httpGet(url: String, proxy: Proxy, timeoutMs: Int): String? {
+    /**
+     * One HTTP GET with an explicit proxy, returning either a body or a *specific* reason.
+     *
+     * The previous version returned `null` for every failure, so a proxy with wrong credentials,
+     * a proxy that does not answer, and a DNS problem all surfaced as "did not return an exit
+     * IP" — the one message that tells the user nothing. Failures are now classified so the badge
+     * and the monitor can say what actually happened.
+     */
+    private fun httpGet(url: String, proxy: Proxy, timeoutMs: Int): HttpOutcome {
         var connection: HttpURLConnection? = null
         return try {
             connection = (URL(url).openConnection(proxy) as HttpURLConnection).apply {
@@ -236,17 +252,62 @@ object ProxyTester {
                 setRequestProperty("Accept-Encoding", "gzip")
                 setRequestProperty("User-Agent", "JoeBrowser/2 (proxy-health-check)")
             }
-            if (connection.responseCode !in 200..299) return null
+            val status = connection.responseCode
+            if (status !in 200..299) {
+                return when (status) {
+                    407 -> HttpOutcome.problem("Proxy rejected the credentials (HTTP 407)")
+                    403 -> HttpOutcome.problem("Proxy refused the request (HTTP 403)")
+                    429 -> HttpOutcome.problem("Proxy rate-limited the check (HTTP 429)")
+                    in 500..599 -> HttpOutcome.problem("Upstream proxy failed (HTTP $status)")
+                    else -> HttpOutcome.problem("Unexpected response from upstream (HTTP $status)")
+                }
+            }
             val stream = if ("gzip".equals(connection.contentEncoding, true)) {
                 GZIPInputStream(connection.inputStream)
             } else {
                 connection.inputStream
             }
-            BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { it.readText() }
+            // readText with a cap: the echo services return a few dozen bytes, so anything large
+            // is a captive portal or an error page, not our answer.
+            val body = BufferedReader(InputStreamReader(stream, Charsets.UTF_8)).use { reader ->
+                val buffer = CharArray(4096)
+                val out = StringBuilder()
+                while (out.length < MAX_BODY_CHARS) {
+                    val read = reader.read(buffer)
+                    if (read <= 0) break
+                    out.append(buffer, 0, read)
+                }
+                out.toString()
+            }
+            HttpOutcome.ok(body)
         } catch (t: Throwable) {
-            null
+            HttpOutcome.problem(describe(t, timeoutMs))
         } finally {
             runCatching { connection?.disconnect() }
         }
     }
-}
+
+    /** Turns a transport exception into something a user can act on. */
+    private fun describe(t: Throwable, timeoutMs: Int): String = when (t) {
+        is java.net.SocketTimeoutException ->
+            "Upstream did not answer within ${timeoutMs / 1000} s"
+        is java.net.UnknownHostException ->
+            "Cannot resolve the proxy address"
+        is java.net.ConnectException ->
+            "Proxy refused the connection"
+        is javax.net.ssl.SSLException ->
+            "TLS failed through the proxy"
+        is java.net.NoRouteToHostException ->
+            "No route to the proxy"
+        else -> t.message?.takeIf { it.isNotBlank() } ?: "Unreachable"
+    }
+
+    private class HttpOutcome(private val body: String?, private val error: String) {
+        fun bodyOrNull(): String? = body
+        fun errorOrBlank(): String = error
+
+        companion object {
+            fun ok(body: String): HttpOutcome = HttpOutcome(body, "")
+            fun problem(reason: String): HttpOutcome = HttpOutcome(null, reason)
+        }
+    }
