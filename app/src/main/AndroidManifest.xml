@@ -65,6 +65,12 @@
             android:label="@string/history_title" />
 
         <activity
+            android:name=".ui.FingerprintBatchActivity"
+            android:exported="false"
+            android:label="@string/batch_title"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
             android:name=".ui.FingerprintLabActivity"
             android:exported="false"
             android:label="@string/lab_title" />

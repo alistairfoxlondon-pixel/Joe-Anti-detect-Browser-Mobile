@@ -57,6 +57,9 @@ class FingerprintLabActivity : AppCompatActivity() {
         binding.labProfileCard.setOnClickListener { pickProfile() }
         binding.labSwitch.setOnClickListener { pickProfile() }
         binding.labRunAll.setOnClickListener { openSite(sites.first()) }
+        binding.labAuditAll.setOnClickListener {
+            startActivity(Intent(this, FingerprintBatchActivity::class.java))
+        }
 
         val requestedId = intent.getStringExtra(EXTRA_PROFILE_ID)
         ProfileRepository.profiles(this) { list ->

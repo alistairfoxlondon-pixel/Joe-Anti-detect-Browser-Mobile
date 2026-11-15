@@ -83,6 +83,7 @@
     <string name="profiles_count_filtered">%1$d of %2$d</string>
     <string name="profiles_quick_proxy">Switch proxy</string>
     <string name="profiles_new_fingerprint">New fingerprint</string>
+    <string name="profiles_audit_all">Audit all fingerprints</string>
     <string name="profiles_test_fp">Test fingerprint</string>
     <string name="profiles_fingerprint_regenerated">New fingerprint</string>
     <string name="profiles_batch_select">Select for batch action</string>
@@ -359,6 +360,16 @@
     <string name="not_checked">Not checked</string>
 
     <!-- Fingerprint lab -->
+    <string name="batch_title">Fingerprint audit</string>
+    <string name="batch_no_issues">No contradictions</string>
+    <plurals name="batch_summary">
+        <item quantity="one">%1$d of %2$d profile clean · %3$d issues</item>
+        <item quantity="other">%1$d of %2$d profiles clean · %3$d issues</item>
+    </plurals>
+    <plurals name="batch_duplicates">
+        <item quantity="one">%1$d duplicate fingerprint — sites can link those profiles</item>
+        <item quantity="other">%1$d duplicate fingerprints — sites can link those profiles</item>
+    </plurals>
     <string name="lab_title">Fingerprint lab</string>
     <string name="lab_switch">Switch</string>
     <string name="lab_no_profile">No profile yet</string>

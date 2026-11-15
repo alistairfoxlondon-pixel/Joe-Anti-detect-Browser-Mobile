@@ -40,6 +40,12 @@
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/lab_title" />
+
+        <ImageButton
+            android:id="@+id/labAuditAll"
+            style="@style/Widget.Jb.IconButton"
+            android:contentDescription="@string/profiles_audit_all"
+            android:src="@drawable/ic_layers" />
     </LinearLayout>
 
     <View

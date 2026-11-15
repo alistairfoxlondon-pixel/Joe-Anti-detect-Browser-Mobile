@@ -198,6 +198,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         popup.menu.add(0, ACTION_SELECT, 5, getString(R.string.profiles_batch_select))
         popup.menu.add(0, ACTION_CLEAR, 6, getString(R.string.browser_clear_data))
         popup.menu.add(0, ACTION_DELETE, 7, getString(R.string.action_delete))
+        popup.menu.add(0, ACTION_AUDIT_ALL, 8, getString(R.string.profiles_audit_all))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 ACTION_EDIT -> (activity as? MainActivity)?.openProfileEditor(profile.id)
@@ -208,6 +209,9 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 ACTION_SELECT -> toggleSelection(profile.id)
                 ACTION_CLEAR -> confirmClearData(profile)
                 ACTION_DELETE -> confirmDelete(profile)
+                ACTION_AUDIT_ALL -> startActivity(
+                    android.content.Intent(requireContext(), FingerprintBatchActivity::class.java)
+                )
             }
             true
         }
@@ -651,6 +655,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         private const val ACTION_DELETE = 104
         private const val ACTION_SWITCH_PROXY = 105
         private const val ACTION_NEW_FINGERPRINT = 106
+        private const val ACTION_AUDIT_ALL = 109
         private const val ACTION_TEST_FINGERPRINT = 108
         private const val ACTION_SELECT = 107
     }
