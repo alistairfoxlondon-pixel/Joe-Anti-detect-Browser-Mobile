@@ -376,6 +376,9 @@ for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml
     const body = m[2];
     if (!/android:clickable="true"/.test(body)) continue;
     if (/android:minHeight="(?:4[89]|[5-9]\d|\d{3,})dp"/.test(body)) continue;
+    // `match_parent` inherits the parent's size, which for a segment half is the sized
+    // container above it — those are fine and cannot be judged from this file alone.
+    if (/android:layout_height="match_parent"/.test(body)) continue;
     const w = /android:layout_width="(\d+)dp"/.exec(body);
     const h = /android:layout_height="(\d+)dp"/.exec(body);
     if ((w && Number(w[1]) < 48) || (h && Number(h[1]) < 48)) {
