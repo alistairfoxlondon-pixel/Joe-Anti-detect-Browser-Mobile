@@ -138,6 +138,8 @@ jobs:
 
           ${signed_note}
 
-          What's in this build: isolated per-profile storage (AndroidX WebKit MULTI_PROFILE where supported), proxy authentication via loopback relay (HTTP/HTTPS/SOCKS5), per-profile fingerprint engine (canvas/audio/hardware noise, screen/GPU/cores/memory/locale consistency), paste-as-human typing, built-in HTTP tracker counter, proxy library with parallel checks and offline/rotation alerts, history, backups via JSON export.
+          What's in this build: isolated per-profile storage (AndroidX WebKit MULTI_PROFILE where supported), proxy authentication via loopback relay (HTTP/HTTPS/SOCKS5), per-profile fingerprint engine (canvas/audio/hardware noise, screen/GPU/cores/memory/locale consistency, Android UA-CH architecture fixes), paste-as-human typing, built-in HTTP tracker counter, proxy library with parallel checks and offline/rotation alerts, history, backups via JSON export.
+
+          New in v1.2.0: multi-tab fingerprinted browsing, cookie import/export (JSON + Netscape), batch profile actions (proxy switch, group move, fingerprint reroll, delete), quick proxy/fingerprint actions on profile cards, Trash Manager with restore/permanent delete, MaterialSwitch fixes, dashboard 2x2 grid, bottom-sheet overflow fixes, and profile editor proxy-field preservation.
 
           All data stays on the device. See README for honest limitations (Android WebView cannot run Chrome extensions or its own sandboxed profile engine; Firefox identities are UA-level only)."

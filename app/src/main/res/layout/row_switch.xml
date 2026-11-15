@@ -1,20 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Reusable "label + switch" row.
-
-  Included via <include android:id="@+id/rowX" layout="@layout/row_switch"/> and configured in
-  code: the include's id becomes the row container; its children are addressed by their own
-  ids through the generated binding (`rowX.rowLabel`, `rowX.rowSwitch`).
-
-  Height is 48dp, the label is weight=1 with an optional secondary line, and the switch keeps
-  its natural width — the standard Android setting-row geometry, which cannot overflow.
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:gravity="center_vertical"
-    android:minHeight="@dimen/touch_target"
-    android:orientation="horizontal">
+    android:minHeight="52dp"
+    android:orientation="horizontal"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
 
     <LinearLayout
         android:layout_width="0dp"
@@ -24,28 +17,27 @@
 
         <TextView
             android:id="@+id/rowLabel"
-            style="@style/TextAppearance.Material3.BodyLarge"
-            android:textColor="?attr/colorOnSurface"
+            style="@style/Text.Jb.Body"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:ellipsize="end"
-            android:maxLines="1" />
+            android:maxLines="2" />
 
         <TextView
             android:id="@+id/rowHint"
-            style="@style/TextAppearance.Material3.BodySmall"
-            android:textColor="?attr/colorOnSurfaceVariant"
+            style="@style/Text.Jb.Caption"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:ellipsize="end"
-            android:maxLines="1"
+            android:maxLines="3"
             android:visibility="gone" />
     </LinearLayout>
 
-    <Switch
+    <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/rowSwitch"
-        style="@style/Widget.Material3.CompoundButton.MaterialSwitch"
+        style="@style/Widget.Jb.Switch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="8dp" />
+        android:layout_marginStart="12dp" />
 </LinearLayout>

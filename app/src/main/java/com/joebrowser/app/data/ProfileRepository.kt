@@ -109,7 +109,9 @@ object ProfileRepository {
         Async.serialize {
             runCatching {
                 db(app).deleteProfile(profile, keepTrash)
-                ProfileStorage.erase(app, profile.id)
+                if (!keepTrash) {
+                    ProfileStorage.erase(app, profile.id)
+                }
             }.onFailure { Log.w(TAG, "deleteProfile failed", it) }
             Async.onMain { onDone() }
             notifyChanged()
@@ -274,10 +276,44 @@ object ProfileRepository {
         Async.compute({ db(app).trashCount() }) { onResult(it ?: 0) }
     }
 
+    fun trashedProfiles(context: Context, onResult: (List<Pair<Profile, Long>>) -> Unit) {
+        val app = context.applicationContext
+        Async.compute({ db(app).getAllTrashedProfiles() }) { onResult(it ?: emptyList()) }
+    }
+
+    fun restoreFromTrash(context: Context, id: String, onDone: (Profile?) -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            val restored = runCatching {
+                val p = db(app).restoreTrashedProfile(id)
+                if (p != null) ProfileStorage.ensure(app, p.id)
+                p
+            }.getOrNull()
+            Async.onMain { onDone(restored) }
+            notifyChanged()
+        }
+    }
+
+    fun deleteTrashedForever(context: Context, id: String, onDone: () -> Unit = {}) {
+        val app = context.applicationContext
+        Async.serialize {
+            runCatching {
+                db(app).deleteTrashedForever(id)
+                ProfileStorage.erase(app, id)
+            }
+            Async.onMain { onDone() }
+            notifyChanged()
+        }
+    }
+
     fun emptyTrash(context: Context, onDone: () -> Unit = {}) {
         val app = context.applicationContext
         Async.serialize {
-            runCatching { db(app).emptyTrash() }
+            runCatching {
+                val items = db(app).getAllTrashedProfiles()
+                db(app).emptyTrash()
+                items.forEach { (p, _) -> ProfileStorage.erase(app, p.id) }
+            }
             Async.onMain { onDone() }
             notifyChanged()
         }

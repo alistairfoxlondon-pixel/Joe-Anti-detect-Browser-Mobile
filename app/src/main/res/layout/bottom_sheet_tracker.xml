@@ -5,6 +5,7 @@
   scrolls smoothly instead of inflating 3000 views.
 -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:background="@color/surface"
@@ -32,7 +33,7 @@
             android:layout_height="@dimen/icon_md"
             android:contentDescription="@null"
             android:src="@drawable/ic_shield_check"
-            android:tint="@color/accent" />
+            app:tint="@color/accent" />
 
         <TextView
             style="@style/Text.Jb.CardTitle"
@@ -49,6 +50,7 @@
             style="@style/Text.Jb.Caption"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
             android:ellipsize="end"
             android:maxLines="1" />
     </LinearLayout>
@@ -58,18 +60,17 @@
         style="@style/Text.Jb.Caption"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="14dp"
-        android:layout_marginBottom="14dp"
+        android:layout_marginTop="18dp"
+        android:layout_marginBottom="18dp"
+        android:gravity="center"
         android:text="@string/browser_tracker_empty"
         android:visibility="gone" />
 
     <androidx.recyclerview.widget.RecyclerView
         android:id="@+id/trackerList"
         android:layout_width="match_parent"
-        android:layout_height="0dp"
+        android:layout_height="280dp"
         android:layout_marginTop="8dp"
-        android:layout_weight="1"
-        android:minHeight="120dp"
         android:clipToPadding="false"
         android:paddingBottom="@dimen/gap_m"
         android:scrollbars="vertical" />

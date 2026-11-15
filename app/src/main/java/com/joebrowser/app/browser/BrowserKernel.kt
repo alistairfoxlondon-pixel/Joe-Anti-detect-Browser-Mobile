@@ -68,7 +68,7 @@ class BrowserKernel(
      * and stacking a second rule would leave the old identity's script running first, which
      * defeats the point of the update. `ScriptHandler.remove()` is the documented undo.
      */
-    private var startHandle: ScriptHandler? = null
+    private val startHandles = java.util.WeakHashMap<WebView, ScriptHandler>()
 
     private var injectionMode: InjectionMode = InjectionMode.EARLY_FALLBACK
     private var isolationMode: IsolationMode = IsolationMode.SHARED
@@ -94,19 +94,13 @@ class BrowserKernel(
     }
 
     /**
-     * Binds the WebView to the profile's isolated bucket and attaches the document-start
-     * script. Call after `prepare()` and before `loadUrl`.
+     * Binds a brand-new, untouched WebView to the profile's isolated bucket BEFORE any
+     * `getSettings()`, client assignment, or JavascriptInterface call occurs.
      */
-    @SuppressLint("SetJavaScriptEnabled")
-    fun install(webView: WebView) {
-        if (installed) return
-        installed = true
-
-        // ---- isolation
+    fun bindProfileEarly(webView: WebView) {
         isolationMode = if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             try {
                 val store = store() ?: throw IllegalStateException("ProfileStore unavailable")
-                // getOrCreateProfile is cheap after the first call and returns the same bucket.
                 val bucket: WebKitProfile = store.getOrCreateProfile(token)
                 WebViewCompat.setProfile(webView, bucket.name)
                 IsolationMode.ISOLATED
@@ -117,12 +111,29 @@ class BrowserKernel(
         } else {
             IsolationMode.SHARED
         }
+    }
+
+    /**
+     * Attaches per-profile cookie policy and document-start spoofing script onto a WebView
+     * whose profile was bound via [bindProfileEarly]. Call before `loadUrl`.
+     */
+    @SuppressLint("SetJavaScriptEnabled")
+    fun install(webView: WebView) {
+        installed = true
+
+        if (isolationMode == IsolationMode.SHARED && WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+            // Fallback if caller didn't call bindProfileEarly first
+            runCatching {
+                val store = store() ?: throw IllegalStateException("ProfileStore unavailable")
+                val bucket: WebKitProfile = store.getOrCreateProfile(token)
+                WebViewCompat.setProfile(webView, bucket.name)
+                isolationMode = IsolationMode.ISOLATED
+            }.onFailure {
+                Log.w(Async.TAG, "Late MULTI_PROFILE binding skipped", it)
+            }
+        }
 
         // ---- per-profile cookie policy
-        //
-        // When a WebKit Profile is bound, cookies live in that bucket's own jar and must be
-        // driven through it: CookieManager.getInstance() is the *default* (global) jar, so using
-        // it here would accept, read and clear the wrong profile's cookies.
         runCatching {
             if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE) &&
                 isolationMode == IsolationMode.ISOLATED
@@ -142,7 +153,8 @@ class BrowserKernel(
         // ---- fingerprint injection: earliest possible hook
         injectionMode = if (WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT) && script.isNotEmpty()) {
             try {
-                startHandle = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
+                runCatching { startHandles.remove(webView)?.remove() }
+                startHandles[webView] = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
                 InjectionMode.DOCUMENT_START
             } catch (t: Throwable) {
                 Log.w(Async.TAG, "Document-start injection failed; using early fallback", t)
@@ -184,7 +196,7 @@ class BrowserKernel(
      * replace semantics: leaving the old rule attached would run the old identity's script
      * ahead of the new one on every subsequent document.
      */
-    fun refreshScript(webView: WebView, updated: Profile): Boolean {
+    fun refreshScript(webViews: Collection<WebView>, updated: Profile): Boolean {
         val rebuilt = runCatching {
             FingerprintScript.build(updated.fp, updated.engine, updated.tools.unlockSelection)
         }.getOrNull()
@@ -194,20 +206,21 @@ class BrowserKernel(
         if (injectionMode == InjectionMode.DOCUMENT_START &&
             WebViewFeature.isFeatureSupported(WebViewFeature.DOCUMENT_START_SCRIPT)
         ) {
-            runCatching { startHandle?.remove() }
-            startHandle = null
-            runCatching {
-                startHandle = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
-            }.onFailure {
-                Log.w(Async.TAG, "Could not re-attach document-start script", it)
-                injectionMode = InjectionMode.EARLY_FALLBACK
+            webViews.forEach { webView ->
+                runCatching { startHandles.remove(webView)?.remove() }
+                runCatching {
+                    startHandles[webView] = WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*"))
+                }.onFailure {
+                    Log.w(Async.TAG, "Could not re-attach document-start script", it)
+                    injectionMode = InjectionMode.EARLY_FALLBACK
+                }
             }
         }
-        // The fallback path injects into the live document too, so a reload is not strictly
-        // required for it to take effect — but the page's cached globals still are, so the
-        // caller reloads identically in both modes.
         return true
     }
+
+    fun refreshScript(webView: WebView, updated: Profile): Boolean =
+        refreshScript(listOf(webView), updated)
 
     /** The bucket's cookie store when isolation is active, otherwise the global one. */
     private fun cookieStore(): CookieManager? = try {
@@ -251,28 +264,47 @@ class BrowserKernel(
         return KernelStatus(isolationMode, injectionMode, token, warning)
     }
 
+    /** The bucket's cookie store when isolation is active, otherwise the global one. */
+    fun activeCookieManager(): CookieManager? = cookieStore()
+
+    /** The bucket's WebStorage when isolation is active, otherwise the global one. */
+    private fun webStorage(): android.webkit.WebStorage? = try {
+        if (isolationMode == IsolationMode.ISOLATED && WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+            store()?.getOrCreateProfile(token)?.webStorage ?: android.webkit.WebStorage.getInstance()
+        } else {
+            android.webkit.WebStorage.getInstance()
+        }
+    } catch (t: Throwable) {
+        Log.w(Async.TAG, "WebStorage unavailable", t)
+        null
+    }
+
     /**
-     * Wipes this profile's browser data: the isolated bucket, cookies, cache and the
-     * materialised directories. Runs synchronously; call from a background thread.
+     * Wipes this profile's browser data: cookies, WebStorage (localStorage/IndexedDB), cache,
+     * form data, history, and materialised directories. Must run on the main thread when
+     * clearing live WebView state, or safe from background when [webView] is null.
      */
     fun wipeData(webView: WebView?) {
-        // Scoped to this profile's bucket. The previous version called the global
-        // CookieManager.removeAllCookies(), which signed the user out of *every* profile in the
-        // app — a direct violation of the isolation the product promises — and, because a
-        // WebKit Profile's cookies live in a separate jar, did not reliably clear this one.
         clearCookies()
-        runCatching { webView?.clearCache(true) }
-        runCatching { webView?.clearFormData() }
-        runCatching { webView?.clearHistory() }
-
-        if (isolationMode == IsolationMode.ISOLATED || WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
-            runCatching {
-                val store = store() ?: throw IllegalStateException("ProfileStore unavailable")
-                store.deleteProfile(token)
-                // Re-create immediately so the live WebView keeps a valid bucket.
-                val recreated = store.getOrCreateProfile(ProfileStorage.rotateKernelToken(context, profile.id))
-                token = recreated.name
-            }.onFailure { Log.w(Async.TAG, "Could not delete WebKit profile bucket", it) }
+        runCatching { webStorage()?.deleteAllData() }
+        if (webView != null) {
+            Async.onMain {
+                runCatching { webView.clearCache(true) }
+                runCatching { webView.clearFormData() }
+                runCatching { webView.clearHistory() }
+                runCatching {
+                    webView.evaluateJavascript(
+                        "try{localStorage.clear();sessionStorage.clear();}catch(_){}",
+                        null
+                    )
+                }
+            }
+        }
+        // Rotate the kernel token on disk so the NEXT session starts in a brand-new WebKit bucket,
+        // without calling deleteProfile() on the currently loaded live profile (which throws
+        // IllegalStateException on AndroidX WebKit).
+        runCatching {
+            ProfileStorage.rotateKernelToken(context, profile.id)
         }
         ProfileStorage.markWiped(context, profile.id)
         listOf("cookies", "cache", "localstorage", "indexdb")

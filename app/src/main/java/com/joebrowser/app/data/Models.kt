@@ -209,12 +209,15 @@ data class ProxyConfig(
 
     fun authority(): String = if (enabled) host + ":" + port else ""
 
-    fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
+    fun toJson(includeSecret: Boolean = true, portableSecret: Boolean = false): JSONObject = JSONObject().apply {
         put("type", type)
         put("host", host)
         put("port", port)
         put("user", user)
-        if (includeSecret && password.isNotEmpty()) put("passwordEnc", SecureStore.encrypt(password))
+        if (includeSecret && password.isNotEmpty()) {
+            if (portableSecret) put("password", password)
+            else put("passwordEnc", SecureStore.encrypt(password))
+        }
         put("lastIp", lastIp)
         put("lastCountry", lastCountry)
         put("lastCountryCode", lastCountryCode)
@@ -243,9 +246,10 @@ data class ProxyConfig(
             d.host = o.optString("host", "")
             d.port = o.optInt("port", 0).coerceIn(0, 65535)
             d.user = o.optString("user", "")
-            // SecureStore.decrypt never throws: a missing/invalid key degrades to an empty
-            // password, which the relay treats as "no credentials" instead of crashing.
-            d.password = SecureStore.decrypt(o.optString("passwordEnc", ""))
+            val plainPassword = o.optString("password", "")
+            d.password = plainPassword.ifEmpty {
+                SecureStore.decrypt(o.optString("passwordEnc", ""))
+            }
             d.lastIp = o.optString("lastIp", "")
             d.lastCountry = o.optString("lastCountry", "")
             d.lastCountryCode = o.optString("lastCountryCode", "")
@@ -370,7 +374,7 @@ data class Profile(
         }
     }
 
-    fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
+    fun toJson(includeSecret: Boolean = true, portableSecret: Boolean = false): JSONObject = JSONObject().apply {
         put("id", id)
         put("name", name)
         put("notes", notes)
@@ -386,7 +390,7 @@ data class Profile(
         put("created", created)
         put("lastOpened", lastOpened)
         put("fp", fp.toJson())
-        put("proxy", proxy.toJson(includeSecret))
+        put("proxy", proxy.toJson(includeSecret, portableSecret))
         put("tools", tools.toJson())
     }
 
@@ -445,11 +449,11 @@ data class SavedProxy(
 ) {
     fun displayName(): String = name.ifBlank { config.authority().ifBlank { "Proxy" } }
 
-    fun toJson(includeSecret: Boolean = true): JSONObject = JSONObject().apply {
+    fun toJson(includeSecret: Boolean = true, portableSecret: Boolean = false): JSONObject = JSONObject().apply {
         put("id", id)
         put("name", name)
         put("note", note)
-        put("config", config.toJson(includeSecret))
+        put("config", config.toJson(includeSecret, portableSecret))
     }
 
     companion object {
@@ -626,8 +630,8 @@ object ExportFormat {
         // install's Android Keystore key and cannot be read anywhere else. Secrets therefore
         // leave as plaintext inside the (user-chosen) file, and the flag says so.
         put("credentialFormat", "plaintext")
-        put("profiles", JSONArray().apply { profiles.forEach { put(it.toJson(includeSecrets)) } })
-        put("proxies", JSONArray().apply { proxies.forEach { put(it.toJson(includeSecrets)) } })
+        put("profiles", JSONArray().apply { profiles.forEach { put(it.toJson(includeSecrets, portableSecret = true)) } })
+        put("proxies", JSONArray().apply { proxies.forEach { put(it.toJson(includeSecrets, portableSecret = true)) } })
         put("extensions", JSONArray().apply { extensions.forEach { put(it.toJson()) } })
     }
 }

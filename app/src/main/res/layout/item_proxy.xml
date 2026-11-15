@@ -1,12 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!--
-  Proxy library row.
-
-  The row is a two-line block plus a state dot, a watch switch and a menu target. The middle
-  column is weight=1 so `host:port` ellipsizes rather than displacing the switch. The whole
-  row is clickable for an immediate re-check.
--->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/proxyRow"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -14,13 +8,14 @@
     android:background="@drawable/bg_card"
     android:clickable="true"
     android:focusable="true"
+    android:foreground="?attr/selectableItemBackground"
     android:gravity="center_vertical"
-    android:minHeight="72dp"
+    android:minHeight="76dp"
     android:orientation="horizontal"
-    android:paddingStart="12dp"
-    android:paddingTop="10dp"
-    android:paddingEnd="4dp"
-    android:paddingBottom="10dp">
+    android:paddingStart="14dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="6dp"
+    android:paddingBottom="12dp">
 
     <View
         android:id="@+id/proxyStatusDot"
@@ -31,7 +26,7 @@
     <LinearLayout
         android:layout_width="0dp"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
+        android:layout_marginStart="12dp"
         android:layout_weight="1"
         android:orientation="vertical">
 
@@ -50,7 +45,7 @@
                 android:maxLines="1"
                 android:text="host:port"
                 android:textColor="@color/text"
-                android:textSize="13.5sp"
+                android:textSize="14sp"
                 android:textStyle="bold" />
 
             <TextView
@@ -67,7 +62,7 @@
                 android:paddingBottom="2dp"
                 android:text="SOCKS5"
                 android:textColor="@color/text_dim"
-                android:textSize="9.5sp"
+                android:textSize="10sp"
                 android:textStyle="bold" />
         </LinearLayout>
 
@@ -75,7 +70,7 @@
             android:id="@+id/proxyDetail"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="2dp"
+            android:layout_marginTop="3dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:text="@string/proxies_never_checked"
@@ -85,19 +80,20 @@
             android:id="@+id/proxyMeta"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginTop="2dp"
             android:ellipsize="end"
             android:maxLines="1"
             android:textAppearance="@style/Text.Jb.Caption"
-            android:textSize="10sp"
+            android:textSize="10.5sp"
             android:visibility="gone" />
     </LinearLayout>
 
-    <Switch
+    <com.google.android.material.materialswitch.MaterialSwitch
         android:id="@+id/proxyWatch"
         style="@style/Widget.Jb.Switch"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginStart="4dp"
+        android:layout_marginStart="6dp"
         android:contentDescription="@string/editor_watch" />
 
     <ImageButton
@@ -108,5 +104,5 @@
         android:contentDescription="@string/action_edit"
         android:padding="10dp"
         android:src="@drawable/ic_more"
-        android:tint="@color/text_muted" />
+        app:tint="@color/text_muted" />
 </LinearLayout>

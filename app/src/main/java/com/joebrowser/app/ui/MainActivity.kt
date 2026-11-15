@@ -55,9 +55,8 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         binding.btnHistory.setOnClickListener { openSafely(HistoryActivity::class.java) }
-        binding.btnSettings.setOnClickListener {
-            binding.bottomNav.selectedItemId = R.id.nav_tools
-            showTab(R.id.nav_tools)
+        binding.btnQuickNewProfile.setOnClickListener {
+            ProfileEditorActivity.launch(this, null)
         }
         binding.versionLabel.text = getString(R.string.app_name)
 

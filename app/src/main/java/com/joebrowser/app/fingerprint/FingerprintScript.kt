@@ -195,6 +195,7 @@ object FingerprintScript {
             put("pdfViewer", chromeLike)
             put("unlockSelection", unlockSelection)
             put("brands", brands)
+            put("fullVersion", fp.browserVersion)
             // Model/platform-version tokens for getHighEntropyValues: they must describe the
             // identity's platform, not this device. An Android identity reporting 'Pixel 9' on a
             // Mac profile (or a fixed 15.0.0 on macOS) is a contradiction a probe can read.
@@ -516,19 +517,19 @@ __PATCH_HELPERS__
                     JB.platform === 'MacIntel' ? 'macOS' :
                     JB.platform === 'iPhone' || JB.platform === 'iPad' ? 'iOS' :
                     JB.isMobile ? 'Android' : 'Linux',
-          getHighEntropyValues: function (hints) {
+            getHighEntropyValues: function (hints) {
             return Promise.resolve({
-              architecture: JB.platform === 'Linux armv81' ? 'arm' : 'x86',
+              architecture: JB.platform === 'Linux armv8l' ? 'arm' : 'x86',
               bitness: '64',
               brands: this.brands,
               fullVersionList: JB.brands.map(function (b) {
-                return { brand: b.brand, version: b.version + '.0.0.0' };
+                return { brand: b.brand, version: b.version === '24' ? '24.0.0.0' : (JB.fullVersion || (b.version + '.0.0.0')) };
               }),
               mobile: this.mobile,
               model: JB.androidModel || '',
               platform: this.platform,
               platformVersion: JB.platformVersion || '',
-              uaFullVersion: JB.ua.indexOf('Firefox') >= 0 ? '' : majorVersion(),
+              uaFullVersion: JB.isFirefox ? '' : (JB.fullVersion || majorVersion()),
               wow64: false
             });
           }

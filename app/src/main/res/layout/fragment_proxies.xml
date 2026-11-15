@@ -42,7 +42,7 @@
                 android:layout_height="22dp"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_globe"
-                android:tint="@color/accent" />
+                app:tint="@color/accent" />
 
             <LinearLayout
                 android:layout_width="0dp"
@@ -79,7 +79,7 @@
                 android:contentDescription="@string/action_check_now"
                 android:padding="13dp"
                 android:src="@drawable/ic_refresh"
-                android:tint="@color/text_dim" />
+                app:tint="@color/text_dim" />
         </LinearLayout>
 
         <!-- Monitor strip -->
@@ -134,7 +134,7 @@
                 android:layout_height="@dimen/icon_md"
                 android:contentDescription="@null"
                 android:src="@drawable/ic_chevron_right"
-                android:tint="@color/text_muted" />
+                app:tint="@color/text_muted" />
         </LinearLayout>
 
         <!-- Section header -->
@@ -166,68 +166,82 @@
                 android:textStyle="bold" />
         </LinearLayout>
 
-        <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/proxyList"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="0dp"
-            android:layout_weight="1"
-            android:clipToPadding="false"
-            android:paddingTop="@dimen/gap_xs"
-            android:paddingBottom="@dimen/list_bottom_inset"
-            android:scrollbars="none" />
-    </LinearLayout>
+            android:layout_weight="1">
 
-    <!-- Empty state -->
-    <LinearLayout
-        android:id="@+id/proxyEmptyState"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:gravity="center"
-        android:orientation="vertical"
-        android:padding="32dp"
-        android:visibility="gone">
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/proxyList"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="@dimen/gap_xs"
+                android:paddingBottom="@dimen/list_bottom_inset"
+                android:scrollbars="none" />
 
-        <ImageView
-            android:layout_width="56dp"
-            android:layout_height="56dp"
-            android:alpha="0.55"
-            android:contentDescription="@null"
-            android:src="@drawable/ic_nav_proxies"
-            android:tint="@color/text_muted" />
+            <!-- Empty state placed BELOW device IP card & monitor strip so headers stay visible -->
+            <LinearLayout
+                android:id="@+id/proxyEmptyState"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:gravity="center"
+                android:orientation="vertical"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:paddingBottom="48dp"
+                android:visibility="gone">
 
-        <TextView
-            style="@style/Text.Jb.CardTitle"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/gap_m"
-            android:text="@string/proxies_empty_title" />
+                <ImageView
+                    android:layout_width="52dp"
+                    android:layout_height="52dp"
+                    android:alpha="0.55"
+                    android:contentDescription="@null"
+                    android:src="@drawable/ic_nav_proxies"
+                    app:tint="@color/text_muted" />
 
-        <TextView
-            style="@style/Text.Jb.BodyMedium"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/gap_xs"
-            android:gravity="center"
-            android:maxLines="2"
-            android:text="@string/proxies_empty_body" />
+                <TextView
+                    style="@style/Text.Jb.CardTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/gap_m"
+                    android:gravity="center"
+                    android:text="@string/proxies_empty_title" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/emptyPaste"
-            style="@style/Widget.Jb.Button.Outlined"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/button_height"
-            android:layout_marginTop="@dimen/gap_l"
-            android:text="@string/proxies_import_paste"
-            app:icon="@drawable/ic_paste" />
+                <TextView
+                    style="@style/Text.Jb.BodyMedium"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/gap_xs"
+                    android:gravity="center"
+                    android:text="@string/proxies_empty_body" />
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/emptyAdd"
-            style="@style/Widget.Jb.Button"
-            android:layout_width="wrap_content"
-            android:layout_height="@dimen/button_height"
-            android:layout_marginTop="@dimen/gap_s"
-            android:text="@string/proxies_add"
-            app:icon="@drawable/ic_plus" />
+                <LinearLayout
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="@dimen/gap_m"
+                    android:gravity="center"
+                    android:orientation="horizontal">
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/emptyPaste"
+                        style="@style/Widget.Jb.Button.Outlined"
+                        android:layout_width="wrap_content"
+                        android:layout_height="@dimen/button_height"
+                        android:text="@string/proxies_import_paste"
+                        app:icon="@drawable/ic_paste" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/emptyAdd"
+                        style="@style/Widget.Jb.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="@dimen/button_height"
+                        android:layout_marginStart="8dp"
+                        android:text="@string/proxies_add"
+                        app:icon="@drawable/ic_plus" />
+                </LinearLayout>
+            </LinearLayout>
+        </FrameLayout>
     </LinearLayout>
 
     <com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton
