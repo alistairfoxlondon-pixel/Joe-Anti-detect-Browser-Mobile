@@ -6,7 +6,7 @@ import android.util.Log
 import android.webkit.CookieManager
 import android.webkit.WebView
 import android.webkit.WebViewClient
-import androidx.webkit.Profile
+import androidx.webkit.Profile as WebKitProfile
 import androidx.webkit.ProfileStore
 import androidx.webkit.WebViewCompat
 import androidx.webkit.WebViewFeature
@@ -99,7 +99,7 @@ class BrowserKernel(
             try {
                 val store = ProfileStore.getInstance()
                 // getOrCreateProfile is cheap after the first call and returns the same bucket.
-                val bucket: Profile = store.getOrCreateProfile(token)
+                val bucket: WebKitProfile = store.getOrCreateProfile(token)
                 WebViewCompat.setProfile(webView, bucket.name)
                 IsolationMode.ISOLATED
             } catch (t: Throwable) {
@@ -185,7 +185,6 @@ class BrowserKernel(
         runCatching { webView?.clearCache(true) }
         runCatching { webView?.clearFormData() }
         runCatching { webView?.clearHistory() }
-        runCatching { WebViewCompat.clearClientCertPreferences(null) }
 
         if (isolationMode == IsolationMode.ISOLATED || WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             runCatching {

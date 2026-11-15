@@ -1032,7 +1032,8 @@ class BrowserActivity : AppCompatActivity() {
         runCatching { binding.browserWebViewFrame.removeAllViews() }
         runCatching { webView?.stopLoading() }
         runCatching { webView?.webChromeClient = null }
-        runCatching { webView?.webViewClient = null }
+        // destroy() detaches the client; assigning null is not allowed by the platform API.
+        runCatching { webView?.stopLoading() }
         runCatching { webView?.destroy() }
         webView = null
         kernel = null
