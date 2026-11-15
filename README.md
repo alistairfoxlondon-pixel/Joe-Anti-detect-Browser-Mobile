@@ -74,7 +74,7 @@ The fingerprint layer can be checked without Android at all:
 ```bash
 node tools/verify-fingerprint.js   # fingerprint layer + identity coherence
 node tools/test-relay.js           # proxy relay over real sockets
-node tools/test-trackers.js        # tracker blocklist + host parsing
+node tools/test-trackers.js        # tracker blocklist, host parsing, capped rows vs true totals
 node tools/test-human-paste.js     # typing engine against a DOM mock
 node tools/test-user-agent.js      # 98-identity user-agent matrix
 ```
