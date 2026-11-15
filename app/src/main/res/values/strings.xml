@@ -119,12 +119,10 @@
     <string name="editor_screen_width">Width</string>
     <string name="editor_screen_height">Height</string>
     <string name="editor_pixel_ratio">Pixel ratio</string>
-    <string name="editor_section_hardware">Hardware</string>
     <string name="editor_cores">CPU cores</string>
     <string name="editor_memory">RAM (GB)</string>
     <string name="editor_touch">Touches</string>
     <string name="editor_gpu_renderer">GPU renderer</string>
-    <string name="editor_section_locale">Locale</string>
     <string name="editor_timezone">Timezone</string>
     <string name="editor_language">Language</string>
     <string name="editor_automatch">Match locale to proxy</string>
@@ -154,8 +152,6 @@
     <string name="editor_watch_interval">Watch interval</string>
     <string name="editor_human_paste">Human typing</string>
     <string name="editor_human_speed">Typing speed</string>
-    <string name="editor_section_typing">Typing</string>
-    <string name="editor_section_watch">Monitoring</string>
     <string name="editor_section_storage">Storage</string>
     <string name="editor_storage_used">Storage</string>
     <string name="editor_save">Save profile</string>

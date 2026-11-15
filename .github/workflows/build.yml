@@ -38,6 +38,13 @@ jobs:
         shell: bash
         run: node tools/verify-resources.js
 
+      # Copy budget: how much of the 1.4.0 baseline wording survived, and how much of the new
+      # text belongs to features that did not exist. Printed on every run so the "less text"
+      # requirement stays measurable instead of being asserted.
+      - name: Copy budget report
+        shell: bash
+        run: node tools/copy-report.js
+
       # The icon set, launcher art and store images are generated from one source of truth.
       # Regenerate and fail if the committed output has drifted (a stale icon ships as a bug).
       - name: Verify generated assets are current
