@@ -697,16 +697,35 @@ __PATCH_HELPERS__
   } catch (e) {}
 
   /* --------------------------------------------------------------- battery */
-  if (JB.spoofBattery) {
+  /*
+   * Battery Status API. Two bugs lived here: the property is `navigator.getBattery()` (a method
+   * on navigator), not something to overwrite as a plain value, and it was assigned without the
+   * nativeToString wrapper — so the patched function announced itself. The level is also derived
+   * from the profile seed now, because a constant 0.87 across every profile is its own signal.
+   */
+  if (JB.spoofBattery && navigator.getBattery) {
     try {
-      if (navigator.getBattery) {
-        navigator.getBattery = function () {
-          return Promise.resolve({
-            charging: true, chargingTime: 0, dischargingTime: Infinity, level: 0.87,
-            addEventListener: function () {}, removeEventListener: function () {}
-          });
-        };
-      }
+      var originalBattery = navigator.getBattery;
+      var seededLevel = 0.35 + (ihash(0, 0, 907) % 60) / 100;
+      var batteryWrapper = function () {
+        return Promise.resolve({
+          charging: true,
+          chargingTime: 0,
+          dischargingTime: Infinity,
+          level: seededLevel,
+          onchargingchange: null,
+          onchargingtimechange: null,
+          ondischargingtimechange: null,
+          onlevelchange: null,
+          addEventListener: function () {},
+          removeEventListener: function () {},
+          dispatchEvent: function () { return true; }
+        });
+      };
+      nativeToString(batteryWrapper, originalBattery);
+      Object.defineProperty(navigator, 'getBattery', {
+        value: batteryWrapper, configurable: true, writable: true, enumerable: false
+      });
     } catch (e) {}
   }
 

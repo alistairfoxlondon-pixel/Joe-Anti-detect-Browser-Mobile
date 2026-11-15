@@ -170,6 +170,15 @@ function makeEnvironment(cfg) {
   env.devicePixelRatio = 1;
   env.CanvasRenderingContext2D = CanvasRenderingContext2D;
   env.HTMLCanvasElement = HTMLCanvasElement;
+  // Battery Status API, as Blink exposes it: a method on navigator that returns a promise.
+  Object.defineProperty(navigator, 'getBattery', {
+    value: function getBattery() {
+      return Promise.resolve({
+        charging: false, chargingTime: Infinity, dischargingTime: 900, level: 0.5
+      });
+    },
+    configurable: true, writable: true, enumerable: false
+  });
   env.__cfg = cfg;
   return env;
 }
@@ -268,6 +277,18 @@ const untouched = Array.from((function () {
 check('stable across probes (same profile = same machine)', first.join() === second.join(), true);
 check('noise actually applied', first.join() !== untouched.join(), true);
 
+// ---------------------------------------------------------------- battery
+(async function () {
+  const original = nav.getBattery;
+  check('getBattery is still a function', typeof nav.getBattery, 'function');
+  check('getBattery keeps native source text', /native code|getBattery/.test(String(nav.getBattery)), true);
+  const battery = await nav.getBattery();
+  check('battery is reported charging', battery.charging, 'true');
+  check('battery level is seeded, not 0.5', battery.level !== 0.5, true);
+  check('battery level is plausible', battery.level > 0.3 && battery.level < 1, true);
+  const again = await nav.getBattery();
+  check('battery level is stable per profile', battery.level, again.level);
+
 console.log('\nfont metrics');
 const nativeWidth = 'fingerprint me'.length * 7.31;
 const measured = ctx.measureText('fingerprint me').width;
@@ -287,7 +308,8 @@ check('locale differs per profile', otherEnv.navigator.language, otherCfg.langua
 const otherPixels = Array.from(otherCtx.getImageData(0, 0, 8, 8).data);
 check('canvas differs between profiles', first.join() !== otherPixels.join(), true);
 
-console.log('\n' + (failures === 0
-  ? 'all assertions passed'
-  : failures + ' assertion(s) failed'));
-process.exit(failures === 0 ? 0 : 1);
+  console.log('\n' + (failures === 0
+    ? 'all assertions passed'
+    : failures + ' assertion(s) failed'));
+  process.exit(failures === 0 ? 0 : 1);
+})();
