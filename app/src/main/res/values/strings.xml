@@ -192,7 +192,7 @@
 
     <!-- Engines -->
     <string name="engines_title">Browser engines</string>
-    <string name="engines_body">Rendering is always the system WebView. The engine below is the identity each profile reports.</string>
+    <string name="engines_body">Rendering is always the system WebView (Blink) — the engine you pick below is the identity each profile reports, and the fingerprint layer hides what that identity would not expose.</string>
     <string name="engines_used_by">%1$d profile(s)</string>
     <string name="engines_unused">Not used</string>
     <string name="engines_create">Create profile with %1$s</string>
@@ -200,7 +200,7 @@
     <string name="engines_latest">Latest %1$s</string>
     <string name="engines_rendering">Rendering</string>
     <string name="engines_rendering_value">System WebView (Blink)</string>
-    <string name="engines_firefox_note">Gecko identities are user-agent level only.</string>
+    <string name="engines_firefox_note">Gecko identities are user-agent level only: the page is still rendered by the system WebView, and features Gecko would not expose are hidden rather than emulated.</string>
 
     <!-- Tools -->
     <string name="tools_title">Tools</string>
