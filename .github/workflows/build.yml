@@ -35,6 +35,10 @@ jobs:
         shell: bash
         run: node tools/verify-fingerprint.js
 
+      - name: Verify proxy relay
+        shell: bash
+        run: node tools/test-relay.js
+
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 

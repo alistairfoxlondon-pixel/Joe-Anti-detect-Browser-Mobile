@@ -70,8 +70,11 @@ Google Maven + Maven Central.
 The fingerprint layer can be checked without Android at all:
 
 ```bash
-node tools/verify-fingerprint.js
+node tools/verify-fingerprint.js   # fingerprint layer, 30 assertions
+node tools/test-relay.js           # proxy relay over real sockets
 ```
+
+Both run in CI before Gradle, so a regression fails the build rather than the APK.
 
 ## Signing (for maintainers)
 
@@ -103,6 +106,10 @@ Being straight about what was and wasn't tested:
   Blink-shaped mock (values as prototype getters, `webdriver` as an own property) and asserts
   the resulting `navigator`, `screen`, timezone and canvas output, plus that two profiles never
   collide.
+- ✅ **Proxy relay exercised end to end** — `node tools/test-relay.js` runs a faithful port of
+  `LocalProxyRelay` against real loopback sockets: plain HTTP must reach the proxy in absolute
+  form with credentials, CONNECT tunnels must deliver a 512 KB body byte-exact, bad credentials
+  must fail with 502 (never a direct fallback), and host/port parsing must reject nonsense.
 - ❌ **Not run on a device/emulator yet** — no instrumented UI test has been executed. First-run
   flows (WebView `MULTI_PROFILE` bucket binding, document-start injection, proxy relay CONNECT,
   tracker sheet, downloads, file chooser, fullscreen video) are implemented but untested at

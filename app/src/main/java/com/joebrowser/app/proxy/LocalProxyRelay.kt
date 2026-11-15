@@ -131,11 +131,31 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
         val authority = if (slash >= 0) withoutScheme.substring(0, slash) else withoutScheme
         val path = if (slash >= 0) withoutScheme.substring(slash) else "/"
 
-        val upstreamSocket = openUpstreamSocket() ?: return respond(output, 502, "Bad Gateway")
+        // Two different wire formats, depending on where the request goes:
+        //   - an HTTP(S) proxy upstream wants the request line in ABSOLUTE form and resolves
+        //     the host itself, so we talk to the proxy and keep the absolute URI;
+        //   - a SOCKS5 upstream is a byte pipe to the origin, so we open that pipe and use
+        //     ORIGIN form with a Host header, exactly as a direct client would.
+        // Sending an origin-form request to an HTTP proxy (or connecting directly to the
+        // origin) both used to happen here in earlier revisions and both break routing.
+        val socks = upstream.type == "socks5"
+        val upstreamSocket: Socket?
+        val requestTarget: String
+        if (socks) {
+            val hostPort = splitAuthority(authority) ?: return respond(output, 400, "Bad Request")
+            upstreamSocket = connectViaSocks5(hostPort.first, hostPort.second)
+            requestTarget = path
+        } else {
+            upstreamSocket = openProxySocket()
+            requestTarget = absoluteUri
+        }
+        if (upstreamSocket == null) return respond(output, 502, "Bad Gateway")
         openSockets.add(upstreamSocket)
         try {
             val upstreamOut = BufferedOutputStream(upstreamSocket.getOutputStream())
-            upstreamOut.write(buildPlainRequest(method, path, version, authority, headers).toByteArray(Charsets.UTF_8))
+            upstreamOut.write(
+                buildPlainRequest(method, requestTarget, version, authority, headers).toByteArray(Charsets.UTF_8)
+            )
             upstreamOut.flush()
             splice(client, upstreamSocket)
         } finally {
@@ -144,15 +164,31 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
         }
     }
 
+    /** Splits an `authority` (host[:port]) into a host and a port, defaulting to 80. */
+    private fun splitAuthority(authority: String): Pair<String, Int>? {
+        if (authority.isBlank()) return null
+        if (authority.startsWith("[")) {
+            val end = authority.indexOf(']')
+            if (end <= 0) return null
+            val host = authority.substring(1, end)
+            val port = authority.substring(end + 1).removePrefix(":").toIntOrNull() ?: 80
+            return if (port in 1..65535) host to port else null
+        }
+        val colon = authority.lastIndexOf(':')
+        if (colon <= 0) return authority to 80
+        val port = authority.substring(colon + 1).toIntOrNull() ?: return null
+        return if (port in 1..65535) authority.substring(0, colon) to port else null
+    }
+
     private fun buildPlainRequest(
         method: String,
-        path: String,
+        requestTarget: String,
         version: String,
         authority: String,
         headers: List<Pair<String, String>>
     ): String {
         val sb = StringBuilder()
-        sb.append(method).append(' ').append(path).append(' ').append(version).append("\r\n")
+        sb.append(method).append(' ').append(requestTarget).append(' ').append(version).append("\r\n")
         sb.append("Host: ").append(authority).append("\r\n")
         appendProxyAuthorization(sb)
         headers.forEach { (name, value) ->
@@ -178,6 +214,10 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
         return if (upstream.type == "socks5") connectViaSocks5(host, port) else connectViaConnect(host, port)
     }
 
+    /** Socket to the proxy itself (used for absolute-form HTTP requests). */
+    private fun openProxySocket(): Socket? = openUpstreamSocket()
+
+    /** Socket to an origin server through the proxy (used for CONNECT tunnels and SOCKS). */
     private fun openUpstreamSocket(): Socket? = try {
         Socket().apply {
             connect(InetSocketAddress(upstream.host, upstream.port), CONNECT_TIMEOUT_MS)
@@ -281,18 +321,28 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
         }
     }
 
-    /** Copies bytes in both directions until either side closes. */
+    /**
+     * Copies bytes in both directions until either side is done.
+     *
+     * Each pump reports its own completion; the moment one direction finishes the peer is
+     * half-closed (FIN) and the other direction is given a grace period to drain. Closing both
+     * sockets as soon as the *first* pump returned — as this used to — could cut a response off
+     * mid-body, which a page sees as a truncated download.
+     */
     private fun splice(a: Socket, b: Socket) {
-        val first = Thread({ pump(a, b) }, "joe-relay-down")
-        val second = Thread({ pump(b, a) }, "joe-relay-up")
+        val finished = java.util.concurrent.CountDownLatch(2)
+        val first = Thread({ pump(a, b); finished.countDown() }, "joe-relay-down")
+        val second = Thread({ pump(b, a); finished.countDown() }, "joe-relay-up")
         first.isDaemon = true
         second.isDaemon = true
         first.start()
         second.start()
-        runCatching { first.join(SPLICE_LIFETIME_MS) }
+        // Wait for both, but never longer than the lifetime cap (long-lived websockets).
+        runCatching { finished.await(SPLICE_LIFETIME_MS, TimeUnit.MILLISECONDS) }
         closeQuietly(a)
         closeQuietly(b)
-        second.interrupt()
+        runCatching { first.interrupt() }
+        runCatching { second.interrupt() }
     }
 
     private fun pump(from: Socket, to: Socket) {
@@ -309,6 +359,7 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
         } catch (t: Throwable) {
             // Normal termination path for HTTP/1.0 or a cancelled navigation.
         } finally {
+            // Half-close: the peer may still have bytes flowing the other way.
             runCatching { to.shutdownOutput() }
         }
     }
@@ -322,22 +373,38 @@ class LocalProxyRelay private constructor(private val upstream: ProxyConfig) : C
         }
     }
 
+    /**
+     * Reads one CRLF-terminated line, without the terminator.
+     *
+     * The previous version appended every non-CR byte and then removed one character when it saw
+     * CRLF — but the CR had already been skipped, so it removed the line's last real character.
+     * `CONNECT example.com:443 HTTP/1.1` parsed as `...:44 HTTP/1.`, which silently sent every
+     * tunnel to the wrong port.
+     */
     private fun readLine(input: InputStream): String? {
         val sb = StringBuilder()
-        var previous = -1
+        var pendingCr = false
         while (true) {
             val current = try {
                 input.read()
             } catch (t: Throwable) {
                 return null
             }
-            if (current == -1) return if (sb.isEmpty()) null else sb.toString()
-            if (previous == '\r'.code && current == '\n'.code) {
-                sb.setLength(sb.length - 1)
+            if (current == -1) {
+                if (sb.isEmpty()) return null
+                if (pendingCr) sb.append('\r')
                 return sb.toString()
             }
-            if (current != '\r'.code) sb.append(current.toChar())
-            previous = current
+            if (pendingCr) {
+                pendingCr = false
+                if (current == '\n'.code) return sb.toString()
+                sb.append('\r')
+            }
+            if (current == '\r'.code) {
+                pendingCr = true
+            } else {
+                sb.append(current.toChar())
+            }
             if (sb.length > MAX_HEADER_BYTES) return null
         }
     }
