@@ -725,7 +725,7 @@ class BrowserActivity : AppCompatActivity() {
             // Wipe order matters: the WebKit bucket first (it owns cookies + site data),
             // then the materialised directories, then the history rows.
             runCatching { kernel?.wipeData(web) }
-            runCatching { CookieManager.getInstance().flush() }
+            runCatching { kernel?.flushCookies() ?: CookieManager.getInstance().flush() }
             ProfileStorage.sessionDirs(app, loaded.id)
                 .forEach { dir -> runCatching { dir.deleteRecursively() } }
             ProfileRepository.clearHistory(app, loaded.id)
@@ -834,8 +834,9 @@ class BrowserActivity : AppCompatActivity() {
         val loaded = profile ?: return
         val web = webView
         val app = applicationContext
-        // Always flush the cookie jar so a killed process cannot lose a login the user made.
-        runCatching { CookieManager.getInstance().flush() }
+        // Always flush this profile's cookie jar so a killed process cannot lose a login the
+        // user just made. Flushing the global jar instead would persist the wrong profile.
+        runCatching { kernel?.flushCookies() ?: CookieManager.getInstance().flush() }
         if (!loaded.freshSession) return
         Async.bg {
             runCatching { kernel?.wipeData(web) }
@@ -1113,7 +1114,7 @@ class BrowserActivity : AppCompatActivity() {
         liveWindows = (liveWindows - 1).coerceAtLeast(0)
         runCatching { webView?.onPause() }
         runCatching { webView?.pauseTimers() }
-        runCatching { CookieManager.getInstance().flush() }
+        runCatching { kernel?.flushCookies() ?: CookieManager.getInstance().flush() }
         super.onPause()
     }
 

@@ -97,7 +97,7 @@ class BrowserKernel(
         // ---- isolation
         isolationMode = if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             try {
-                val store = ProfileStore.getInstance()
+                val store = store() ?: throw IllegalStateException("ProfileStore unavailable")
                 // getOrCreateProfile is cheap after the first call and returns the same bucket.
                 val bucket: WebKitProfile = store.getOrCreateProfile(token)
                 WebViewCompat.setProfile(webView, bucket.name)
@@ -110,8 +110,22 @@ class BrowserKernel(
             IsolationMode.SHARED
         }
 
-        // ---- per-profile cookie policy (jar is still per-bucket when isolated)
+        // ---- per-profile cookie policy
+        //
+        // When a WebKit Profile is bound, cookies live in that bucket's own jar and must be
+        // driven through it: CookieManager.getInstance() is the *default* (global) jar, so using
+        // it here would accept, read and clear the wrong profile's cookies.
         runCatching {
+            if (WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE) &&
+                isolationMode == IsolationMode.ISOLATED
+            ) {
+                val bucketManager = store()?.getOrCreateProfile(token)?.cookieManager
+                if (bucketManager != null) {
+                    bucketManager.setAcceptCookie(true)
+                    bucketManager.setAcceptThirdPartyCookies(webView, true)
+                    return@runCatching
+                }
+            }
             val cookies = CookieManager.getInstance()
             cookies.setAcceptCookie(true)
             cookies.setAcceptThirdPartyCookies(webView, true)
@@ -159,6 +173,35 @@ class BrowserKernel(
         runCatching { WebViewCompat.addDocumentStartJavaScript(webView, script, setOf("*")) }
     }
 
+    /** The bucket's cookie store when isolation is active, otherwise the global one. */
+    private fun cookieStore(): CookieManager? = try {
+        if (isolationMode == IsolationMode.ISOLATED && WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
+            store()?.getOrCreateProfile(token)?.cookieManager ?: CookieManager.getInstance()
+        } else {
+            CookieManager.getInstance()
+        }
+    } catch (t: Throwable) {
+        Log.w(Async.TAG, "Cookie store unavailable", t)
+        null
+    }
+
+    /** Clears cookies for this profile only. Safe on any thread; call from a background one. */
+    fun clearCookies() {
+        runCatching {
+            cookieStore()?.let { manager ->
+                manager.removeAllCookies(null)
+                manager.flush()
+            }
+        }.onFailure { Log.w(Async.TAG, "Could not clear profile cookies", it) }
+    }
+
+    /** Persists the profile's cookie jar so a killed process does not lose a fresh login. */
+    fun flushCookies() {
+        runCatching { cookieStore()?.flush() }
+    }
+
+    private fun store(): ProfileStore? = runCatching { ProfileStore.getInstance() }.getOrNull()
+
     fun status(): KernelStatus {
         val warning = when {
             isolationMode == IsolationMode.SHARED && injectionMode == InjectionMode.EARLY_FALLBACK ->
@@ -177,18 +220,18 @@ class BrowserKernel(
      * materialised directories. Runs synchronously; call from a background thread.
      */
     fun wipeData(webView: WebView?) {
-        runCatching {
-            val cookies = CookieManager.getInstance()
-            cookies.removeAllCookies(null)
-            cookies.flush()
-        }
+        // Scoped to this profile's bucket. The previous version called the global
+        // CookieManager.removeAllCookies(), which signed the user out of *every* profile in the
+        // app — a direct violation of the isolation the product promises — and, because a
+        // WebKit Profile's cookies live in a separate jar, did not reliably clear this one.
+        clearCookies()
         runCatching { webView?.clearCache(true) }
         runCatching { webView?.clearFormData() }
         runCatching { webView?.clearHistory() }
 
         if (isolationMode == IsolationMode.ISOLATED || WebViewFeature.isFeatureSupported(WebViewFeature.MULTI_PROFILE)) {
             runCatching {
-                val store = ProfileStore.getInstance()
+                val store = store() ?: throw IllegalStateException("ProfileStore unavailable")
                 store.deleteProfile(token)
                 // Re-create immediately so the live WebView keeps a valid bucket.
                 val recreated = store.getOrCreateProfile(ProfileStorage.rotateKernelToken(context, profile.id))
