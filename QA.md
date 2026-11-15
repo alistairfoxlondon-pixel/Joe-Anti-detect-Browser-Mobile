@@ -7,7 +7,7 @@ reproducible by running the listed command or by reading the listed file.
 
 | Gate | Command | Result at 1.5.0 |
 |---|---|---|
-| Static audit — resources, bindings, menus, touch targets, colours, dead copy | `node tools/verify-resources.js` | pass — 640 resources / 14 types, 32 layouts, 38 Kotlin files, 0 unused strings |
+| Static audit — resources, bindings, menus, 48dp targets, single-colour policy, palette parity, dead copy | `node tools/verify-resources.js` | pass — 639 resources / 14 types, 32 layouts, 38 Kotlin files, 0 unused strings |
 | Fingerprint layer executed against a Blink-shaped mock | `node tools/verify-fingerprint.js` | pass — 94 assertions |
 | Proxy relay over real loopback sockets | `node tools/test-relay.js` | pass — 20 assertions |
 | Tracker classifier + capped rows vs true totals | `node tools/test-trackers.js` | pass — 48 assertions |
@@ -24,7 +24,7 @@ baseline (1.4.0):  4374 chars, 332 keys
   still present:   3906 chars, 302 keys   (89% of baseline)
   removed:          363 chars,  30 keys
   rewritten:        105 chars saved on surviving keys
-new copy:           466 chars for new features · 237 chars for redesign labels
+new copy:           466 chars for new features · 302 chars for redesign labels
 ```
 
 Honest reading: copy for the *existing* screens is 11% smaller by character count, and 30 whole
