@@ -333,10 +333,12 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.rowWatch.configureCheck(profile.tools.proxyWatch)
 
             binding.switchProxy.isChecked = profile.proxy.enabled
-            binding.editorProxyType.setText(
-                if (profile.proxy.type == "none") "http" else profile.proxy.type,
-                false
-            )
+            val proxyLabel = when (profile.proxy.type.lowercase()) {
+                "socks5" -> "SOCKS5"
+                "https" -> "HTTPS"
+                else -> "HTTP"
+            }
+            binding.editorProxyType.setText(proxyLabel, false)
             binding.editorProxyHost.setText(profile.proxy.host)
             binding.editorProxyPort.setText(
                 if (profile.proxy.port > 0) profile.proxy.port.toString() else ""
@@ -349,11 +351,8 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.editorLat.setText(fp.geoLat)
             binding.editorLng.setText(fp.geoLng)
             binding.editorPasteSpeed.setText(HumanPaste.speedById(profile.tools.humanPasteSpeed).label, false)
-            val clampedSec = profile.tools.proxyWatchIntervalSec.coerceIn(15, 300)
-            val snappedSec = ((clampedSec / 15) * 15).coerceIn(15, 300)
-            binding.watchIntervalSlider.value = snappedSec.toFloat()
             binding.watchIntervalValue.text =
-                getString(R.string.editor_interval_value, intervalLabel(snappedSec))
+                getString(R.string.editor_interval_value, intervalLabel(profile.tools.proxyWatchIntervalSec))
             binding.proxyStatus.setText(R.string.editor_proxy_idle)
 
             populateIdentityFields()
@@ -368,6 +367,7 @@ class ProfileEditorActivity : AppCompatActivity() {
 
         binding.editorTouchSlider.addOnChangeListener { _, value, fromUser ->
             if (!fromUser) return@addOnChangeListener
+            val fp = profile.fp
             fp.touchPoints = value.toInt()
             fp.deviceType = if (value.toInt() == 0) "desktop" else OsCatalog.deviceType(fp.os)
             binding.touchLabel.text = getString(R.string.editor_touch) + " · " + value.toInt()
