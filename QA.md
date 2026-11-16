@@ -1,11 +1,11 @@
-# QA — Joe Browser 1.5.0
+# QA — Joe Browser 1.5.1
 
 What was checked, how, and what still cannot be checked without a device. Every claim below is
 reproducible by running the listed command or by reading the listed file.
 
 ## Automated gates (run on every push, and locally)
 
-| Gate | Command | Result at 1.5.0 |
+| Gate | Command | Result at 1.5.1 |
 |---|---|---|
 | Static audit — resources, bindings, menus, 48dp targets, single-colour policy, palette parity, dead copy | `node tools/verify-resources.js` | pass — 639 resources / 14 types, 32 layouts, 38 Kotlin files, 0 unused strings |
 | Fingerprint layer executed against a Blink-shaped mock | `node tools/verify-fingerprint.js` | pass — 94 assertions |

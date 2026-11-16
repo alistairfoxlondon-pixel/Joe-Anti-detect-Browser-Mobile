@@ -19,6 +19,9 @@ jobs:
   build:
     name: Build APKs
     runs-on: ubuntu-latest
+    outputs:
+      # Consumed by the release job so its notes state a fact instead of guessing.
+      signed: ${{ steps.apk.outputs.signed }}
     timeout-minutes: 45
     env:
       KEYSTORE_BASE64: ${{ secrets.JOE_KEYSTORE_BASE64 }}
@@ -148,7 +151,23 @@ jobs:
 
           # A release APK is only redistributed when it is actually signed. An unsigned one is
           # unusable to the user and is exactly the artefact antivirus products reject.
-          release_apk=$(find app/build/outputs/apk/release -name '*.apk' ! -name '*unsigned*' | head -1 || true)
+          #
+          # Do NOT filter by filename: `applicationVariants.all` renames every output to
+          # `joe-browser-<version>-release.apk`, so the old `! -name '*unsigned*'` test stopped
+          # matching anything and an unsigned build was published as if it were signed. Ask the
+          # file itself instead.
+          apksigner_bin=$(command -v apksigner || find "${ANDROID_HOME:-/usr/local/lib/android/sdk}/build-tools" -name apksigner -type f 2>/dev/null | sort -r | head -1 || true)
+          release_apk=""
+          for candidate in app/build/outputs/apk/release/*.apk; do
+            [ -f "$candidate" ] || continue
+            if [ -n "$apksigner_bin" ] && "$apksigner_bin" verify --print-certs "$candidate" >/dev/null 2>&1; then
+              release_apk="$candidate"
+            else
+              echo "Unsigned release output left out of the release: $candidate"
+            fi
+            break
+          done
+
           if [ -n "${release_apk:-}" ]; then
             cp "$release_apk" "$out/joe-browser-$version-release.apk"
             echo "signed=yes" >> "$GITHUB_OUTPUT"
@@ -169,13 +188,14 @@ jobs:
           fi
 
           ls -la "$out"
-          # Best-effort signature dump: apksigner ships with the Android build-tools image.
-          if command -v apksigner >/dev/null 2>&1; then
+          # Signature dump for the record: apksigner ships with the Android build-tools image.
+          if [ -n "$apksigner_bin" ]; then
             for f in "$out"/*.apk; do
-              echo "---- $f"; apksigner verify --print-certs "$f" || true
+              echo "---- $f"
+              "$apksigner_bin" verify --print-certs "$f" || echo "(no valid signature — debug key status unknown)"
             done
           else
-            find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -r | head -1 | xargs -r -I{} sh -c 'for f in '"$out"'/*.apk; do echo "---- $f"; {} verify --print-certs "$f" || true; done'
+            echo "::warning::apksigner not found; signature status was not printed."
           fi
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
@@ -218,6 +238,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           DRY_RUN: ${{ inputs.dry_run_release && '1' || '0' }}
+          SIGNED: ${{ needs.build.outputs.signed }}
         shell: bash
         run: |
           set -euo pipefail
@@ -236,10 +257,12 @@ jobs:
           ( cd apks && sha256sum *.apk > SHA256SUMS.txt )
           assets="$assets apks/SHA256SUMS.txt"
 
-          if ls apks/*-release.apk >/dev/null 2>&1; then
+          # The build job already verified the signature with apksigner; trust its answer rather
+          # than inferring anything from a filename.
+          if [ "$SIGNED" = "yes" ] && compgen -G "apks/*-release.apk" >/dev/null; then
             signed_note="Signed release APK attached. Verify with \`apksigner verify\` and the SHA-256 sums below."
           else
-            signed_note="No signing key was configured for this build, so only the debug-signed APK is attached. Install it by allowing your file manager to install unknown apps; see INSTALL.md."
+            signed_note="**No release keystore was configured for this build**, so the release APK is unsigned and cannot be installed. Use \`joe-browser-${tag#v}-debug.apk\` (signed with the Android debug key) — it installs normally; see INSTALL.md."
           fi
 
           if [ "$DRY_RUN" = "1" ]; then
