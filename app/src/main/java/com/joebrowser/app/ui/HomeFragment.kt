@@ -133,9 +133,9 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
         val group = binding.verifyChips
         group.removeAllViews()
         val context = requireContext()
-        VERIFY_SITES.forEach { (url, label) ->
+        SiteBrand.primary.forEach { site ->
             group.addView(
-                UiKit.actionChip(context, label) { openVerifySite(url) }
+                UiKit.actionChip(context, site.label) { openVerifySite(site.url) }
             )
         }
     }
@@ -310,12 +310,5 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
             AppEvents.ACTION_MONITOR_ALERT
         )
 
-        private val VERIFY_SITES = listOf(
-            "https://www.browserscan.net/" to "BrowserScan",
-            "https://iphey.com/" to "IPHey",
-            "https://pixelscan.net/" to "PixelScan",
-            "https://www.ipfighter.com/browser-fingerprint" to "IPFighter",
-            "https://whoer.net/" to "Whoer"
-        )
     }
 }

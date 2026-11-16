@@ -800,13 +800,15 @@ class BrowserActivity : AppCompatActivity() {
                     .let { runCatching { startActivity(it) } }
                 true
             }
-            R.id.fpBrowserScan -> { load("https://browserscan.net/"); true }
-            R.id.fpIpHey -> { load("https://iphey.com/"); true }
-            R.id.fpPixelScan -> { load("https://pixelscan.net/"); true }
-            R.id.fpIpFighter -> { load("https://ipfighter.com/"); true }
-            R.id.fpWhoer -> { load("https://whoer.net/"); true }
-            R.id.fpCreepJs -> { load("https://abrahamjuliot.github.io/creepjs/"); true }
-            R.id.fpSanny -> { load("https://bot.sannysoft.com/"); true }
+            // One source of truth for the detector URLs, so the in-browser menu, the home
+            // chips and the lab grid can never point at different pages.
+            R.id.fpBrowserScan -> { load(com.joebrowser.app.ui.SiteBrand.BROWSERSCAN.url); true }
+            R.id.fpIpHey -> { load(com.joebrowser.app.ui.SiteBrand.IPHEY.url); true }
+            R.id.fpPixelScan -> { load(com.joebrowser.app.ui.SiteBrand.PIXELSCAN.url); true }
+            R.id.fpIpFighter -> { load(com.joebrowser.app.ui.SiteBrand.IPFIGHTER.url); true }
+            R.id.fpWhoer -> { load(com.joebrowser.app.ui.SiteBrand.WHOER.url); true }
+            R.id.fpCreepJs -> { load(com.joebrowser.app.ui.SiteBrand.CREEPJS.url); true }
+            R.id.fpSanny -> { load(com.joebrowser.app.ui.SiteBrand.SANNYSOFT.url); true }
             else -> false
         }
     }

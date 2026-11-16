@@ -466,9 +466,11 @@ for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml
       fail(`${path.relative(ROOT, file)}: hard-coded colour ${m[1]} — use a @color role`);
     }
   }
-  // Launcher/splash artwork paints brand colours on purpose; the ic_* icon set must stay
-  // untinted black so one usage-site tint controls it.
-  const ARTWORK = /(launcher|splash|ic_logo)/;
+  // Launcher/splash artwork paints brand colours on purpose, and a third-party brand mark
+  // (brand_*) must be reproduced in the owner's own colours — flattening Brave to monochrome
+  // would not be the "authentic official logo" the design calls for. The ic_* icon set is
+  // different: it must stay untinted black so one usage-site tint controls it.
+  const ARTWORK = /(launcher|splash|ic_logo|^brand_)/;
   for (const file of walk(path.join(RES, 'drawable')).filter((f) => f.endsWith('.xml'))) {
     const text = fs.readFileSync(file, 'utf8');
     if (/<gradient\b/.test(text)) {
@@ -480,6 +482,13 @@ for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml
       // #000 (filled) and #00000000 (stroke-only) are both correct for a tinted icon.
       if (!/^#(?:FF)?000000$|^#00000000$/i.test(m[1])) {
         fail(`${path.relative(ROOT, file)}: icon fill ${m[1]} — icons must be #000 and tinted`);
+      }
+    }
+    // Lucide glyphs are stroked, not filled, so the stroke colour is the one that actually
+    // paints. Checking only fills let a coloured stroke through unnoticed.
+    for (const m of (isArtwork ? [] : text.matchAll(/android:strokeColor="(#[0-9A-Fa-f]{6,8})"/g))) {
+      if (!/^#(?:FF)?000000$|^#00000000$/i.test(m[1])) {
+        fail(`${path.relative(ROOT, file)}: icon stroke ${m[1]} — icons must be #000 and tinted`);
       }
     }
     for (const m of (isArtwork ? [] : text.matchAll(/<solid android:color="(#[0-9A-Fa-f]{6,8})"/g))) {
