@@ -47,10 +47,10 @@ hides behaviour, and R8 is configured to keep the app's own classes readable.
 
 ```bash
 # Windows (PowerShell)
-Get-FileHash .\joe-browser-1.5.1-debug.apk -Algorithm SHA256
+Get-FileHash .\joe-browser-1.6.0-debug.apk -Algorithm SHA256
 
 # macOS / Linux
-shasum -a 256 joe-browser-1.5.1-debug.apk
+shasum -a 256 joe-browser-1.6.0-debug.apk
 ```
 
 Compare the result with the matching line in `SHA256SUMS.txt` on the release page. If they
@@ -80,7 +80,7 @@ Joe Browser APKs are signed either by the project's release key or — for the `
 # Allow the download to stay put if Defender quarantined it
 Add-MpPreference -ExclusionPath "$env:USERPROFILE\Downloads\joe-browser-*.apk"
 
-adb install -r .\joe-browser-1.5.1-debug.apk
+adb install -r .\joe-browser-1.6.0-debug.apk
 ```
 
 `adb install` is the cleanest route because the file never passes through a browser download
