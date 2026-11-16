@@ -48,7 +48,7 @@
                 android:textColor="@color/hero_text"
                 android:textSize="21sp"
                 android:textStyle="bold"
-                android:fontFamily="@font/jakarta" />
+                android:fontFamily="@font/app_font" />
 
             <!-- Two kernel facts as dot + label; no sentences, no chip chrome. -->
             <LinearLayout

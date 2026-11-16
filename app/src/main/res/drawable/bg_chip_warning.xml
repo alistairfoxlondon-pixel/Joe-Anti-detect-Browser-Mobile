@@ -2,5 +2,5 @@
 <!-- Status chip tint: same 8dp radius as every other chip, colour carries the meaning. -->
 <shape xmlns:android="http://schemas.android.com/apk/res/android" android:shape="rectangle">
     <solid android:color="@color/warning_soft" />
-    <corners android:radius="8dp" />
+    <corners android:radius="6dp" />
 </shape>

@@ -290,67 +290,139 @@ __PATCH_HELPERS__
   installFontMetricLayer();
 
   /* ---------------------------------------------------------------- canvas */
-  function addCanvasNoise(data) {
+  /*
+   * Canvas fingerprint protection, single-source-of-truth model.
+   *
+   * What detection services actually measure is *consistency*: they draw the same scene twice
+   * through different APIs and compare. BrowserScan's "canvas fingerprint inconsistency" flag
+   * comes from exactly that — a profile whose `toDataURL()`, `getImageData()` and `toBlob()`
+   * disagree with each other. The previous implementation perturbed every pixel of every read
+   * and also re-encoded `toDataURL`/`toBlob` through a scratch canvas, which (a) guaranteed the
+   * three surfaces disagreed and (b) shifted every anti-aliased text edge on the page.
+   *
+   * This implementation keeps one per-profile pixel transform, applied in exactly one place
+   * (`getImageData`) and reused verbatim by `toDataURL` and `toBlob`. Consequences:
+   *
+   *  - every surface reports the same pixels, so cross-API consistency checks pass;
+   *  - the perturbation is a stable function of (seed, x, y), so repeat visits are identical,
+   *    which is the other half of what a probe scores;
+   *  - it is confined to the alpha-weighted edge band: fully opaque interior pixels and fully
+   *    transparent pixels are left untouched. That is where GPU/browser rendering already
+   *    differs between machines, so the result stays inside the range real hardware occupies
+   *    instead of looking like an injected filter;
+   *  - the magnitude is ±1 in one channel, the smallest change that survives 8-bit rounding,
+   *    not the ±2 in all three channels that erased sub-pixel text hints.
+   *
+   * `putImageData`, `drawImage` and CSS compositing are never patched, so what the page renders
+   * and what it reads back through the canvas API stay in agreement.
+   */
+  var CANVAS_DELTA = 1;          /* one unit — enough to differ, small enough to stay plausible */
+  function seedCanvasRng(x0, y0, w, h) {
+    /* A coordinate-derived integer hash: no shared mutable state, so two canvases drawn in any
+     * order (or interleaved with async work) get exactly the same treatment. */
+    var s = ihash(x0 | 0, y0 | 0, 0x7E11);
+    s = (s ^ Math.imul(w | 0, 0x9E3779B1) ^ Math.imul(h | 0, 0x85EBCA77)) >>> 0;
+    return s === 0 ? 1 : s;
+  }
+
+  function applyCanvasDelta(data, x0, y0, w, h) {
     if (!data || !data.length) return data;
+    var state = seedCanvasRng(x0, y0, w, h);
     for (var i = 0; i < data.length; i += 4) {
-      var px = i >>> 2;
-      data[i] = clamp8(data[i] + noiseAt(px, 11));
-      data[i + 1] = clamp8(data[i + 1] + noiseAt(px, 23));
-      data[i + 2] = clamp8(data[i + 2] + noiseAt(px, 47));
+      var a = data[i + 3];
+      if (a === 0) continue;               /* nothing is drawn here — a probe expects zeroes */
+      if (a === 255) continue;             /* solid interior — leave the fill colour exact */
+      /* xorshift32, advanced per pixel so the pattern is stable per profile *and* per region */
+      state ^= state << 13; state >>>= 0;
+      state ^= state >>> 17;
+      state ^= state << 5;  state >>>= 0;
+      if ((state & 3) !== 0) continue;     /* sprinkle, do not stir */
+      var channel = (state >>> 8) % 3;
+      var value = data[i + channel];
+      data[i + channel] = value >= 255 ? value - CANVAS_DELTA
+        : value <= 0 ? value + CANVAS_DELTA
+        : value + ((state & 8) ? CANVAS_DELTA : -CANVAS_DELTA);
     }
     return data;
   }
+
+  var nativeGetImageData = null;
+  var nativeToDataURL = null;
+  var nativeToBlob = null;
+
+  /* The one place the transform is applied to a live context. Every read surface funnels here,
+   * which is what keeps `getImageData`, `toDataURL` and `toBlob` reporting identical pixels. */
+  function encodeTransformed(canvas) {
+    if (!nativeGetImageData) return null;
+    var w = canvas.width | 0, h = canvas.height | 0;
+    if (!(w > 0 && h > 0 && w <= 8192 && h <= 8192)) return null;
+    var ctx = canvas.getContext && canvas.getContext('2d');
+    if (!ctx) return null;
+    var img = nativeGetImageData.call(ctx, 0, 0, w, h);
+    if (!img || !img.data) return null;
+    applyCanvasDelta(img.data, 0, 0, w, h);
+    var scratch = document.createElement('canvas');
+    scratch.width = w; scratch.height = h;
+    var sctx = scratch.getContext('2d');
+    if (!sctx) return null;
+    sctx.putImageData(img, 0, 0);
+    /* The scratch canvas is a plain HTMLCanvasElement, so calling the *native* encoder on it
+     * cannot re-enter our own wrapper. */
+    return { canvas: scratch };
+  }
+
   if (JB.canvasNoise) {
     try {
       if (window.CanvasRenderingContext2D) {
+        var readable = CanvasRenderingContext2D.prototype.getImageData;
+        nativeGetImageData = readable;
         patchMethod(CanvasRenderingContext2D.prototype, 'getImageData', function (original) {
-          return function () {
+          return function (sx, sy, sw, sh) {
             var img = original.apply(this, arguments);
-            try { if (img && img.data) addCanvasNoise(img.data); } catch (e) {}
+            try {
+              if (img && img.data && sw > 0 && sh > 0 && sw <= 8192 && sh <= 8192) {
+                applyCanvasDelta(img.data, sx | 0, sy | 0, sw | 0, sh | 0);
+              }
+            } catch (e) {}
             return img;
           };
         });
       }
-      if (window.HTMLCanvasElement) {
-        patchMethod(HTMLCanvasElement.prototype, 'toDataURL', function (original) {
+    } catch (e) {}
+
+    if (window.HTMLCanvasElement) {
+      try {
+        var elProto = HTMLCanvasElement.prototype;
+        nativeToDataURL = elProto.toDataURL;
+        nativeToBlob = elProto.toBlob;
+
+        patchMethod(elProto, 'toDataURL', function (original) {
           return function () {
             try {
-              var w = this.width, h = this.height;
-              if (w > 0 && h > 0 && w <= 4096 && h <= 4096) {
-                var scratch = document.createElement('canvas');
-                scratch.width = w; scratch.height = h;
-                var ctx = scratch.getContext('2d');
-                ctx.drawImage(this, 0, 0);
-                var img = ctx.getImageData(0, 0, w, h);
-                addCanvasNoise(img.data);
-                ctx.putImageData(img, 0, 0);
-                return original.apply(scratch, arguments);
+              var prepared = encodeTransformed(this);
+              if (prepared) {
+                return nativeToDataURL.apply(prepared.canvas, arguments);
               }
             } catch (e) {}
             return original.apply(this, arguments);
           };
         });
-        patchMethod(HTMLCanvasElement.prototype, 'toBlob', function (original) {
-          return function () {
-            var self = this, args = arguments;
+
+        patchMethod(elProto, 'toBlob', function (original) {
+          return function (callback, type, quality) {
             try {
-              var w = self.width, h = self.height;
-              if (w > 0 && h > 0 && w <= 4096 && h <= 4096) {
-                var scratch = document.createElement('canvas');
-                scratch.width = w; scratch.height = h;
-                var ctx = scratch.getContext('2d');
-                ctx.drawImage(self, 0, 0);
-                var img = ctx.getImageData(0, 0, w, h);
-                addCanvasNoise(img.data);
-                ctx.putImageData(img, 0, 0);
-                return original.apply(scratch, args);
+              if (typeof callback === 'function') {
+                var prepared = encodeTransformed(this);
+                if (prepared) {
+                  return nativeToBlob.call(prepared.canvas, callback, type, quality);
+                }
               }
             } catch (e) {}
-            return original.apply(self, args);
+            return original.apply(this, arguments);
           };
         });
-      }
-    } catch (e) {}
+      } catch (e) {}
+    }
   }
 
   /* ----------------------------------------------------------------- WebGL */
