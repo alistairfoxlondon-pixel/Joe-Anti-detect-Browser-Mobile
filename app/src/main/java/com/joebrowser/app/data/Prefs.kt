@@ -154,13 +154,15 @@ object Prefs {
      */
     fun recordTestRun(context: Context, profileId: String, site: String) {
         if (profileId.isBlank() || site.isBlank()) return
-        val entry = "$profileId|$site|${System.currentTimeMillis()}"
         val kept = lastTestRuns(context)
-            .filterNot { it.startsWith("$profileId|$site|") }
+            .filterNot { it.profileId == profileId && it.site == site }
             .toMutableList()
-        kept.add(0, entry)
+        kept.add(0, TestRun(profileId, site, System.currentTimeMillis()))
         while (kept.size > MAX_TEST_RUNS) kept.removeAt(kept.lastIndex)
-        sp(context).edit().putString(KEY_TEST_RUNS, kept.joinToString("\n")).apply()
+        sp(context).edit().putString(
+            KEY_TEST_RUNS,
+            kept.joinToString("\n") { "${it.profileId}|${it.site}|${it.at}" }
+        ).apply()
     }
 
     data class TestRun(val profileId: String, val site: String, val at: Long)
