@@ -6,9 +6,9 @@ be managed from one device without cross-contamination.
 
 Local account only. No cloud. No telemetry. Everything lives on the device.
 
-## New in 1.5.0
+## New in 1.5.1
 
-**Signed, correctly-named APKs — and an install guide.** 1.5.0 ships `joe-browser-1.5.0-release.apk`
+**Signed, correctly-named APKs — and an install guide.** 1.5.1 ships `joe-browser-1.5.1-release.apk`
 signed with v1+v2+v3 schemes (when keystore secrets are configured), alongside a `SHA256SUMS.txt`
 on every release. If Windows SmartScreen or Defender blocks or deletes the download, read
 [`INSTALL.md`](INSTALL.md): it explains why an unknown, unsigned, generically-named APK is
@@ -30,6 +30,12 @@ twenty profiles are twenty fingerprints, not twenty copies.
 exact warnings the editor uses, then one-tap detectors (BrowserScan, IPHey, PixelScan, CreepJS,
 IPFighter, Whoer, Sannysoft, DeviceInfo) that open **inside the selected profile's session**, so
 what you test is what that profile will show the world.
+
+**1.5.1 fixes a release-pipeline bug in 1.5.0.** 1.5.0's release job renamed every build output and
+then filtered on the old filename, so an *unsigned* `joe-browser-1.5.0-release.apk` was published and
+described as signed. 1.5.1 asks `apksigner` whether the file is actually signed and withholds the
+release APK when it is not — the asset is gone from this release, and the notes now say plainly that
+the debug-signed APK is the installable one.
 
 **Copy and chrome diet.** Duplicate labels were merged into single keys (`Not checked` existed four
 times), the dashboard hero absorbed the Verify row, four editor section headers were replaced by
@@ -97,16 +103,16 @@ and a batch of overflow/crash fixes across the UI.
   is exactly the shape OS heuristics distrust. Compare the SHA-256:
 
   ```powershell
-  Get-FileHash .\joe-browser-1.5.0-release.apk -Algorithm SHA256
+  Get-FileHash .\joe-browser-1.5.1-release.apk -Algorithm SHA256
   ```
 
   ```bash
-  shasum -a 256 joe-browser-1.5.0-release.apk
+  shasum -a 256 joe-browser-1.5.1-release.apk
   ```
 
   The digest must match the line for that file in `SHA256SUMS.txt`.
 - **Why Windows warns** — SmartScreen/Defender flag unsigned or low-reputation binaries, and a
-  generic `app-release-unsigned.apk` name scores badly on its own. 1.5.0 fixes all three causes:
+  generic `app-release-unsigned.apk` name scores badly on its own. 1.5.1 fixes all three causes:
   builds are signed, filenames are specific and versioned, and checksums are published. Full
   detail, false-positive reporting links and Android/WSL/macOS install steps: [`INSTALL.md`](INSTALL.md).
 - **CI**: every push builds debug and release APKs (Actions → *Build* → artifact `joe-browser-apks`),
