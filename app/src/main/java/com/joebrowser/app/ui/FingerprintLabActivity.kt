@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.BrowserActivity
+import com.joebrowser.app.data.Prefs
 import com.joebrowser.app.data.Profile
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.fingerprint.FingerprintFactory
@@ -261,8 +262,13 @@ class FingerprintLabActivity : AppCompatActivity() {
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
+        val lastRun = current?.let { Prefs.lastTestRun(this@FingerprintLabActivity, it.id, site.label) }
         text.addView(TextView(this@FingerprintLabActivity).apply {
-            this.text = site.subtitle()
+            this.text = if (lastRun != null) {
+                getString(R.string.lab_last_run, site.subtitle(), relativeTime(lastRun))
+            } else {
+                site.subtitle()
+            }
             textSize = 11f
             setTextColor(ContextCompat.getColor(this@FingerprintLabActivity, R.color.text_muted))
             maxLines = 1
@@ -282,12 +288,27 @@ class FingerprintLabActivity : AppCompatActivity() {
         })
     }
 
+    /** "just now" / "12 min ago" / "3 h ago" — enough to answer "did I test this today?". */
+    private fun relativeTime(epochMillis: Long): String {
+        val minutes = ((System.currentTimeMillis() - epochMillis) / 60_000L).coerceAtLeast(0)
+        return when {
+            minutes < 1 -> getString(R.string.time_just_now)
+            minutes < 60 -> getString(R.string.time_minutes_ago, minutes)
+            minutes < 24 * 60 -> getString(R.string.time_hours_ago, minutes / 60)
+            else -> getString(R.string.time_days_ago, minutes / (24 * 60))
+        }
+    }
+
     private fun openSite(site: SiteBrand) {
         val profile = current
         if (profile == null) {
             pickProfile()
             return
         }
+        // Record the visit *before* launching: the detections these services report are the
+        // service's own numbers, which the app never invents — what it can honestly track is
+        // that this profile was actually taken to this detector, and when.
+        Prefs.recordTestRun(this, profile.id, site.label)
         BrowserActivity.launch(this, profile.id, site.url)
     }
 

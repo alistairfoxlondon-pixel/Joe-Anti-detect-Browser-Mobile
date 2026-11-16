@@ -13,8 +13,13 @@ import java.util.UUID
  * what keeps a corrupt row from crashing the app on launch.
  */
 
-const val BROWSERSCAN_URL = "https://www.browserscan.net/"
-const val DEFAULT_START_URL = BROWSERSCAN_URL
+/*
+ * An anti-detect browser should open to a neutral page, not to one vendor's detector: a startup
+ * URL that instantly loads a fingerprint-test script tells that vendor (and anyone watching the
+ * exit IP) which product is in use before the user has done anything. BrowserScan stays one tap
+ * away in Home → Verify and in the browser's Fingerprint-check menu.
+ */
+const val DEFAULT_START_URL = "https://www.google.com/"
 
 /** Browser engines a profile can present itself as. Rendering is always the system WebView. */
 enum class BrowserEngine(val id: String, val title: String, val engineFamily: String) {

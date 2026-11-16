@@ -310,6 +310,11 @@
     <string name="browser_find_hint">Find in page</string>
     <string name="browser_find_prev">Previous match</string>
     <string name="browser_find_next">Next match</string>
+    <string name="lab_last_run">%1$s · tested %2$s</string>
+    <string name="time_just_now">just now</string>
+    <string name="time_minutes_ago">%1$d min ago</string>
+    <string name="time_hours_ago">%1$d h ago</string>
+    <string name="time_days_ago">%1$d d ago</string>
     <string name="browser_home">Home</string>
     <string name="browser_share">Share page</string>
     <string name="browser_shield">Protection</string>

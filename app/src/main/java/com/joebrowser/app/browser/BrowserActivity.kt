@@ -802,15 +802,27 @@ class BrowserActivity : AppCompatActivity() {
             }
             // One source of truth for the detector URLs, so the in-browser menu, the home
             // chips and the lab grid can never point at different pages.
-            R.id.fpBrowserScan -> { load(com.joebrowser.app.ui.SiteBrand.BROWSERSCAN.url); true }
-            R.id.fpIpHey -> { load(com.joebrowser.app.ui.SiteBrand.IPHEY.url); true }
-            R.id.fpPixelScan -> { load(com.joebrowser.app.ui.SiteBrand.PIXELSCAN.url); true }
-            R.id.fpIpFighter -> { load(com.joebrowser.app.ui.SiteBrand.IPFIGHTER.url); true }
+            R.id.fpBrowserScan -> { openDetector(com.joebrowser.app.ui.SiteBrand.BROWSERSCAN); true }
+            R.id.fpIpHey -> { openDetector(com.joebrowser.app.ui.SiteBrand.IPHEY); true }
+            R.id.fpPixelScan -> { openDetector(com.joebrowser.app.ui.SiteBrand.PIXELSCAN); true }
+            R.id.fpIpFighter -> { openDetector(com.joebrowser.app.ui.SiteBrand.IPFIGHTER); true }
             R.id.fpWhoer -> { load(com.joebrowser.app.ui.SiteBrand.WHOER.url); true }
             R.id.fpCreepJs -> { load(com.joebrowser.app.ui.SiteBrand.CREEPJS.url); true }
             R.id.fpSanny -> { load(com.joebrowser.app.ui.SiteBrand.SANNYSOFT.url); true }
             else -> false
         }
+    }
+
+    /**
+     * Opens a detector page inside this profile and records the run.
+     *
+     * The app deliberately does not attempt to read or reproduce the detector's verdict: the
+     * score a user sees must be the service's own. What it can do is make the run repeatable —
+     * same page, same identity, one tap — and remember when it happened.
+     */
+    private fun openDetector(site: com.joebrowser.app.ui.SiteBrand) {
+        load(site.url)
+        profile?.let { Prefs.recordTestRun(this, it.id, site.label) }
     }
 
     private fun setSpeed(speed: String, item: android.view.MenuItem) {
