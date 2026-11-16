@@ -154,6 +154,9 @@ class BrowserActivity : AppCompatActivity() {
         binding.browserProfileName.text = loaded.displayName()
         binding.browserCaption.text = engineCaption(loaded)
 
+        // ---- 0. engine chrome: geometry and affordances follow the profile's engine
+        applyEngineChrome(loaded)
+
         // ---- 1. kernel FIRST: prepare() must run before the WebView exists
         // prepare() builds the spoofing payload and resolves the profile's storage token.
         val prepared = BrowserKernel.preflight(this, loaded)
@@ -234,6 +237,7 @@ class BrowserActivity : AppCompatActivity() {
     private fun updateTabBadge() {
         if (!::binding.isInitialized) return
         binding.tabsCount.text = tabs.size.coerceAtLeast(1).toString()
+        syncTabChrome()
     }
 
     private fun openNewTab(initialUrl: String? = null) {
@@ -580,7 +584,64 @@ class BrowserActivity : AppCompatActivity() {
         tintProxyButton(colorRes)
     }
 
-    private fun engineCaption(p: Profile): String = "${p.engine.title} · ${p.fp.os}"
+    private fun engineCaption(p: Profile): String = EngineChrome.of(p.engine).caption(p.fp.os)
+
+    // ----------------------------------------------------------- engine chrome
+
+    /**
+     * The profile decides what the browser *looks and behaves like*, not just what it claims to
+     * be. Chromium, Edge and Firefox keep a back/forward row; Chrome and Edge keep the omnibox
+     * as the whole toolbar; Brave and Firefox show the shield inside the URL bar; Firefox keeps a
+     * home button. Every decision comes from [EngineChrome] so there is one place to reason about
+     * it, and nothing here can desynchronise from the identity the fingerprint layer presents.
+     */
+    private fun applyEngineChrome(profile: Profile) {
+        val chrome = EngineChrome.of(profile.engine)
+        chrome.apply(
+            urlBar = binding.browserUrlBar,
+            urlShield = binding.browserUrlShield,
+            navRow = binding.browserNavRow,
+            homeButton = binding.btnNavHome,
+            shareButton = binding.btnShare,
+            tabStrip = binding.browserTabStrip,
+            tabCounter = binding.btnTabs,
+            tabPill = binding.browserTabPill
+        )
+        binding.browserTabStripRule.visibility = binding.browserTabStrip.visibility
+        binding.browserTabStripLabel.text = profile.displayName()
+        binding.browserTabPill.text = profile.displayName()
+        syncTabChrome()
+    }
+
+    /**
+     * Keeps the engine-specific tab affordances in step with the tab list. Called on every
+     * open/close/switch instead of at layout time, because a stale count in a visible strip is
+     * exactly the kind of inconsistency a user notices immediately.
+     */
+    private fun syncTabChrome() {
+        val count = tabs.size.coerceAtLeast(1)
+        binding.browserTabStripCount.text = getString(R.string.browser_tabs_short, count)
+        binding.browserTabStripLabel.text =
+            activeTab()?.webView?.title?.takeIf { it.isNotBlank() } ?: profile?.displayName().orEmpty()
+        binding.browserTabPill.text = activeTab()?.webView?.title?.takeIf { it.isNotBlank() }
+            ?: profile?.displayName().orEmpty()
+    }
+
+    /** Where the home button goes: the profile's start page, then the app default. */
+    private fun homeUrl(): String =
+        profile?.startUrl?.takeIf { it.isNotBlank() } ?: Prefs.defaultStartUrl(this)
+
+    private fun shareCurrentPage() {
+        val web = activeTab() ?: return
+        val url = web.url.orEmpty()
+        if (url.isBlank()) return
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, web.title.orEmpty())
+            putExtra(Intent.EXTRA_TEXT, url)
+        }
+        runCatching { startActivity(Intent.createChooser(intent, getString(R.string.browser_share))) }
+    }
 
     // ---------------------------------------------------------------- toolbar
 
@@ -595,6 +656,9 @@ class BrowserActivity : AppCompatActivity() {
             true
         }
         binding.btnBrowserMenu.setOnClickListener { showMenu(it) }
+        binding.btnNavHome.setOnClickListener { load(homeUrl()) }
+        binding.btnShare.setOnClickListener { shareCurrentPage() }
+        binding.browserTabStrip.setOnClickListener { showTabSwitcher() }
         binding.browserUrlField.setOnEditorActionListener { _, actionId, event ->
             val isGo = actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO ||
                 (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER)
@@ -1304,6 +1368,7 @@ class BrowserActivity : AppCompatActivity() {
                 binding.browserLoading.visibility = View.GONE
                 binding.browserProgress.progress = 0
                 syncUrlField(url)
+                syncTabChrome()
                 updateNavButtons()
                 val query = binding.browserFindInput.text?.toString().orEmpty()
                 if (binding.browserFindBar.visibility == View.VISIBLE && query.isNotBlank()) {

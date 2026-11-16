@@ -138,6 +138,46 @@
         android:progress="0"
         android:progressDrawable="@drawable/progress_browser" />
 
+    <!-- ============================================================== tab strip -->
+    <!-- Only engines that show tabs at the top expose this (Edge). It is one row, not a
+         scrollable tab bar: on a phone a real tab bar costs more than it gives. -->
+    <LinearLayout
+        android:id="@+id/browserTabStrip"
+        android:layout_width="match_parent"
+        android:layout_height="34dp"
+        android:background="@color/surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingEnd="6dp"
+        android:visibility="gone">
+
+        <TextView
+            android:id="@+id/browserTabStripLabel"
+            style="@style/Text.Jb.Caption"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textSize="11.5sp" />
+
+        <TextView
+            android:id="@+id/browserTabStripCount"
+            style="@style/Text.Jb.Caption"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="8dp"
+            android:textSize="11.5sp" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/browserTabStripRule"
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft"
+        android:visibility="gone" />
+
     <!-- ================================================================ content -->
     <FrameLayout
         android:id="@+id/browserWebViewFrame"
@@ -290,6 +330,7 @@
         android:background="@color/line_soft" />
 
     <LinearLayout
+        android:id="@+id/browserNavRow"
         android:layout_width="match_parent"
         android:layout_height="@dimen/browser_url_bar_height"
         android:background="@color/surface"
@@ -319,6 +360,7 @@
             android:src="@drawable/ic_back" />
 
         <LinearLayout
+            android:id="@+id/browserUrlBar"
             android:layout_width="0dp"
             android:layout_height="40dp"
             android:layout_marginStart="2dp"
@@ -337,6 +379,17 @@
                 android:contentDescription="@null"
                 android:src="@drawable/ic_search"
                 app:tint="@color/text_muted" />
+
+            <!-- Brave and Firefox keep the shield inside the URL bar; the other engines do not. -->
+            <ImageView
+                android:id="@+id/browserUrlShield"
+                android:layout_width="@dimen/icon_sm"
+                android:layout_height="@dimen/icon_sm"
+                android:layout_marginStart="6dp"
+                android:contentDescription="@string/browser_shield"
+                android:src="@drawable/ic_shield_check"
+                android:visibility="gone"
+                app:tint="@color/accent" />
 
             <EditText
                 android:id="@+id/browserUrlField"
@@ -366,6 +419,24 @@
                 android:src="@drawable/ic_refresh" />
         </LinearLayout>
 
+        <!-- Chromium's nested active-tab pill: a single darker capsule showing the current
+             tab, which is what its toolbar looks like before a vendor skin. -->
+        <TextView
+            android:id="@+id/browserTabPill"
+            style="@style/Text.Jb.Caption"
+            android:layout_width="wrap_content"
+            android:layout_height="28dp"
+            android:layout_marginEnd="2dp"
+            android:background="@drawable/bg_chip_neutral"
+            android:ellipsize="end"
+            android:gravity="center"
+            android:maxWidth="96dp"
+            android:maxLines="1"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:textSize="11sp"
+            android:visibility="gone" />
+
         <!-- The pill is 34dp because a tab counter that size reads correctly, but the touch
              target must be 48dp: wrap it in a transparent, padded frame. -->
         <FrameLayout
@@ -390,6 +461,26 @@
                 android:textSize="12sp"
                 android:textStyle="bold" />
         </FrameLayout>
+
+        <ImageButton
+            android:id="@+id/btnNavHome"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            style="@style/Widget.Jb.IconButton"
+            android:contentDescription="@string/browser_home"
+            android:padding="11dp"
+            android:src="@drawable/ic_nav_home"
+            android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/btnShare"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            style="@style/Widget.Jb.IconButton"
+            android:contentDescription="@string/browser_share"
+            android:padding="11dp"
+            android:src="@drawable/ic_share"
+            android:visibility="gone" />
 
         <ImageButton
             android:id="@+id/btnBrowserMenu"

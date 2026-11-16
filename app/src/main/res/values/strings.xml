@@ -310,6 +310,10 @@
     <string name="browser_find_hint">Find in page</string>
     <string name="browser_find_prev">Previous match</string>
     <string name="browser_find_next">Next match</string>
+    <string name="browser_home">Home</string>
+    <string name="browser_share">Share page</string>
+    <string name="browser_shield">Protection</string>
+    <string name="browser_tabs_short">%1$d tabs</string>
     <string name="browser_forward">Forward</string>
     <string name="browser_reload">Reload</string>
     <string name="browser_menu">Menu</string>
