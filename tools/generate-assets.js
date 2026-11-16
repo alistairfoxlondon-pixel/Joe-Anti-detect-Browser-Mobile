@@ -16,7 +16,7 @@
  *
  * Usage:  node tools/generate-assets.js [--icons-only]
  * Requires (dev machine only, never at build time): lucide-static, @resvg/resvg-js,
- * opentype.js, @expo-google-fonts/plus-jakarta-sans.
+ * opentype.js. Type for the art is read from res/font, so no font package is required.
  */
 const fs = require('fs');
 const path = require('path');
@@ -308,13 +308,26 @@ async function generateArt() {
   const { Resvg } = require(path.join(MODULES, '@resvg/resvg-js'));
   const opentype = require(path.join(MODULES, 'opentype.js'));
 
-  const fontPath = (w) =>
-    path.join(MODULES, '@expo-google-fonts/plus-jakarta-sans', w, `PlusJakartaSans_${w}.ttf`);
+  /*
+   * Store art uses the same typeface the app ships, read straight out of res/font — so the
+   * feature graphic and the in-app UI can never drift apart, and the dev machine no longer
+   * needs a separate font package installed.
+   */
+  const fontFile = (name) => path.join(RES, 'font', `${name}.ttf`);
   const fonts = {};
-  for (const w of ['400Regular', '500Medium', '600SemiBold', '700Bold', '800ExtraBold']) {
-    const p = fontPath(w);
+  for (const [weight, file] of Object.entries({
+    '400Regular': 'inter_regular',
+    '500Medium': 'inter_medium',
+    '600SemiBold': 'inter_semibold',
+    '700Bold': 'inter_bold',
+    '800ExtraBold': 'inter_extrabold'
+  })) {
+    const f = fontFile(file);
     // opentype v1 exposes parse(); loadSync() is gone from newer releases.
-    if (fs.existsSync(p)) fonts[w] = opentype.parse(fs.readFileSync(p).buffer.slice(0));
+    if (fs.existsSync(f)) {
+      const buf = fs.readFileSync(f);
+      fonts[weight] = opentype.parse(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength));
+    }
   }
 
   const text = (str, opts) => {

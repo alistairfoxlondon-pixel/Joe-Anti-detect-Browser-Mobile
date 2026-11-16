@@ -6,42 +6,79 @@ be managed from one device without cross-contamination.
 
 Local account only. No cloud. No telemetry. Everything lives on the device.
 
+## New in 1.6.0
+
+**Every engine now looks like the engine it claims to be.** Chrome, Chromium, Brave, Edge and
+Firefox each get their own shell — a tab strip, an active-tab pill or a tab counter depending on
+the product, a capsule or a field URL bar, an omnibox-only toolbar or a back/forward row, Brave's
+shield inside the URL bar, Firefox's and Edge's home button, Chrome's share action. The engine is
+expressed through geometry and affordances only: the app still has exactly one colour identity, so
+there is no second brand palette competing with it.
+
+**Canvas fingerprints are now internally consistent.** This is the fix behind the low BrowserScan
+score. The previous layer perturbed every pixel of every canvas by ±2 in all three channels, and
+re-encoded `toDataURL`/`toBlob` through a scratch canvas — so the three read surfaces could never
+agree with each other, which is precisely what "canvas fingerprint inconsistency" measures. One
+per-profile transform now lives in one place and is reused by all three: coordinate-seeded and
+deterministic, confined to the anti-aliased alpha edge band (fully opaque and fully transparent
+pixels are untouched), clamped to one unit in one channel. Repeat visits are identical, cross-API
+checks pass, and text rendering is no longer smeared. `tools/verify-fingerprint.js` asserts all
+three properties.
+
+**Inter replaces Plus Jakarta Sans.** Five pinned static instances (400–800), subset to Latin +
+Latin-Ext + punctuation (~1.2k glyphs each), behind one `@font/app_font` family. Pinned weights
+rather than one variable file because Android's variable-font support is API 28+ and varies by OEM
+type stack; the store art now reads its typeface straight from `res/font`, so artwork and UI can
+never drift apart.
+
+**Tighter geometry.** Corners came down a step across the whole system — hero 22→14, cards 18→12,
+insets and tiles 12→8, chips 8→6, buttons 14→8 — while the rounded URL capsule and hero pill keep
+their form. The app reads like a tool now, not a toy.
+
+**Authentic brand marks.** The official Google Chrome, Brave, Mozilla Firefox and Huawei vector
+marks ship in `brand_*`, reproduced in each owner's colour. The fingerprint services have no
+redistributable mark, so their tiles carry the service's own wordmark initial on a plate in its
+brand colour — recognisable, and never a lookalike.
+
+**One source of truth for the test services.** `SiteBrand` declares each service's name, purpose,
+canonical test URL and colour once; the home verify chips, the in-browser Fingerprint-check menu
+and the lab grid all read from it, so they can no longer disagree about which page to open.
+
+**Honest test history.** Opening a detector now records *when* that profile was taken there, and
+the lab tile shows it ("Fingerprint report · tested 12 min ago"). The app never reproduces or
+guesses a detector's verdict — the number on screen is always the service's own. The lab grid is
+also one full-width row per service instead of eight identical glyphs.
+
+**Home opens your profile.** The hero carries an Open pill beside the profile name, so the most
+common task is one tap from launch.
+
+**A neutral startup page.** New profiles opened to a detector's homepage, announcing the product to
+that vendor before the user had done anything; they now open to a neutral page, with the detectors
+one tap away in Home and the browser menu.
+
 ## New in 1.5.1
 
-**Signed, correctly-named APKs — and an install guide.** 1.5.1 ships `joe-browser-1.5.1-release.apk`
-signed with v1+v2+v3 schemes (when keystore secrets are configured), alongside a `SHA256SUMS.txt`
-on every release. If Windows SmartScreen or Defender blocks or deletes the download, read
-[`INSTALL.md`](INSTALL.md): it explains why an unknown, unsigned, generically-named APK is
-heuristic-bad and shows how to verify the checksum before installing.
+**Signed, correctly-named APKs — and an install guide.** 1.5.1 asked `apksigner` whether a build
+output is actually signed and withholds the release APK when it is not; it also ships
+`SHA256SUMS.txt` on every release. If Windows SmartScreen or Defender blocks or deletes the
+download, read [`INSTALL.md`](INSTALL.md): it explains why an unknown, unsigned, generically-named
+APK is heuristic-bad and shows how to verify the checksum before installing.
 
 **New brand mark and icon set.** A shield-and-keyhole mark on deep green replaces the old logo;
-the full 69-icon set was redrawn on a single 24dp grid with one stroke weight, and the launcher
+the full icon set was redrawn on a single 24dp grid with one stroke weight, and the launcher
 foreground/background layers were rebuilt at the correct safe-zone scale.
-
-**One type system, one colour.** Plus Jakarta Sans 400–800 everywhere (`@font/jakarta`), a single
-brand green (`#0C7A52` light / `#2FBF8F` dark) with a deep-green `#0B3D2E` hero surface, and
-**no gradients anywhere** — every surface is a flat fill.
 
 **Bulk profile creation.** Profiles → layers icon: name prefix, count (up to 50), engine, OS and
 one shared proxy. Every profile in the batch is de-duplicated against all existing signatures, so
 twenty profiles are twenty fingerprints, not twenty copies.
 
 **Fingerprint Lab.** Profiles → ⋮ → *Test fingerprint* opens an on-device coherence score with the
-exact warnings the editor uses, then one-tap detectors (BrowserScan, IPHey, PixelScan, CreepJS,
-IPFighter, Whoer, Sannysoft, DeviceInfo) that open **inside the selected profile's session**, so
-what you test is what that profile will show the world.
+exact warnings the editor uses, then one-tap detectors that open **inside the selected profile's
+session**, so what you test is what that profile will show the world.
 
-**1.5.1 fixes a release-pipeline bug in 1.5.0.** 1.5.0's release job renamed every build output and
+**1.5.1 fixed a release-pipeline bug in 1.5.0.** 1.5.0's release job renamed every build output and
 then filtered on the old filename, so an *unsigned* `joe-browser-1.5.0-release.apk` was published and
-described as signed. 1.5.1 asks `apksigner` whether the file is actually signed and withholds the
-release APK when it is not — the asset is gone from this release, and the notes now say plainly that
-the debug-signed APK is the installable one.
-
-**Copy and chrome diet.** Duplicate labels were merged into single keys (`Not checked` existed four
-times), the dashboard hero absorbed the Verify row, four editor section headers were replaced by
-grouping, and every section that can be empty now collapses instead of printing a sentence about
-being empty. `node tools/copy-report.js` prints the exact per-key comparison against 1.4.0 on every
-CI run — see [`QA.md`](QA.md) for the numbers and what is still unverified.
+described as signed.
 
 ## New in 1.4.0
 
@@ -103,11 +140,11 @@ and a batch of overflow/crash fixes across the UI.
   is exactly the shape OS heuristics distrust. Compare the SHA-256:
 
   ```powershell
-  Get-FileHash .\joe-browser-1.5.1-release.apk -Algorithm SHA256
+  Get-FileHash .\joe-browser-1.6.0-release.apk -Algorithm SHA256
   ```
 
   ```bash
-  shasum -a 256 joe-browser-1.5.1-release.apk
+  shasum -a 256 joe-browser-1.6.0-release.apk
   ```
 
   The digest must match the line for that file in `SHA256SUMS.txt`.

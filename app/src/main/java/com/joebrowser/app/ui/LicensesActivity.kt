@@ -26,7 +26,7 @@ class LicensesActivity : AppCompatActivity() {
         Entry("Material Components for Android", "Apache License 2.0", "github.com/material-components/material-components-android"),
         Entry("AndroidX WebKit (ProfileStore, document-start injection)", "Apache License 2.0", "developer.android.com/reference/androidx/webkit"),
         Entry("Kotlin standard library", "Apache License 2.0", "kotlinlang.org"),
-        Entry("Plus Jakarta Sans typeface (every UI string)", "SIL Open Font License 1.1", "github.com/tokotype/PlusJakartaSans"),
+        Entry("Inter typeface (every UI string)", "SIL Open Font License 1.1", "github.com/rsms/inter"),
         Entry("Lucide icon set (every UI icon)", "ISC License", "lucide.dev"),
         Entry("ip-api.com geolocation endpoint", "Free tier, rate limited", "ip-api.com"),
         Entry("api.ipify.org IP echo", "Free service", "www.ipify.org")

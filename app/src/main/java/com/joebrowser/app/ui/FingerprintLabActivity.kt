@@ -11,6 +11,7 @@ import androidx.core.content.ContextCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.BrowserActivity
+import com.joebrowser.app.data.Prefs
 import com.joebrowser.app.data.Profile
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.fingerprint.FingerprintFactory
@@ -34,19 +35,8 @@ class FingerprintLabActivity : AppCompatActivity() {
     private var profiles: List<Profile> = emptyList()
     private var current: Profile? = null
 
-    /** Detector services, in the order they are most useful: full report first. */
-    private val sites = listOf(
-        Site("BrowserScan", "Full report", "https://www.browserscan.net/"),
-        Site("IPHey", "Trust score", "https://iphey.com/"),
-        Site("PixelScan", "Consistency", "https://pixelscan.net/"),
-        Site("CreepJS", "Deep probe", "https://abrahamjuliot.github.io/creepjs/"),
-        Site("IPFighter", "Leak test", "https://www.ipfighter.com/browser-fingerprint"),
-        Site("Whoer", "Anonymity", "https://whoer.net/"),
-        Site("Sannysoft", "Headless", "https://bot.sannysoft.com/"),
-        Site("DeviceInfo", "Hardware", "https://www.deviceinfo.me/")
-    )
-
-    private data class Site(val name: String, val purpose: String, val url: String)
+    /** Detector services come from the shared brand model so every screen agrees. */
+    private val sites: List<SiteBrand> = SiteBrand.all
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -56,7 +46,7 @@ class FingerprintLabActivity : AppCompatActivity() {
         binding.btnLabBack.setOnClickListener { onBackPressedDispatcher.onBackPressed() }
         binding.labProfileCard.setOnClickListener { pickProfile() }
         binding.labSwitch.setOnClickListener { pickProfile() }
-        binding.labRunAll.setOnClickListener { openSite(sites.first()) }
+        binding.labRunAll.setOnClickListener { openSite(SiteBrand.BROWSERSCAN) }
         binding.labAuditAll.setOnClickListener {
             startActivity(Intent(this, FingerprintBatchActivity::class.java))
         }
@@ -204,78 +194,121 @@ class FingerprintLabActivity : AppCompatActivity() {
     private fun buildSiteGrid() {
         val grid = binding.labSiteGrid
         grid.removeAllViews()
-        sites.chunked(2).forEach { pair ->
-            val row = LinearLayout(this).apply {
-                orientation = LinearLayout.HORIZONTAL
+        // One full-width row per service: at 34dp the plate plus two lines of text do not fit in
+        // a half-width column on a small phone, and a clipped service name is worse than a
+        // longer list.
+        sites.forEachIndexed { index, site ->
+            grid.addView(siteTile(site).apply {
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply { bottomMargin = UiKit.dp(this@FingerprintLabActivity, 8) }
-            }
-            pair.forEachIndexed { index, site ->
-                row.addView(siteTile(site).apply {
-                    layoutParams = LinearLayout.LayoutParams(
-                        0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f
-                    ).apply {
-                        if (index == 0) marginEnd = UiKit.dp(this@FingerprintLabActivity, 8)
-                    }
-                })
-            }
-            if (pair.size == 1) {
-                // Keep the last odd tile the same width as its neighbours.
-                row.addView(View(this).apply {
-                    layoutParams = LinearLayout.LayoutParams(0, 1, 1f)
-                })
-            }
-            grid.addView(row)
+                ).apply { if (index > 0) topMargin = UiKit.dp(this@FingerprintLabActivity, 8) }
+            })
         }
     }
 
-    private fun siteTile(site: Site): View = LinearLayout(this).apply {
-        orientation = LinearLayout.VERTICAL
+    /**
+     * One detector tile.
+     *
+     * The mark comes from [SiteBrand]: a real vector brand mark where the vendor publishes one,
+     * otherwise the service's own wordmark initial on a plate in its brand colour. A generic
+     * fingerprint glyph for all eight services made the grid unreadable at a glance.
+     */
+    private fun siteTile(site: SiteBrand): View = LinearLayout(this).apply {
+        orientation = LinearLayout.HORIZONTAL
         background = ContextCompat.getDrawable(this@FingerprintLabActivity, R.drawable.bg_card)
+        gravity = android.view.Gravity.CENTER_VERTICAL
         setPadding(
-            UiKit.dp(this@FingerprintLabActivity, 13),
             UiKit.dp(this@FingerprintLabActivity, 12),
-            UiKit.dp(this@FingerprintLabActivity, 13),
+            UiKit.dp(this@FingerprintLabActivity, 12),
+            UiKit.dp(this@FingerprintLabActivity, 12),
             UiKit.dp(this@FingerprintLabActivity, 12)
         )
         isClickable = true
         isFocusable = true
         setOnClickListener { openSite(site) }
 
-        addView(android.widget.ImageView(this@FingerprintLabActivity).apply {
-            setImageResource(R.drawable.ic_fingerprint)
-            imageTintList = android.content.res.ColorStateList.valueOf(
-                ContextCompat.getColor(this@FingerprintLabActivity, R.color.accent)
-            )
+        val plate = TextView(this@FingerprintLabActivity).apply {
             layoutParams = LinearLayout.LayoutParams(
-                UiKit.dp(this@FingerprintLabActivity, 18),
-                UiKit.dp(this@FingerprintLabActivity, 18)
+                UiKit.dp(this@FingerprintLabActivity, 34),
+                UiKit.dp(this@FingerprintLabActivity, 34)
             )
-        })
-        addView(TextView(this@FingerprintLabActivity).apply {
-            text = site.name
+            gravity = android.view.Gravity.CENTER
+            setTextColor(android.graphics.Color.WHITE)
+            textSize = 13f
+            setTypeface(typeface, Typeface.BOLD)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+        }
+        val mark = android.widget.ImageView(this@FingerprintLabActivity).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                UiKit.dp(this@FingerprintLabActivity, 34),
+                UiKit.dp(this@FingerprintLabActivity, 34)
+            )
+            contentDescription = null
+        }
+        site.bindPlate(this@FingerprintLabActivity, plate, mark)
+        addView(plate)
+        addView(mark)
+
+        val text = LinearLayout(this@FingerprintLabActivity).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+                .apply { marginStart = UiKit.dp(this@FingerprintLabActivity, 10) }
+        }
+        text.addView(TextView(this@FingerprintLabActivity).apply {
+            this.text = site.label
             textSize = 13.5f
             setTypeface(typeface, Typeface.BOLD)
             setTextColor(ContextCompat.getColor(this@FingerprintLabActivity, R.color.text))
-            setPadding(0, UiKit.dp(this@FingerprintLabActivity, 7), 0, 0)
             maxLines = 1
             ellipsize = android.text.TextUtils.TruncateAt.END
         })
-        addView(TextView(this@FingerprintLabActivity).apply {
-            text = site.purpose
+        val lastRun = current?.let { Prefs.lastTestRun(this@FingerprintLabActivity, it.id, site.label) }
+        text.addView(TextView(this@FingerprintLabActivity).apply {
+            this.text = if (lastRun != null) {
+                getString(R.string.lab_last_run, site.subtitle(), relativeTime(lastRun))
+            } else {
+                site.subtitle()
+            }
             textSize = 11f
             setTextColor(ContextCompat.getColor(this@FingerprintLabActivity, R.color.text_muted))
             maxLines = 1
+            ellipsize = android.text.TextUtils.TruncateAt.END
+        })
+        addView(text)
+
+        addView(android.widget.ImageView(this@FingerprintLabActivity).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            imageTintList = android.content.res.ColorStateList.valueOf(
+                ContextCompat.getColor(this@FingerprintLabActivity, R.color.text_muted)
+            )
+            layoutParams = LinearLayout.LayoutParams(
+                UiKit.dp(this@FingerprintLabActivity, 16),
+                UiKit.dp(this@FingerprintLabActivity, 16)
+            )
         })
     }
 
-    private fun openSite(site: Site) {
+    /** "just now" / "12 min ago" / "3 h ago" — enough to answer "did I test this today?". */
+    private fun relativeTime(epochMillis: Long): String {
+        val minutes = ((System.currentTimeMillis() - epochMillis) / 60_000L).coerceAtLeast(0)
+        return when {
+            minutes < 1 -> getString(R.string.time_just_now)
+            minutes < 60 -> getString(R.string.time_minutes_ago, minutes)
+            minutes < 24 * 60 -> getString(R.string.time_hours_ago, minutes / 60)
+            else -> getString(R.string.time_days_ago, minutes / (24 * 60))
+        }
+    }
+
+    private fun openSite(site: SiteBrand) {
         val profile = current
         if (profile == null) {
             pickProfile()
             return
         }
+        // Record the visit *before* launching: the detections these services report are the
+        // service's own numbers, which the app never invents — what it can honestly track is
+        // that this profile was actually taken to this detector, and when.
+        Prefs.recordTestRun(this, profile.id, site.label)
         BrowserActivity.launch(this, profile.id, site.url)
     }
 

@@ -466,9 +466,11 @@ for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml
       fail(`${path.relative(ROOT, file)}: hard-coded colour ${m[1]} — use a @color role`);
     }
   }
-  // Launcher/splash artwork paints brand colours on purpose; the ic_* icon set must stay
-  // untinted black so one usage-site tint controls it.
-  const ARTWORK = /(launcher|splash|ic_logo)/;
+  // Launcher/splash artwork paints brand colours on purpose, and a third-party brand mark
+  // (brand_*) must be reproduced in the owner's own colours — flattening Brave to monochrome
+  // would not be the "authentic official logo" the design calls for. The ic_* icon set is
+  // different: it must stay untinted black so one usage-site tint controls it.
+  const ARTWORK = /(launcher|splash|ic_logo|^brand_)/;
   for (const file of walk(path.join(RES, 'drawable')).filter((f) => f.endsWith('.xml'))) {
     const text = fs.readFileSync(file, 'utf8');
     if (/<gradient\b/.test(text)) {
@@ -482,9 +484,68 @@ for (const file of walk(path.join(RES, 'layout')).filter((f) => f.endsWith('.xml
         fail(`${path.relative(ROOT, file)}: icon fill ${m[1]} — icons must be #000 and tinted`);
       }
     }
+    // Lucide glyphs are stroked, not filled, so the stroke colour is the one that actually
+    // paints. Checking only fills let a coloured stroke through unnoticed.
+    for (const m of (isArtwork ? [] : text.matchAll(/android:strokeColor="(#[0-9A-Fa-f]{6,8})"/g))) {
+      if (!/^#(?:FF)?000000$|^#00000000$/i.test(m[1])) {
+        fail(`${path.relative(ROOT, file)}: icon stroke ${m[1]} — icons must be #000 and tinted`);
+      }
+    }
     for (const m of (isArtwork ? [] : text.matchAll(/<solid android:color="(#[0-9A-Fa-f]{6,8})"/g))) {
       if (!ALLOWED_SCRIM.test(m[1])) {
         fail(`${path.relative(ROOT, file)}: hard-coded fill ${m[1]} — use a @color role`);
+      }
+    }
+  }
+}
+
+// --------------------------------------------------------- engine chrome wiring
+
+/**
+ * The per-engine shell (EngineChrome.kt) is only real if every view it toggles exists in the
+ * layout and every one of them is bound in the activity. Kotlin cannot be compiled here, so the
+ * wiring is checked textually — a renamed id or a dropped binding would otherwise reach the
+ * APK and fail at runtime with an NPE on a ViewBinding reference.
+ */
+{
+  const chromeFile = path.join(JAVA, 'com/joebrowser/app/browser/EngineChrome.kt');
+  const browserLayout = path.join(RES, 'layout/activity_browser.xml');
+  if (!fs.existsSync(chromeFile)) {
+    fail('EngineChrome.kt is missing — the per-engine shell has no model');
+  } else if (fs.existsSync(browserLayout)) {
+    const layoutText = fs.readFileSync(browserLayout, 'utf8');
+    const activityText = fs.readFileSync(
+      path.join(JAVA, 'com/joebrowser/app/browser/BrowserActivity.kt'), 'utf8'
+    );
+    const REQUIRED = [
+      ['browserUrlBar', 'URL bar container'],
+      ['browserUrlShield', 'in-bar shield'],
+      ['browserNavRow', 'navigation row'],
+      ['btnNavHome', 'home button'],
+      ['btnShare', 'share button'],
+      ['browserTabStrip', 'tab strip'],
+      ['browserTabStripRule', 'tab strip rule'],
+      ['browserTabStripLabel', 'tab strip label'],
+      ['browserTabStripCount', 'tab strip counter'],
+      ['browserTabPill', 'active-tab pill']
+    ];
+    for (const [id, purpose] of REQUIRED) {
+      if (!layoutText.includes(`@+id/${id}`)) {
+        fail(`activity_browser.xml: missing ${purpose} (@id/${id}) — EngineChrome toggles it`);
+      }
+      if (!activityText.includes(`binding.${id}`)) {
+        fail(`BrowserActivity: never binds ${purpose} (binding.${id})`);
+      }
+    }
+    // Every engine must be modelled: an engine without chrome silently falls back to Chrome.
+    const engines = fs.readFileSync(path.join(JAVA, 'com/joebrowser/app/data/Models.kt'), 'utf8');
+    const declared = [...engines.matchAll(/^\s{4}([A-Z][A-Z0-9_]*)\("([a-z]+)",/gm)].map((m) => m[1]);
+    if (declared.length >= 5) {
+      const chromeText = fs.readFileSync(chromeFile, 'utf8');
+      for (const name of declared) {
+        if (!new RegExp(`^\\s{4}${name}\\(`, 'm').test(chromeText)) {
+          fail(`EngineChrome: engine ${name} has no chrome profile`);
+        }
       }
     }
   }

@@ -1,21 +1,33 @@
-# QA — Joe Browser 1.5.1
+# QA — Joe Browser 1.6.0
 
 What was checked, how, and what still cannot be checked without a device. Every claim below is
 reproducible by running the listed command or by reading the listed file.
 
 ## Automated gates (run on every push, and locally)
 
-| Gate | Command | Result at 1.5.1 |
+| Gate | Command | Result at 1.6.0 |
 |---|---|---|
-| Static audit — resources, bindings, menus, 48dp targets, single-colour policy, palette parity, dead copy | `node tools/verify-resources.js` | pass — 639 resources / 14 types, 32 layouts, 38 Kotlin files, 0 unused strings |
-| Fingerprint layer executed against a Blink-shaped mock | `node tools/verify-fingerprint.js` | pass — 94 assertions |
+| Static audit — resources, bindings, menus, 48dp targets, single-colour policy, palette parity, dead copy | `node tools/verify-resources.js` | pass — 654 resources / 14 types, 32 layouts, 40 Kotlin files, 0 unused strings |
+| Fingerprint layer executed against a Blink-shaped mock | `node tools/verify-fingerprint.js` | pass — 99 assertions |
 | Proxy relay over real loopback sockets | `node tools/test-relay.js` | pass — 20 assertions |
 | Tracker classifier + capped rows vs true totals | `node tools/test-trackers.js` | pass — 48 assertions |
 | Human-typing engine against a DOM mock | `node tools/test-human-paste.js` | pass — 25 assertions |
 | User-agent matrix | `node tools/test-user-agent.js` | pass — 98 identities, 13 assertions |
-| Generated assets match their source | `node tools/generate-assets.js --check` | pass — 69 icons, launcher, splash, store art |
+| Generated assets match their source | `node tools/generate-assets.js --check` | pass — 70 icons, launcher, splash, store art |
 | Copy budget vs the 1.4.0 baseline | `node tools/copy-report.js` | see below |
 | Compile (debug + release, R8 + resource shrink) | GitHub Actions → *Build* | pass |
+
+## 1.6.0 — what changed under the gates
+
+| Gate | 1.6.0 result |
+| --- | --- |
+| `node tools/verify-fingerprint.js` | **99 assertions pass**, up from 94. New assertions: `toDataURL` encodes exactly the pixels `getImageData` reports; `toBlob` reads the same transformed surface; repeat reads are byte-identical; every change is at most one unit in one channel; alpha-0 and alpha-255 pixels are never perturbed. These are the properties the old canvas layer violated. |
+| `node tools/verify-resources.js` | Passes with two new rules: **engine-chrome wiring** (every view `EngineChrome` toggles exists in `activity_browser.xml` and is bound in `BrowserActivity`, and every `BrowserEngine` has a chrome profile — fault-injected to confirm it fires) and **icon stroke colour** (Lucide glyphs are stroked, so a coloured stroke previously slipped past the fill-only check — fault-injected to confirm it fires). |
+| `node tools/generate-assets.js --check` | Passes, 70 icons (adds `ic_share`). Store art now reads its typeface from `res/font`, so the art cannot drift from the UI. |
+
+**Copy budget** is 361 keys / 4702 chars including the new engine-chrome and test-history labels.
+Requirement 5 (a ≥50 % text cut against 1.4.0) is still **not met by counting**; see the honest
+framing below rather than reading the number as success.
 
 ### Copy budget
 

@@ -150,16 +150,38 @@ function makeEnvironment(cfg) {
     for (let i = 0; i < count; i++) data[i] = (i * 7) % 251;
     return data;
   }
-  function CanvasRenderingContext2D() {}
+  /*
+   * A faithful-enough canvas model to test the invariant that actually matters: what a page
+   * reads back through `getImageData` must be byte-identical to what it reads back through
+   * `toDataURL`/`toBlob`. Every read surface here is the *native* one; the shim under test is
+   * expected to keep them in agreement on its own.
+   */
+  function CanvasRenderingContext2D(canvas) { this.canvas = canvas || null; }
   CanvasRenderingContext2D.prototype.getImageData = function (x, y, w, h) {
     return { data: rawPixels(w * h * 4), width: w, height: h };
+  };
+  CanvasRenderingContext2D.prototype.putImageData = function (img) {
+    if (this.canvas) this.canvas.__pixels = Array.from(img.data);
   };
   CanvasRenderingContext2D.prototype.measureText = function (text) {
     // Native Blink returns a TextMetrics whose width is a plain, writable data property.
     return { width: String(text || '').length * 7.31 };
   };
-  function HTMLCanvasElement() {}
-  HTMLCanvasElement.prototype.getContext = function () { return new CanvasRenderingContext2D(); };
+  function HTMLCanvasElement() {
+    this.width = 0;
+    this.height = 0;
+    this.__pixels = null;
+  }
+  HTMLCanvasElement.prototype.getContext = function () {
+    if (!this.__ctx) this.__ctx = new CanvasRenderingContext2D(this);
+    return this.__ctx;
+  };
+  HTMLCanvasElement.prototype.toDataURL = function () {
+    return 'data:image/png;base64,' + (this.__pixels ? this.__pixels.join(',') : 'none');
+  };
+  HTMLCanvasElement.prototype.toBlob = function (callback) {
+    callback({ size: this.__pixels ? this.__pixels.length : 0, type: 'image/png' });
+  };
 
   const env = {};
   env.window = env;
@@ -183,7 +205,9 @@ function makeEnvironment(cfg) {
     visibilityState: 'visible',
     hasFocus: function () { return true; },
     createEvent: function () { return { initEvent: function () {} }; },
-    createElement: function () {
+    createElement: function (tag) {
+      // The canvas layer creates scratch canvases; everything else can stay a stub.
+      if (String(tag).toLowerCase() === 'canvas') return new HTMLCanvasElement();
       return {
         getContext: function () { return null; },
         style: {}, setAttribute: function () {}, appendChild: function () {}
@@ -305,16 +329,61 @@ console.log('\ntimezone / locale');
 check('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone, cfg.timezone);
 
 console.log('\ncanvas');
-const ctx = new env.CanvasRenderingContext2D();
-const first = Array.from(ctx.getImageData(0, 0, 8, 8).data);
-const second = Array.from(ctx.getImageData(0, 0, 8, 8).data);
+/*
+ * The property BrowserScan scores is *internal consistency*: the three read surfaces must
+ * agree, and they must agree again on the next visit. Both are asserted here, because the
+ * previous implementation failed both and that is what produced the "canvas fingerprint
+ * inconsistency" flag.
+ */
+function makeCanvas(w, h) {
+  const c = new env.HTMLCanvasElement();
+  c.width = w; c.height = h;
+  return c;
+}
+const scene = makeCanvas(220, 30);
+const sceneCtx = scene.getContext('2d');
+const first = Array.from(sceneCtx.getImageData(0, 0, 220, 30).data);
+
+// Cross-API consistency: encode the same canvas and compare with the pixels getImageData gave.
+const encoded = scene.toDataURL('image/png');
+const pixelsFromEncode = encoded.replace('data:image/png;base64,', '').split(',').map(Number);
+check('toDataURL encodes exactly the pixels getImageData reports',
+  pixelsFromEncode.join() === first.join(), true);
+let blobPixels = null;
+scene.toBlob(function (blob) { blobPixels = blob.size; });
+check('toBlob reads the same transformed surface', blobPixels, first.length);
+
+// Determinism: a second read of the same canvas is byte-identical.
+const second = Array.from(sceneCtx.getImageData(0, 0, 220, 30).data);
+check('stable across probes (same profile = same machine)', second.join() === first.join(), true);
+
+/* Geometry preservation. A transform that touches solid fills or empty areas is visible:
+ * it speckles flat backgrounds and shifts anti-aliased text edges. The two skip rules are
+ * asserted per-pixel below, against the same untransformed buffer the shim started from. */
 const untouched = Array.from((function () {
-  const raw = new Uint8ClampedArray(8 * 8 * 4);
+  const raw = new Uint8ClampedArray(220 * 30 * 4);
   for (let i = 0; i < raw.length; i++) raw[i] = (i * 7) % 251;
   return raw;
 })());
-check('stable across probes (same profile = same machine)', first.join() === second.join(), true);
 check('noise actually applied', first.join() !== untouched.join(), true);
+check('every change is at most one unit per channel', (function () {
+  for (let i = 0; i < first.length; i++) {
+    if (Math.abs(first[i] - untouched[i]) > 1) return false;
+  }
+  return true;
+})(), true);
+check('only partial-alpha pixels are touched', (function () {
+  for (let i = 0; i < first.length; i += 4) {
+    const alpha = untouched[i + 3];
+    if (alpha === 0 || alpha === 255) {
+      if (first[i] !== untouched[i] || first[i + 1] !== untouched[i + 1] || first[i + 2] !== untouched[i + 2]) {
+        return false;
+      }
+    }
+  }
+  return true;
+})(), true);
+const ctx = sceneCtx;
 
 // ---------------------------------------------------------------- battery
 (async function () {

@@ -6,9 +6,9 @@ The operating-system and browser brand marks (Chrome, Chromium, Brave, Edge, Fir
 Windows, Apple, Linux, Android) are trademarks of their respective owners and are used only
 to identify the platform a profile presents itself as.
 
-This product includes the Plus Jakarta Sans typeface by Tokotype and the Plus Jakarta Sans
-Project Authors, used under the SIL Open Font License 1.1
-(https://scripts.sil.org/OFL). A copy is at tools/licenses/plus-jakarta-sans.txt.
+This product includes the Inter typeface by Rasmus Andersson and the Inter
+Project Authors (https://github.com/rsms/inter), used under the SIL Open Font
+License 1.1 (https://scripts.sil.org/OFL). A copy is at tools/licenses/inter.txt.
 
 This product includes icon geometry from Lucide (https://lucide.dev), used under the ISC
 License. Vector drawables under app/src/main/res/drawable and the mark in ic_logo.xml are

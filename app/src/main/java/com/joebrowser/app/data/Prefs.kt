@@ -31,6 +31,7 @@ object Prefs {
     private const val KEY_TRACKER = "global_tracker"
     private const val KEY_HUMAN_JITTER = "human_jitter"
     private const val KEY_UNLOCK_SELECTION = "global_unlock_selection"
+    private const val KEY_TEST_RUNS = "test_runs"
 
     fun sp(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -137,4 +138,46 @@ object Prefs {
 
     fun setHumanPasteJitter(context: Context, value: Boolean) =
         sp(context).edit().putBoolean(KEY_HUMAN_JITTER, value).apply()
+
+    // ------------------------------------------------------------ test runs
+
+    /**
+     * Records that a detector page was actually opened for a profile.
+     *
+     * This is a *history of visits*, never a score: the app does not measure what BrowserScan
+     * or PixelScan report, and inventing a number for it would be the one thing this project
+     * must not do. What it can honestly record is when each service was last loaded for each
+     * profile, so "did I already test this one today?" has an answer.
+     *
+     * Stored as `profileId|site|epochMillis` triples, newest first, capped so the preference
+     * file cannot grow without bound.
+     */
+    fun recordTestRun(context: Context, profileId: String, site: String) {
+        if (profileId.isBlank() || site.isBlank()) return
+        val kept = lastTestRuns(context)
+            .filterNot { it.profileId == profileId && it.site == site }
+            .toMutableList()
+        kept.add(0, TestRun(profileId, site, System.currentTimeMillis()))
+        while (kept.size > MAX_TEST_RUNS) kept.removeAt(kept.lastIndex)
+        sp(context).edit().putString(
+            KEY_TEST_RUNS,
+            kept.joinToString("\n") { "${it.profileId}|${it.site}|${it.at}" }
+        ).apply()
+    }
+
+    data class TestRun(val profileId: String, val site: String, val at: Long)
+
+    fun lastTestRuns(context: Context): List<TestRun> =
+        (sp(context).getString(KEY_TEST_RUNS, "") ?: "")
+            .split('\n')
+            .mapNotNull { line ->
+                val parts = line.split('|')
+                val at = parts.getOrNull(2)?.toLongOrNull() ?: return@mapNotNull null
+                TestRun(parts[0], parts[1], at)
+            }
+
+    fun lastTestRun(context: Context, profileId: String, site: String): Long? =
+        lastTestRuns(context).firstOrNull { it.profileId == profileId && it.site == site }?.at
+
+    private const val MAX_TEST_RUNS = 200
 }

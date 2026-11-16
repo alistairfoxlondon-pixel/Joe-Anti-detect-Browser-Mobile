@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Inter (SIL Open Font License 1.1) — the single type family of the app.
+
+  Static instances rather than one variable file: Android's variable-font support reaches the
+  `wght` axis through `android:textFontWeight`, which only works from API 28 and behaves
+  differently across OEM WebView/OEM type stacks. Five pinned weights render identically on
+  API 26+, which is what a UI needs from a typeface.
+
+  Instances are subset to Latin + Latin-Ext + punctuation/symbols (~1.2k glyphs), which covers
+  every European language the UI can be translated into and keeps the APK small.
+-->
+<font-family xmlns:app="http://schemas.android.com/apk/res-auto">
+    <font app:fontStyle="normal" app:fontWeight="400" app:font="@font/inter_regular" />
+    <font app:fontStyle="normal" app:fontWeight="500" app:font="@font/inter_medium" />
+    <font app:fontStyle="normal" app:fontWeight="600" app:font="@font/inter_semibold" />
+    <font app:fontStyle="normal" app:fontWeight="700" app:font="@font/inter_bold" />
+    <font app:fontStyle="normal" app:fontWeight="800" app:font="@font/inter_extrabold" />
+</font-family>

@@ -154,6 +154,9 @@ class BrowserActivity : AppCompatActivity() {
         binding.browserProfileName.text = loaded.displayName()
         binding.browserCaption.text = engineCaption(loaded)
 
+        // ---- 0. engine chrome: geometry and affordances follow the profile's engine
+        applyEngineChrome(loaded)
+
         // ---- 1. kernel FIRST: prepare() must run before the WebView exists
         // prepare() builds the spoofing payload and resolves the profile's storage token.
         val prepared = BrowserKernel.preflight(this, loaded)
@@ -234,6 +237,7 @@ class BrowserActivity : AppCompatActivity() {
     private fun updateTabBadge() {
         if (!::binding.isInitialized) return
         binding.tabsCount.text = tabs.size.coerceAtLeast(1).toString()
+        syncTabChrome()
     }
 
     private fun openNewTab(initialUrl: String? = null) {
@@ -580,7 +584,64 @@ class BrowserActivity : AppCompatActivity() {
         tintProxyButton(colorRes)
     }
 
-    private fun engineCaption(p: Profile): String = "${p.engine.title} · ${p.fp.os}"
+    private fun engineCaption(p: Profile): String = EngineChrome.of(p.engine).caption(p.fp.os)
+
+    // ----------------------------------------------------------- engine chrome
+
+    /**
+     * The profile decides what the browser *looks and behaves like*, not just what it claims to
+     * be. Chromium, Edge and Firefox keep a back/forward row; Chrome and Edge keep the omnibox
+     * as the whole toolbar; Brave and Firefox show the shield inside the URL bar; Firefox keeps a
+     * home button. Every decision comes from [EngineChrome] so there is one place to reason about
+     * it, and nothing here can desynchronise from the identity the fingerprint layer presents.
+     */
+    private fun applyEngineChrome(profile: Profile) {
+        val chrome = EngineChrome.of(profile.engine)
+        chrome.apply(
+            urlBar = binding.browserUrlBar,
+            urlShield = binding.browserUrlShield,
+            navRow = binding.browserNavRow,
+            homeButton = binding.btnNavHome,
+            shareButton = binding.btnShare,
+            tabStrip = binding.browserTabStrip,
+            tabCounter = binding.btnTabs,
+            tabPill = binding.browserTabPill
+        )
+        binding.browserTabStripRule.visibility = binding.browserTabStrip.visibility
+        binding.browserTabStripLabel.text = profile.displayName()
+        binding.browserTabPill.text = profile.displayName()
+        syncTabChrome()
+    }
+
+    /**
+     * Keeps the engine-specific tab affordances in step with the tab list. Called on every
+     * open/close/switch instead of at layout time, because a stale count in a visible strip is
+     * exactly the kind of inconsistency a user notices immediately.
+     */
+    private fun syncTabChrome() {
+        val count = tabs.size.coerceAtLeast(1)
+        binding.browserTabStripCount.text = getString(R.string.browser_tabs_short, count)
+        binding.browserTabStripLabel.text =
+            activeTab()?.webView?.title?.takeIf { it.isNotBlank() } ?: profile?.displayName().orEmpty()
+        binding.browserTabPill.text = activeTab()?.webView?.title?.takeIf { it.isNotBlank() }
+            ?: profile?.displayName().orEmpty()
+    }
+
+    /** Where the home button goes: the profile's start page, then the app default. */
+    private fun homeUrl(): String =
+        profile?.startUrl?.takeIf { it.isNotBlank() } ?: Prefs.defaultStartUrl(this)
+
+    private fun shareCurrentPage() {
+        val web = activeTab() ?: return
+        val url = web.url.orEmpty()
+        if (url.isBlank()) return
+        val intent = Intent(Intent.ACTION_SEND).apply {
+            type = "text/plain"
+            putExtra(Intent.EXTRA_SUBJECT, web.title.orEmpty())
+            putExtra(Intent.EXTRA_TEXT, url)
+        }
+        runCatching { startActivity(Intent.createChooser(intent, getString(R.string.browser_share))) }
+    }
 
     // ---------------------------------------------------------------- toolbar
 
@@ -595,6 +656,9 @@ class BrowserActivity : AppCompatActivity() {
             true
         }
         binding.btnBrowserMenu.setOnClickListener { showMenu(it) }
+        binding.btnNavHome.setOnClickListener { load(homeUrl()) }
+        binding.btnShare.setOnClickListener { shareCurrentPage() }
+        binding.browserTabStrip.setOnClickListener { showTabSwitcher() }
         binding.browserUrlField.setOnEditorActionListener { _, actionId, event ->
             val isGo = actionId == android.view.inputmethod.EditorInfo.IME_ACTION_GO ||
                 (event != null && event.keyCode == KeyEvent.KEYCODE_ENTER)
@@ -736,15 +800,29 @@ class BrowserActivity : AppCompatActivity() {
                     .let { runCatching { startActivity(it) } }
                 true
             }
-            R.id.fpBrowserScan -> { load("https://browserscan.net/"); true }
-            R.id.fpIpHey -> { load("https://iphey.com/"); true }
-            R.id.fpPixelScan -> { load("https://pixelscan.net/"); true }
-            R.id.fpIpFighter -> { load("https://ipfighter.com/"); true }
-            R.id.fpWhoer -> { load("https://whoer.net/"); true }
-            R.id.fpCreepJs -> { load("https://abrahamjuliot.github.io/creepjs/"); true }
-            R.id.fpSanny -> { load("https://bot.sannysoft.com/"); true }
+            // One source of truth for the detector URLs, so the in-browser menu, the home
+            // chips and the lab grid can never point at different pages.
+            R.id.fpBrowserScan -> { openDetector(com.joebrowser.app.ui.SiteBrand.BROWSERSCAN); true }
+            R.id.fpIpHey -> { openDetector(com.joebrowser.app.ui.SiteBrand.IPHEY); true }
+            R.id.fpPixelScan -> { openDetector(com.joebrowser.app.ui.SiteBrand.PIXELSCAN); true }
+            R.id.fpIpFighter -> { openDetector(com.joebrowser.app.ui.SiteBrand.IPFIGHTER); true }
+            R.id.fpWhoer -> { load(com.joebrowser.app.ui.SiteBrand.WHOER.url); true }
+            R.id.fpCreepJs -> { load(com.joebrowser.app.ui.SiteBrand.CREEPJS.url); true }
+            R.id.fpSanny -> { load(com.joebrowser.app.ui.SiteBrand.SANNYSOFT.url); true }
             else -> false
         }
+    }
+
+    /**
+     * Opens a detector page inside this profile and records the run.
+     *
+     * The app deliberately does not attempt to read or reproduce the detector's verdict: the
+     * score a user sees must be the service's own. What it can do is make the run repeatable —
+     * same page, same identity, one tap — and remember when it happened.
+     */
+    private fun openDetector(site: com.joebrowser.app.ui.SiteBrand) {
+        load(site.url)
+        profile?.let { Prefs.recordTestRun(this, it.id, site.label) }
     }
 
     private fun setSpeed(speed: String, item: android.view.MenuItem) {
@@ -1304,6 +1382,7 @@ class BrowserActivity : AppCompatActivity() {
                 binding.browserLoading.visibility = View.GONE
                 binding.browserProgress.progress = 0
                 syncUrlField(url)
+                syncTabChrome()
                 updateNavButtons()
                 val query = binding.browserFindInput.text?.toString().orEmpty()
                 if (binding.browserFindBar.visibility == View.VISIBLE && query.isNotBlank()) {

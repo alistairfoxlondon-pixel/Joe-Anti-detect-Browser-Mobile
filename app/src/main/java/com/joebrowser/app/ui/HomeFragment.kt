@@ -133,9 +133,9 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
         val group = binding.verifyChips
         group.removeAllViews()
         val context = requireContext()
-        VERIFY_SITES.forEach { (url, label) ->
+        SiteBrand.primary.forEach { site ->
             group.addView(
-                UiKit.actionChip(context, label) { openVerifySite(url) }
+                UiKit.actionChip(context, site.label) { openVerifySite(site.url) }
             )
         }
     }
@@ -196,7 +196,17 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
                 target1?.displayName() ?: context.getString(R.string.home_hero_idle)
             }
         }
+        // The hero names the profile that a verify tap would use and offers the primary action
+        // itself, so the most common task (open my profile) is one tap from launch rather than
+        // a trip through the profile list.
         target.heroHeadline.text = text
+        val hasProfile = profiles.isNotEmpty()
+        target.heroOpen.visibility = if (hasProfile) View.VISIBLE else View.GONE
+        target.heroOpen.setOnClickListener {
+            val selected = selectVerifyTarget() ?: return@setOnClickListener
+            Prefs.setLastProfileId(requireContext(), selected.id)
+            BrowserActivity.launch(requireContext(), selected.id)
+        }
     }
 
     private fun bindProxyMetric(target: FragmentHomeBinding, proxies: List<SavedProxy>) {
@@ -310,12 +320,5 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
             AppEvents.ACTION_MONITOR_ALERT
         )
 
-        private val VERIFY_SITES = listOf(
-            "https://www.browserscan.net/" to "BrowserScan",
-            "https://iphey.com/" to "IPHey",
-            "https://pixelscan.net/" to "PixelScan",
-            "https://www.ipfighter.com/browser-fingerprint" to "IPFighter",
-            "https://whoer.net/" to "Whoer"
-        )
     }
 }
