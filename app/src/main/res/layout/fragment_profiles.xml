@@ -69,25 +69,27 @@
                     android:id="@+id/clearSearch"
                     android:layout_width="32dp"
                     android:layout_height="32dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
+                    style="@style/Widget.Jb.IconButton"
                     android:contentDescription="@string/action_clear"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_close"
-                    app:tint="@color/text_muted"
-                    android:visibility="gone" />
+                    android:visibility="gone"
+                    android:src="@drawable/ic_close" />
             </LinearLayout>
 
-            <ImageButton
-                android:id="@+id/sortProfiles"
-                android:layout_width="@dimen/touch_target"
-                android:layout_height="@dimen/touch_target"
+            <ImageView
+                android:id="@+id/bulkCreate"
+                style="@style/Widget.Jb.IconButton"
                 android:layout_gravity="center_vertical"
-                android:layout_marginStart="6dp"
-                android:background="?attr/selectableItemBackgroundBorderless"
+                android:layout_marginStart="2dp"
+                android:contentDescription="@string/profiles_bulk_new"
+                android:src="@drawable/ic_layers" />
+
+            <ImageView
+                android:id="@+id/sortProfiles"
+                style="@style/Widget.Jb.IconButton"
+                android:layout_gravity="center_vertical"
+                android:layout_marginStart="2dp"
                 android:contentDescription="@string/profiles_sort"
-                android:padding="13dp"
-                android:src="@drawable/ic_sort"
-                app:tint="@color/text_dim" />
+                android:src="@drawable/ic_sort" />
         </LinearLayout>
 
         <!-- Group filter -->

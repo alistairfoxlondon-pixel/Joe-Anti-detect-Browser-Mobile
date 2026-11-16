@@ -132,6 +132,9 @@ class ProfileEditorActivity : AppCompatActivity() {
         return fresh
     }
 
+    /** Labels offered by the Status picker; index 0 means "no explicit status" (Active). */
+    private var statusOptions: List<String> = emptyList()
+
     // -------------------------------------------------------------- dropdowns
 
     private fun setupDropdowns() {
@@ -140,6 +143,12 @@ class ProfileEditorActivity : AppCompatActivity() {
         }
         bindDropdown(binding.editorOs, OsCatalog.all) { position ->
             applyOs(OsCatalog.all[position])
+        }
+        // Status is a label, not a behaviour: it drives the chip on the profile card and search,
+        // so one picker is enough and "Active" is the sensible default for a new profile.
+        statusOptions = resources.getStringArray(R.array.editor_status_options).toList()
+        bindDropdown(binding.editorStatus, statusOptions) { position ->
+            profile.status = if (position == 0) "" else statusOptions[position]
         }
         bindDropdown(
             binding.editorDevicePreset,
@@ -216,7 +225,6 @@ class ProfileEditorActivity : AppCompatActivity() {
             val renderer = renderers[position]
             profile.fp.webglRenderer = renderer
             profile.fp.webglVendor = FingerprintFactory.vendorForRenderer(renderer)
-            binding.gpuVendorText.text = profile.fp.webglVendor
             markDirty()
             updateFingerprintSummary()
         }
@@ -234,7 +242,7 @@ class ProfileEditorActivity : AppCompatActivity() {
         configureSwitch(binding.rowMedia, R.string.editor_media_noise) { profile.fp.mediaNoise = it }
         configureSwitch(binding.rowDnt, R.string.editor_dnt) { profile.fp.doNotTrack = it }
         configureSwitch(binding.rowBattery, R.string.editor_battery) { profile.fp.spoofBattery = it }
-        configureSwitch(binding.rowUnlock, R.string.editor_unlock) { profile.tools.unlockSelection = it }
+        configureSwitch(binding.rowUnlock, R.string.tools_unlock) { profile.tools.unlockSelection = it }
         configureSwitch(binding.rowFresh, R.string.editor_fresh, R.string.editor_fresh_hint) {
             profile.freshSession = it
         }
@@ -306,10 +314,13 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.editorStartUrl.setText(profile.startUrl)
             binding.editorEngine.setText(profile.engine.title, false)
             binding.editorOs.setText(fp.os, false)
+            binding.editorStatus.setText(
+                profile.status.takeIf { it.isNotBlank() } ?: statusOptions.firstOrNull().orEmpty(),
+                false
+            )
 
             binding.editorCores.setText(fp.cores.toString(), false)
             binding.editorMemory.setText(fp.memory.toString() + " GB", false)
-            binding.gpuVendorText.text = fp.webglVendor
             binding.editorUserAgent.setText(fp.userAgentOverride)
             binding.editorTimezone.setText(fp.timezone, false)
             binding.editorLanguage.setText(fp.language, false)
@@ -354,7 +365,7 @@ class ProfileEditorActivity : AppCompatActivity() {
             binding.editorPasteSpeed.setText(HumanPaste.speedById(profile.tools.humanPasteSpeed).label, false)
             binding.watchIntervalValue.text =
                 getString(R.string.editor_interval_value, intervalLabel(profile.tools.proxyWatchIntervalSec))
-            binding.proxyStatus.setText(R.string.editor_proxy_idle)
+            binding.proxyStatus.setText(R.string.not_checked)
 
             populateIdentityFields()
         } finally {
@@ -371,7 +382,8 @@ class ProfileEditorActivity : AppCompatActivity() {
             val fp = profile.fp
             fp.touchPoints = value.toInt()
             fp.deviceType = if (value.toInt() == 0) "desktop" else OsCatalog.deviceType(fp.os)
-            binding.touchLabel.text = getString(R.string.editor_touch) + " · " + value.toInt()
+            binding.editorTouchSlider.contentDescription =
+                getString(R.string.editor_touch) + " " + value.toInt()
             markDirty()
             updateFingerprintSummary()
         }
@@ -406,12 +418,12 @@ class ProfileEditorActivity : AppCompatActivity() {
                 fp.screenW.toString() + " × " + fp.screenH + " @ " + formatDpr(fp.pixelRatio) + "x", false
             )
             binding.editorTouchSlider.value = fp.touchPoints.coerceIn(0, 10).toFloat()
-            binding.touchLabel.text = getString(R.string.editor_touch) + " · " + fp.touchPoints
+            binding.editorTouchSlider.contentDescription =
+                getString(R.string.editor_touch) + " " + fp.touchPoints
             binding.editorCores.setText(fp.cores.toString(), false)
             binding.editorMemory.setText(fp.memory.toString() + " GB", false)
             rebuildGpuDropdown()
             binding.editorGpuRenderer.setText(fp.webglRenderer, false)
-            binding.gpuVendorText.text = fp.webglVendor
             binding.editorTimezone.setText(fp.timezone, false)
             binding.editorLanguage.setText(fp.language, false)
             updateFingerprintSummary()
@@ -604,11 +616,11 @@ class ProfileEditorActivity : AppCompatActivity() {
     }
 
     private fun describeProxyState(config: ProxyConfig): String = when {
-        !config.enabled -> getString(R.string.editor_proxy_idle)
+        !config.enabled -> getString(R.string.not_checked)
         config.online -> config.lastIp + " · " + config.latencyMs + " ms" +
             if (config.lastCountryCode.isNotBlank()) " · " + config.lastCountry else ""
         config.checked -> config.lastError.ifBlank { getString(R.string.proxies_failed) }
-        else -> getString(R.string.editor_proxy_idle)
+        else -> getString(R.string.not_checked)
     }
 
     private fun updateGeoVisibility() {
@@ -715,7 +727,7 @@ class ProfileEditorActivity : AppCompatActivity() {
             val labels = saved.map { item ->
                 val config = item.config
                 val state = if (config.online) config.latencyMs.toString() + " ms"
-                else getString(R.string.proxies_untested)
+                else getString(R.string.not_checked)
                 item.displayName() + "\n" + config.type.uppercase() + " " + config.authority() + " · " + state
             }.toTypedArray()
 
@@ -759,8 +771,8 @@ class ProfileEditorActivity : AppCompatActivity() {
 
     private fun confirmClearData() {
         MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.profiles_clear_data)
-            .setMessage(getString(R.string.profiles_clear_data_body, profile.displayName()))
+            .setTitle(R.string.browser_clear_data)
+            .setMessage(getString(R.string.browser_clear_data_body, profile.displayName()))
             .setPositiveButton(R.string.action_clear) { _, _ ->
                 val app = applicationContext
                 val id = profile.id
@@ -854,7 +866,7 @@ class ProfileEditorActivity : AppCompatActivity() {
             // They also refresh on resume; this makes the change visible immediately for the
             // "save and open" path, which leaves the editor on screen over the list.
             AppEvents.emitDataChanged(app, "profile-saved")
-            Async.toast(this, getString(if (wasNew) R.string.editor_created else R.string.editor_saved))
+            Async.toast(this, getString(if (wasNew) R.string.editor_created else R.string.status_saved))
             if (thenLaunch) {
                 BrowserActivity.launch(this, saved.id)
                 finish()

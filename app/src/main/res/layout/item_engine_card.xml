@@ -1,0 +1,90 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  One engine card: official brand mark on a tinted tile, name + usage, and a single action.
+
+  The row is deliberately two lines tall so five engines fit on a phone screen without
+  scrolling. Nothing here is a paragraph.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/engineRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_marginBottom="@dimen/gap_s"
+    android:background="@drawable/bg_card"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingStart="14dp"
+    android:paddingTop="12dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="12dp">
+
+    <FrameLayout
+        android:layout_width="44dp"
+        android:layout_height="44dp"
+        android:background="@drawable/bg_icon_tile">
+
+        <!-- fitCenter keeps each official mark's aspect ratio (Brave's lion is 0.85:1, the
+             rest are square) instead of stretching them onto a fixed box. -->
+        <ImageView
+            android:id="@+id/engineLogo"
+            android:layout_width="28dp"
+            android:layout_height="28dp"
+            android:layout_gravity="center"
+            android:contentDescription="@null"
+            android:scaleType="fitCenter"
+            tools:src="@drawable/logo_chrome" />
+    </FrameLayout>
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="13dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:gravity="center_vertical"
+            android:orientation="horizontal">
+
+            <TextView
+                android:id="@+id/engineName"
+                style="@style/Text.Jb.CardTitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:ellipsize="end"
+                android:maxLines="1"
+                tools:text="Google Chrome" />
+
+            <TextView
+                android:id="@+id/engineCount"
+                style="@style/Text.Jb.Caption"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="8dp"
+                android:ellipsize="end"
+                android:maxLines="1"
+                tools:text="4 profiles" />
+        </LinearLayout>
+
+        <TextView
+            android:id="@+id/engineBuild"
+            style="@style/Text.Jb.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="134 · 133" />
+    </LinearLayout>
+
+    <!-- The whole card is the target; a labelled button repeated the same action five times. -->
+    <ImageButton
+        android:id="@+id/engineCreate"
+        style="@style/Widget.Jb.IconButton"
+        android:contentDescription="@string/engines_new_short"
+        android:src="@drawable/ic_plus" />
+</LinearLayout>

@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plus Jakarta Sans (SIL Open Font License 1.1) — the single type family of the app. -->
+<font-family xmlns:app="http://schemas.android.com/apk/res-auto">
+    <font app:fontStyle="normal" app:fontWeight="400" app:font="@font/jakarta_regular" />
+    <font app:fontStyle="normal" app:fontWeight="500" app:font="@font/jakarta_medium" />
+    <font app:fontStyle="normal" app:fontWeight="600" app:font="@font/jakarta_semibold" />
+    <font app:fontStyle="normal" app:fontWeight="700" app:font="@font/jakarta_bold" />
+    <font app:fontStyle="normal" app:fontWeight="800" app:font="@font/jakarta_extrabold" />
+</font-family>

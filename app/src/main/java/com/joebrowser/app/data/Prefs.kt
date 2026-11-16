@@ -31,7 +31,6 @@ object Prefs {
     private const val KEY_TRACKER = "global_tracker"
     private const val KEY_HUMAN_JITTER = "human_jitter"
     private const val KEY_UNLOCK_SELECTION = "global_unlock_selection"
-    private const val KEY_LAYOUT_MIGRATED = "layout_v2"
 
     fun sp(context: Context): SharedPreferences =
         context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
@@ -55,11 +54,13 @@ object Prefs {
         AppCompatDelegate.setDefaultNightMode(night)
     }
 
-    fun themeLabel(mode: Int): String = when (mode) {
-        1 -> "Dark"
-        2 -> "Light"
-        else -> "System"
-    }
+    fun themeLabel(context: Context, mode: Int): String = context.getString(
+        when (mode) {
+            1 -> com.joebrowser.app.R.string.theme_dark
+            2 -> com.joebrowser.app.R.string.theme_light
+            else -> com.joebrowser.app.R.string.theme_system
+        }
+    )
 
     // ---------------------------------------------------------------- browsing
 

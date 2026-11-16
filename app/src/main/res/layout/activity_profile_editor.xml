@@ -31,13 +31,9 @@
 
         <ImageButton
             android:id="@+id/btnEditorBack"
-            android:layout_width="@dimen/touch_target"
-            android:layout_height="@dimen/touch_target"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_back"
-            android:padding="13dp"
-            android:src="@drawable/ic_back"
-            app:tint="@color/text_dim" />
+            android:src="@drawable/ic_back" />
 
         <TextView
             android:id="@+id/editorTitle"
@@ -94,6 +90,7 @@
                 style="@style/Text.Jb.Section"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginBottom="@dimen/gap_s"
                 android:text="@string/editor_section_identity" />
 
             <HorizontalScrollView
@@ -119,7 +116,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Jb.TextInput"
@@ -187,6 +184,23 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
+                    android:hint="@string/editor_status">
+
+                    <AutoCompleteTextView
+                        android:id="@+id/editorStatus"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:inputType="none"
+                        android:maxLines="1"
+                        android:saveEnabled="false"
+                        android:singleLine="true" />
+                </com.google.android.material.textfield.TextInputLayout>
+
+                <com.google.android.material.textfield.TextInputLayout
+                    style="@style/Widget.Jb.TextInput.Dropdown"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
                     android:hint="@string/editor_engine">
 
                     <AutoCompleteTextView
@@ -221,7 +235,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:hint="@string/editor_start_url">
+                    android:hint="@string/tools_start_url">
 
                     <com.google.android.material.textfield.TextInputEditText
                         android:id="@+id/editorStartUrl"
@@ -281,10 +295,10 @@
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/gap_s"
+                android:layout_marginTop="10dp"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <TextView
                     android:id="@+id/fpSummary"
@@ -321,6 +335,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="@dimen/gap_l"
+                android:layout_marginBottom="@dimen/gap_s"
                 android:text="@string/editor_section_screen" />
 
             <LinearLayout
@@ -329,7 +344,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Jb.TextInput.Dropdown"
@@ -413,16 +428,9 @@
                     </com.google.android.material.textfield.TextInputLayout>
                 </LinearLayout>
 
-                <TextView
-                    android:id="@+id/touchLabel"
-                    style="@style/Text.Jb.Caption"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:text="@string/editor_touch" />
-
                 <com.google.android.material.slider.Slider
                     android:id="@+id/editorTouchSlider"
+                    android:layout_marginTop="8dp"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:stepSize="1"
@@ -433,12 +441,6 @@
             </LinearLayout>
 
             <!-- ======================================================= hardware -->
-            <TextView
-                style="@style/Text.Jb.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/gap_l"
-                android:text="@string/editor_section_hardware" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -446,7 +448,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -527,23 +529,9 @@
                         android:textSize="11.5sp" />
                 </com.google.android.material.textfield.TextInputLayout>
 
-                <TextView
-                    android:id="@+id/gpuVendorText"
-                    style="@style/Text.Jb.Caption"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="6dp"
-                    android:ellipsize="end"
-                    android:maxLines="1" />
             </LinearLayout>
 
             <!-- ========================================================== locale -->
-            <TextView
-                style="@style/Text.Jb.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/gap_l"
-                android:text="@string/editor_section_locale" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -551,7 +539,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <com.google.android.material.textfield.TextInputLayout
                     style="@style/Widget.Jb.TextInput.Dropdown"
@@ -624,7 +612,7 @@
                 android:layout_marginTop="@dimen/gap_s"
                 android:background="@drawable/bg_card"
                 android:orientation="vertical"
-                android:padding="14dp">
+                android:padding="16dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -793,7 +781,7 @@
                         android:layout_height="wrap_content"
                         android:layout_marginTop="2dp"
                         android:maxLines="2"
-                        android:text="@string/editor_proxy_idle" />
+                        android:text="@string/not_checked" />
                 </LinearLayout>
             </LinearLayout>
 
@@ -953,12 +941,6 @@
             </LinearLayout>
 
             <!-- ========================================================== typing -->
-            <TextView
-                style="@style/Text.Jb.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/gap_l"
-                android:text="@string/editor_section_typing" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -1002,12 +984,6 @@
             </LinearLayout>
 
             <!-- ====================================================== monitoring -->
-            <TextView
-                style="@style/Text.Jb.Section"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="@dimen/gap_l"
-                android:text="@string/editor_section_watch" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -1113,7 +1089,7 @@
                     style="@style/Widget.Jb.Button.Outlined"
                     android:layout_width="match_parent"
                     android:layout_height="@dimen/button_height"
-                    android:text="@string/profiles_clear_data" />
+                    android:text="@string/browser_clear_data" />
             </LinearLayout>
         </LinearLayout>
     </ScrollView>
@@ -1131,6 +1107,7 @@
         android:background="@color/surface"
         android:gravity="center_vertical"
         android:orientation="horizontal"
+        android:elevation="2dp"
         android:paddingStart="12dp"
         android:paddingTop="10dp"
         android:paddingEnd="12dp"
@@ -1138,14 +1115,9 @@
 
         <ImageButton
             android:id="@+id/btnEditorDelete"
-            android:layout_width="@dimen/touch_target"
-            android:layout_height="@dimen/touch_target"
-            android:background="?attr/selectableItemBackgroundBorderless"
+            style="@style/Widget.Jb.IconButton"
             android:contentDescription="@string/action_delete"
-            android:padding="13dp"
-            android:src="@drawable/ic_trash"
-            app:tint="@color/danger"
-            android:visibility="gone" />
+            android:src="@drawable/ic_trash" />
 
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btnEditorSave"
@@ -1153,7 +1125,7 @@
             android:layout_width="0dp"
             android:layout_height="@dimen/button_height"
             android:layout_marginStart="4dp"
-            android:layout_weight="1"
+            android:layout_weight="1.35"
             android:text="@string/editor_save" />
 
         <com.google.android.material.button.MaterialButton

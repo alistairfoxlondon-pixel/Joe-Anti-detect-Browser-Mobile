@@ -3,20 +3,20 @@ package com.joebrowser.app.ui
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import androidx.activity.result.contract.ActivityResultContracts
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import com.google.android.material.chip.Chip
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
+import com.joebrowser.app.auth.LocalAccount
 import com.joebrowser.app.browser.HumanPaste
 import com.joebrowser.app.core.Async
-import com.joebrowser.app.data.Database
 import com.joebrowser.app.data.Prefs
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.data.ProfileStorage
@@ -30,13 +30,15 @@ import java.util.Locale
 /**
  * Tools / settings tab.
  *
- * Everything here is a real setting with an immediate effect:
- *  - monitor enable/disable and cadence → restarts (or stops) the foreground service,
- *  - human-typing default speed → used by every new "Paste as human" action,
- *  - history/tracker/selection switches → read by the browser activity at request time,
+ * Every row here changes something real and takes effect immediately:
+ *  - monitor cadence → restarts the foreground service,
+ *  - typing speed / rhythm → read by every "Paste as human" run,
+ *  - history / tracker / selection → read by the browser at request time,
  *  - theme → applied process-wide through AppCompatDelegate,
- *  - backup export → real JSON through the share sheet,
- *  - trash / storage / reset → real filesystem and database operations.
+ *  - backup / restore / trash / reset → real filesystem and database operations.
+ *
+ * The screen is assembled from three row layouts ([item_switch_row], [item_value_row] and the
+ * speed/theme chip groups), so adding a setting is one `<include>` and four lines of binding.
  */
 class ToolsFragment : Fragment(), MainActivity.Refreshable {
 
@@ -56,23 +58,16 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
             }
             val body = buildString {
                 append(getString(R.string.tools_import_confirm, restore.profiles.size, restore.proxies.size))
-                if (restore.hadCredentials) {
-                    append("\n\n")
-                    append(getString(R.string.tools_import_credentials))
-                }
+                if (restore.hadCredentials) append("\n\n").append(getString(R.string.tools_import_credentials))
                 val skipped = restore.skippedProfiles + restore.skippedProxies
-                if (skipped > 0) {
-                    append("\n\n")
-                    append(getString(R.string.tools_import_skipped, skipped))
-                }
+                if (skipped > 0) append("\n\n").append(getString(R.string.tools_import_skipped, skipped))
             }
             MaterialAlertDialogBuilder(context)
                 .setTitle(R.string.tools_import)
                 .setMessage(body)
                 .setPositiveButton(R.string.tools_import) { _, _ ->
                     ProfileRepository.restoreBackup(context, restore) { outcome ->
-                        val message = getString(R.string.tools_import_done, outcome.profiles, outcome.proxies)
-                        Async.toast(context, message)
+                        Async.toast(context, getString(R.string.tools_import_done, outcome.profiles, outcome.proxies))
                         if (outcome.skipped > 0) {
                             Async.toast(context, getString(R.string.tools_import_skipped, outcome.skipped))
                         }
@@ -85,14 +80,10 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         }
     }
 
-
     private var _binding: FragmentToolsBinding? = null
     private val binding get() = _binding!!
 
-    /**
-     * The monitor status line, the trash figure and the storage totals are live values. Without
-     * this the status line only moved when the tab was reopened or a setting was toggled here.
-     */
+    /** Live values (monitor status, storage, trash count) must not go stale behind a tab switch. */
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context?, intent: Intent?) {
             val action = intent?.action ?: return
@@ -106,6 +97,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
     }
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        bindAccount()
         bindAppearance()
         bindMonitor()
         bindTyping()
@@ -121,7 +113,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
     }
 
     override fun onStop() {
-        AppEvents.unregister(requireContext().applicationContext, receiver)
+        runCatching { context?.applicationContext?.let { AppEvents.unregister(it, receiver) } }
         super.onStop()
     }
 
@@ -130,16 +122,46 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         refresh()
     }
 
-    // -------------------------------------------------------------- appearance
+    // ------------------------------------------------------------------ account
+
+    private fun bindAccount() {
+        binding.accountEmail.text = LocalAccount.email(requireContext()) ?: getString(R.string.tools_account)
+
+        binding.btnLockApp.setOnClickListener { lockApp() }
+        binding.btnSignOut.setOnClickListener { confirmSignOut() }
+    }
+
+    /**
+     * Lock = forget the in-memory unlock and return to the gate. Sign out does the same thing
+     * but also drops the activity stack, so the next launch starts at the gate as well.
+     */
+    private fun lockApp() {
+        LocalAccount.lock()
+        val gate = Intent(requireContext(), AccountActivity::class.java)
+        gate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
+        startActivity(gate)
+        requireActivity().finishAffinity()
+    }
+
+    private fun confirmSignOut() {
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.tools_sign_out_title)
+            .setMessage(R.string.tools_sign_out_body)
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.tools_sign_out) { _, _ -> lockApp() }
+            .show()
+    }
+
+    // --------------------------------------------------------------- appearance
 
     private fun bindAppearance() {
-        val current = Prefs.themeMode(requireContext())
         val group = binding.themeChips
         group.removeAllViews()
+        val current = Prefs.themeMode(requireContext())
         (0..2).forEach { mode ->
-            group.addView(Chip(requireContext()).apply {
+            val chip = Chip(requireContext()).apply {
                 id = View.generateViewId()
-                text = Prefs.themeLabel(mode)
+                text = Prefs.themeLabel(requireContext(), mode)
                 isCheckable = true
                 isChecked = mode == current
                 setOnClickListener {
@@ -147,26 +169,42 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
                     group.check(id)
                     (activity as? MainActivity)?.recreate()
                 }
-            })
+            }
+            group.addView(chip)
         }
     }
 
-    // ----------------------------------------------------------------- monitor
+    // ------------------------------------------------------------------ monitor
 
     private fun bindMonitor() {
-        binding.switchMonitor.isChecked = Prefs.monitorEnabled(requireContext())
-        binding.switchMonitor.setOnCheckedChangeListener { _, checked ->
+        binding.rowMonitorEnabled.rowIcon.setImageResource(R.drawable.ic_monitor)
+        binding.rowMonitorEnabled.rowTitle.setText(R.string.tools_monitor_enabled)
+        binding.rowMonitorEnabled.rowSwitch.isChecked = Prefs.monitorEnabled(requireContext())
+        binding.rowMonitorEnabled.rowSwitch.setOnCheckedChangeListener { _, checked ->
             Prefs.setMonitorEnabled(requireContext(), checked)
             if (checked) ProxyMonitorService.startIfNeeded(requireContext())
             else ProxyMonitorService.stop(requireContext())
             refreshMonitorStatus()
         }
-        binding.switchAutoRotate.isChecked = Prefs.autoRotateOnFailure(requireContext())
-        binding.switchAutoRotate.setOnCheckedChangeListener { _, checked ->
+        binding.rowMonitorEnabled.rowRoot.setOnClickListener {
+            binding.rowMonitorEnabled.rowSwitch.isChecked = !binding.rowMonitorEnabled.rowSwitch.isChecked
+        }
+
+        binding.rowAutoRotate.rowIcon.setImageResource(R.drawable.ic_refresh)
+        binding.rowAutoRotate.rowTitle.setText(R.string.tools_auto_rotate)
+        binding.rowAutoRotate.rowSwitch.isChecked = Prefs.autoRotateOnFailure(requireContext())
+        binding.rowAutoRotate.rowSwitch.setOnCheckedChangeListener { _, checked ->
             Prefs.setAutoRotateOnFailure(requireContext(), checked)
         }
-        binding.valueMonitorInterval.text = intervalLabel(Prefs.monitorIntervalSec(requireContext()))
-        binding.rowMonitorInterval.setOnClickListener { showIntervalDialog() }
+        binding.rowAutoRotate.rowRoot.setOnClickListener {
+            binding.rowAutoRotate.rowSwitch.isChecked = !binding.rowAutoRotate.rowSwitch.isChecked
+        }
+
+        binding.rowMonitorInterval.rowIcon.setImageResource(R.drawable.ic_clock)
+        binding.rowMonitorInterval.rowTitle.setText(R.string.tools_monitor_interval)
+        binding.rowMonitorInterval.rowChevron.visibility = View.VISIBLE
+        binding.rowMonitorInterval.rowValue.text = intervalLabel(Prefs.monitorIntervalSec(requireContext()))
+        binding.rowMonitorInterval.rowRoot.setOnClickListener { showIntervalDialog() }
     }
 
     private fun intervalLabel(seconds: Int): String = when {
@@ -183,7 +221,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
             .setTitle(R.string.tools_monitor_interval)
             .setSingleChoiceItems(labels, current) { dialog, which ->
                 Prefs.setMonitorIntervalSec(requireContext(), options[which])
-                binding.valueMonitorInterval.text = labels[which]
+                binding.rowMonitorInterval.rowValue.text = labels[which]
                 ProxyMonitorService.startIfNeeded(requireContext())
                 refreshMonitorStatus()
                 dialog.dismiss()
@@ -200,8 +238,8 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         }) { result ->
             val target = _binding ?: return@compute
             val (watching, line) = result ?: (0 to "")
-            target.valueMonitorStatus.text = line
-            target.valueMonitorStatus.setTextColor(
+            target.monitorStatusLine.text = line
+            target.monitorStatusLine.setTextColor(
                 ContextCompat.getColor(
                     target.root.context, if (watching > 0) R.color.success else R.color.text_muted
                 )
@@ -209,81 +247,135 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         }
     }
 
-    // ------------------------------------------------------------------ typing
+    // ------------------------------------------------------------------- typing
 
     private fun bindTyping() {
-        binding.switchHumanPaste.isChecked = Prefs.humanPasteEnabled(requireContext())
-        binding.switchHumanPaste.setOnCheckedChangeListener { _, checked ->
+        binding.rowHumanPaste.rowIcon.setImageResource(R.drawable.ic_keyboard)
+        binding.rowHumanPaste.rowTitle.setText(R.string.tools_human_enabled)
+        binding.rowHumanPaste.rowSwitch.isChecked = Prefs.humanPasteEnabled(requireContext())
+        binding.rowHumanPaste.rowSwitch.setOnCheckedChangeListener { _, checked ->
             Prefs.setHumanPasteEnabled(requireContext(), checked)
+        }
+        binding.rowHumanPaste.rowRoot.setOnClickListener {
+            binding.rowHumanPaste.rowSwitch.isChecked = !binding.rowHumanPaste.rowSwitch.isChecked
+        }
+
+        binding.rowJitter.rowIcon.setImageResource(R.drawable.ic_paste)
+        binding.rowJitter.rowTitle.setText(R.string.editor_human_jitter)
+        binding.rowJitter.rowSwitch.isChecked = Prefs.humanPasteJitter(requireContext())
+        binding.rowJitter.rowSwitch.setOnCheckedChangeListener { _, checked ->
+            Prefs.setHumanPasteJitter(requireContext(), checked)
+        }
+        binding.rowJitter.rowRoot.setOnClickListener {
+            binding.rowJitter.rowSwitch.isChecked = !binding.rowJitter.rowSwitch.isChecked
         }
 
         val group = binding.speedChips
         group.removeAllViews()
         val current = HumanPaste.speedById(Prefs.humanPasteSpeed(requireContext()))
         HumanPaste.speeds.forEach { speed ->
-            group.addView(Chip(requireContext()).apply {
+            val chip = Chip(requireContext()).apply {
                 id = View.generateViewId()
                 text = speed.label
                 isCheckable = true
                 isChecked = speed.id == current.id
                 setOnClickListener {
                     Prefs.setHumanPasteSpeed(requireContext(), speed.id)
-                    binding.humanSpeedHint.text = speed.description
                     group.check(id)
                 }
-            })
+            }
+            group.addView(chip)
         }
-        binding.humanSpeedHint.text = current.description
     }
 
-    // ---------------------------------------------------------------- browsing
+    // ----------------------------------------------------------------- browsing
 
     private fun bindBrowsing() {
-        binding.inputStartUrl.setText(Prefs.defaultStartUrl(requireContext()))
-        binding.inputStartUrl.setOnFocusChangeListener { _, hasFocus ->
-            if (!hasFocus) persistStartUrl()
-        }
+        binding.rowStartUrl.rowIcon.setImageResource(R.drawable.ic_globe)
+        binding.rowStartUrl.rowTitle.setText(R.string.tools_start_url)
+        binding.rowStartUrl.rowChevron.visibility = View.VISIBLE
+        binding.rowStartUrl.rowValue.text = Prefs.defaultStartUrl(requireContext())
+        binding.rowStartUrl.rowRoot.setOnClickListener { promptStartUrl() }
 
-        binding.switchHistory.isChecked = Prefs.historyEnabled(requireContext())
-        binding.switchHistory.setOnCheckedChangeListener { _, checked ->
-            Prefs.setHistoryEnabled(requireContext(), checked)
+        bindSwitch(binding.rowHistory, R.drawable.ic_history, R.string.tools_history, Prefs.historyEnabled(requireContext())) {
+            Prefs.setHistoryEnabled(requireContext(), it)
         }
-
-        binding.switchTracker.isChecked = Prefs.trackerEnabled(requireContext())
-        binding.switchTracker.setOnCheckedChangeListener { _, checked ->
-            Prefs.setTrackerEnabled(requireContext(), checked)
+        bindSwitch(binding.rowTracker, R.drawable.ic_chart, R.string.tools_tracker, Prefs.trackerEnabled(requireContext())) {
+            Prefs.setTrackerEnabled(requireContext(), it)
         }
-
-        binding.switchUnlockSelection.isChecked = Prefs.unlockSelection(requireContext())
-        binding.switchUnlockSelection.setOnCheckedChangeListener { _, checked ->
-            Prefs.setUnlockSelection(requireContext(), checked)
+        bindSwitch(binding.rowUnlockSelection, R.drawable.ic_eye, R.string.tools_unlock, Prefs.unlockSelection(requireContext())) {
+            Prefs.setUnlockSelection(requireContext(), it)
+        }
+        bindSwitch(binding.rowTrash, R.drawable.ic_delete, R.string.tools_trash, Prefs.trashEnabled(requireContext())) {
+            Prefs.setTrashEnabled(requireContext(), it)
         }
     }
 
-    private fun persistStartUrl() {
-        val value = binding.inputStartUrl.text?.toString()?.trim().orEmpty()
-        if (value.isNotEmpty()) Prefs.setDefaultStartUrl(requireContext(), value)
+    private fun bindSwitch(
+        row: com.joebrowser.app.databinding.ItemSwitchRowBinding,
+        iconRes: Int,
+        titleRes: Int,
+        checked: Boolean,
+        onChange: (Boolean) -> Unit
+    ) {
+        row.rowIcon.setImageResource(iconRes)
+        row.rowTitle.setText(titleRes)
+        row.rowSwitch.isChecked = checked
+        row.rowSwitch.setOnCheckedChangeListener { _, value -> onChange(value) }
+        row.rowRoot.setOnClickListener { row.rowSwitch.isChecked = !row.rowSwitch.isChecked }
     }
 
-    // -------------------------------------------------------------------- data
+    private fun promptStartUrl() {
+        val input = android.widget.EditText(requireContext()).apply {
+            setText(Prefs.defaultStartUrl(requireContext()))
+            setSelection(text.length)
+            setPadding(48, 32, 48, 16)
+            inputType = android.text.InputType.TYPE_TEXT_VARIATION_URI
+            maxLines = 1
+        }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.tools_start_url)
+            .setView(input)
+            .setPositiveButton(R.string.action_save) { _, _ ->
+                val value = input.text?.toString()?.trim().orEmpty()
+                if (value.isNotEmpty()) {
+                    Prefs.setDefaultStartUrl(requireContext(), value)
+                    binding.rowStartUrl.rowValue.text = Prefs.defaultStartUrl(requireContext())
+                }
+            }
+            .setNegativeButton(R.string.action_cancel, null)
+            .show()
+    }
+
+    // --------------------------------------------------------------------- data
 
     private fun bindData() {
-        binding.switchTrash.isChecked = Prefs.trashEnabled(requireContext())
-        binding.switchTrash.setOnCheckedChangeListener { _, checked ->
-            Prefs.setTrashEnabled(requireContext(), checked)
-        }
+        binding.rowExportSafe.rowIcon.setImageResource(R.drawable.ic_download)
+        binding.rowExportSafe.rowTitle.setText(R.string.tools_export_safe)
+        binding.rowExportSafe.rowValue.setText(R.string.tools_export_safe_hint)
+        binding.rowExportSafe.rowRoot.setOnClickListener { exportBackup(includeSecrets = false) }
 
-        binding.rowEmptyTrash.setOnClickListener { emptyTrash() }
+        binding.rowExportFull.rowIcon.setImageResource(R.drawable.ic_download)
+        binding.rowExportFull.rowTitle.setText(R.string.tools_export_full)
+        binding.rowExportFull.rowValue.setText(R.string.tools_export_note)
+        binding.rowExportFull.rowRoot.setOnClickListener { exportBackup(includeSecrets = true) }
 
-        binding.btnExportFull.setOnClickListener { exportBackup(includeSecrets = true) }
-        binding.btnExportSafe.setOnClickListener { exportBackup(includeSecrets = false) }
+        binding.rowRestore.rowIcon.setImageResource(R.drawable.ic_import)
+        binding.rowRestore.rowTitle.setText(R.string.tools_import)
+        binding.rowRestore.rowChevron.visibility = View.VISIBLE
+        binding.rowRestore.rowRoot.setOnClickListener { pickBackup() }
 
-        binding.btnReset.setOnClickListener { confirmReset() }
-        binding.btnRestore.setOnClickListener { pickBackup() }
-        binding.switchJitter.isChecked = Prefs.humanPasteJitter(requireContext())
-        binding.switchJitter.setOnCheckedChangeListener { _, checked ->
-            Prefs.setHumanPasteJitter(requireContext(), checked)
-        }
+        binding.rowEmptyTrash.rowIcon.setImageResource(R.drawable.ic_delete)
+        binding.rowEmptyTrash.rowTitle.setText(R.string.tools_empty_trash)
+        binding.rowEmptyTrash.rowRoot.setOnClickListener { emptyTrash() }
+
+        binding.rowStorageUsed.rowIcon.setImageResource(R.drawable.ic_hard_drive)
+        binding.rowStorageUsed.rowTitle.setText(R.string.tools_storage_used)
+
+        binding.rowReset.rowIcon.setImageResource(R.drawable.ic_warning)
+        binding.rowReset.rowTitle.setText(R.string.tools_reset)
+        binding.rowReset.rowTitle.setTextColor(ContextCompat.getColor(requireContext(), R.color.danger))
+        binding.rowReset.rowRoot.setOnClickListener { confirmReset() }
     }
 
     private fun emptyTrash() {
@@ -395,22 +487,18 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
             .show()
     }
 
-    // ------------------------------------------------------------------- about
+    // -------------------------------------------------------------------- about
 
     private fun bindAbout() {
-        binding.valueVersion.text = getString(
-            R.string.tools_version,
-            versionName(),
-            versionCode().toString()
-        )
-        binding.rowLockApp.setOnClickListener {
-            com.joebrowser.app.auth.LocalAccount.lock()
-            val gate = Intent(requireContext(), AccountActivity::class.java)
-            gate.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK)
-            startActivity(gate)
-            requireActivity().finishAffinity()
-        }
-        binding.rowLicenses.setOnClickListener {
+        binding.rowVersion.rowIcon.setImageResource(R.drawable.ic_info)
+        // The row label is the app's name, not a section header repeated as a row title.
+        binding.rowVersion.rowTitle.setText(R.string.app_name)
+        binding.rowVersion.rowValue.text = getString(R.string.tools_version, versionName(), versionCode().toString())
+
+        binding.rowLicenses.rowIcon.setImageResource(R.drawable.ic_folder)
+        binding.rowLicenses.rowTitle.setText(R.string.tools_licenses)
+        binding.rowLicenses.rowChevron.visibility = View.VISIBLE
+        binding.rowLicenses.rowRoot.setOnClickListener {
             Async.safe { startActivity(Intent(requireContext(), LicensesActivity::class.java)) }
         }
     }
@@ -429,7 +517,7 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         0L
     }
 
-    // ----------------------------------------------------------------- refresh
+    // ------------------------------------------------------------------ refresh
 
     override fun refresh() {
         if (_binding == null || !isAdded) return
@@ -437,15 +525,14 @@ class ToolsFragment : Fragment(), MainActivity.Refreshable {
         refreshMonitorStatus()
 
         ProfileRepository.trashCount(context) { count ->
-            _binding?.valueTrashCount?.text = getString(R.string.tools_trash_count, count)
+            _binding?.rowEmptyTrash?.rowValue?.text = getString(R.string.tools_trash_count, count)
         }
         Async.compute({ ProfileStorage.totalSizeBytes(context) }) { bytes ->
-            _binding?.valueStorageUsed?.text = ProfileStorage.humanSize(bytes ?: 0L)
+            _binding?.rowStorageUsed?.rowValue?.text = ProfileStorage.humanSize(bytes ?: 0L)
         }
     }
 
     override fun onDestroyView() {
-        persistStartUrl()
         _binding = null
         super.onDestroyView()
     }

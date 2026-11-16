@@ -82,7 +82,7 @@ object ProfileRepository {
                 onDone?.let { callback -> Async.onMain { runCatching { callback(saved) } } }
                 notifyChanged()
             } else {
-                Async.toast(app, "Could not save the profile")
+                Async.toast(app, app.getString(com.joebrowser.app.R.string.error_save_profile))
             }
         }
     }
@@ -157,6 +157,60 @@ object ProfileRepository {
         }
     }
 
+    /**
+     * Bulk create — the AdsPower/GoLogin "add 20 profiles" flow, done honestly.
+     *
+     * Each profile gets its own engine/OS identity rolled by [FingerprintFactory.regenerate]
+     * and is de-duplicated against every signature already on the device, so twenty profiles
+     * are twenty distinct fingerprints rather than twenty copies of one. Names are generated
+     * from the requested base (`Shop 01`, `Shop 02`, …) and the whole batch is written inside a
+     * single serialised transaction, so a failure halfway through cannot leave a half-batch.
+     */
+    fun createBatch(
+        context: Context,
+        baseName: String,
+        count: Int,
+        engine: BrowserEngine,
+        os: String,
+        proxyId: String?,
+        onDone: (List<Profile>) -> Unit
+    ) {
+        val app = context.applicationContext
+        val safeCount = count.coerceIn(1, 50)
+        Async.serialize {
+            val created = mutableListOf<Profile>()
+            runCatching {
+                val existing = db(app).getAllProfiles().map { FingerprintFactory.signature(it.fp) }.toMutableList()
+                val proxy = proxyId?.let { id -> db(app).getAllProxies().firstOrNull { it.id == id } }
+                val startIndex = nextBatchIndex(existingNames = db(app).getAllProfiles().map { it.name }, base = baseName)
+                repeat(safeCount) { offset ->
+                    val profile = Profile(name = "%s %02d".format(baseName, startIndex + offset))
+                    profile.browserKind = engine.id
+                    profile.browserVersion = FingerprintFactory.latestBuildFor(engine)
+                    FingerprintFactory.regenerate(profile.fp, os, proxy?.config?.lastCountryCode, engine)
+                    FingerprintFactory.ensureUnique(profile.fp, existing)
+                    existing += FingerprintFactory.signature(profile.fp)
+                    // `enabled` is derived from type/host/port, so assigning the config is
+                    // enough — a proxy with a host and port is on by definition.
+                    if (proxy != null) profile.proxy = proxy.config.duplicate()
+                    db(app).saveProfile(profile)
+                    ProfileStorage.ensure(app, profile.id)
+                    created += profile
+                }
+            }.onFailure { Log.w(TAG, "createBatch stopped after ${created.size} profiles", it) }
+            Async.onMain { onDone(created) }
+            notifyChanged()
+        }
+    }
+
+    /** Next free `base NN` suffix, so a second batch does not collide with the first. */
+    private fun nextBatchIndex(existingNames: List<String>, base: String): Int {
+        val pattern = Regex("^" + Regex.escape(base) + "\\s+(\\d+)$")
+        val highest = existingNames.mapNotNull { pattern.find(it)?.groupValues?.get(1)?.toIntOrNull() }
+            .maxOrNull() ?: 0
+        return highest + 1
+    }
+
     // -------------------------------------------------------------- proxies
 
     fun proxies(context: Context, onResult: (List<SavedProxy>) -> Unit) {
@@ -168,7 +222,7 @@ object ProfileRepository {
         val app = context.applicationContext
         Async.serialize {
             val ok = runCatching { db(app).saveProxy(proxy) }.isSuccess
-            if (ok) Async.onMain { onDone?.invoke() } else Async.toast(app, "Could not save the proxy")
+            if (ok) Async.onMain { onDone?.invoke() } else Async.toast(app, app.getString(com.joebrowser.app.R.string.error_save_proxy))
             notifyChanged()
         }
     }

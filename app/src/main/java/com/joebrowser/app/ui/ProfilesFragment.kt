@@ -3,7 +3,6 @@ package com.joebrowser.app.ui
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
-import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
@@ -20,12 +19,14 @@ import com.joebrowser.app.AppEvents
 import com.joebrowser.app.R
 import com.joebrowser.app.browser.BrowserActivity
 import com.joebrowser.app.core.Async
+import com.joebrowser.app.data.BrowserEngine
 import com.joebrowser.app.data.Prefs
 import com.joebrowser.app.data.Profile
 import com.joebrowser.app.data.ProfileRepository
 import com.joebrowser.app.data.ProfileStorage
 import com.joebrowser.app.databinding.FragmentProfilesBinding
 import com.joebrowser.app.databinding.ItemProfileCardBinding
+import com.joebrowser.app.fingerprint.FingerprintFactory
 
 /**
  * Profiles tab.
@@ -53,9 +54,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
             else BrowserActivity.launch(requireContext(), profile.id)
         },
         onLongPress = { profile -> toggleSelection(profile.id) },
-        onEdit = { profile -> (activity as? MainActivity)?.openProfileEditor(profile.id) },
-        onMenu = { profile, anchor -> showMenu(profile, anchor) },
-        onDelete = { profile -> confirmDelete(profile) }
+        onMenu = { profile, anchor -> showMenu(profile, anchor) }
     )
 
     private var allProfiles: List<Profile> = emptyList()
@@ -92,6 +91,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         }
         binding.clearSearch.setOnClickListener { binding.profileSearch.setText("") }
         binding.sortProfiles.setOnClickListener { anchor -> showSortMenu(anchor) }
+        binding.bulkCreate.setOnClickListener { showBulkCreate() }
         refresh()
     }
 
@@ -108,6 +108,62 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
     override fun onResume() {
         super.onResume()
         refresh()
+    }
+
+
+    // ------------------------------------------------------------- bulk create
+
+    /**
+     * Bulk create sheet: name prefix, count, engine and OS.
+     *
+     * The sheet is a plain BottomSheetDialog rather than a MaterialDatePicker-style wizard
+     * because this is a four-field form; every extra screen is a place to lose a user.
+     */
+    private fun showBulkCreate() {
+        val dialog = com.google.android.material.bottomsheet.BottomSheetDialog(requireContext())
+        val sheet = com.joebrowser.app.databinding.SheetBulkCreateBinding.inflate(layoutInflater)
+        dialog.setContentView(sheet.root)
+
+        sheet.bulkNameInput.setText(getString(R.string.bulk_default_name))
+
+        val engines = BrowserEngine.entries
+        val engineLabels = engines.map { it.title }
+        sheet.bulkEngine.setText(engineLabels[0], false)
+        UiKit.bindDropdown(sheet.bulkEngine, engineLabels)
+
+        val osLabels = FingerprintFactory.osList
+        val defaultOs = osLabels.indexOf("Android").coerceAtLeast(0)
+        sheet.bulkOs.setText(osLabels[defaultOs], false)
+        UiKit.bindDropdown(sheet.bulkOs, osLabels)
+
+        // Proxy options: Direct + every saved proxy, loaded off the main thread.
+        var proxyIndex = 0
+        val proxyIds = mutableListOf<String?>(null)
+        val proxyLabels = mutableListOf(getString(R.string.direct))
+        sheet.bulkProxy.setText(proxyLabels.first(), false)
+        UiKit.bindDropdown(sheet.bulkProxy, proxyLabels.toList()) { proxyIndex = it }
+        ProfileRepository.proxies(requireContext()) { proxies ->
+            proxies.forEach { saved ->
+                proxyIds.add(saved.id)
+                proxyLabels.add(saved.displayName())
+            }
+            if (_binding != null) UiKit.bindDropdown(sheet.bulkProxy, proxyLabels.toList())
+        }
+
+        sheet.bulkCreateButton.setOnClickListener {
+            val base = sheet.bulkNameInput.text?.toString()?.trim().orEmpty()
+                .ifBlank { getString(R.string.bulk_default_name) }
+            val count = (sheet.bulkCountInput.text?.toString()?.toIntOrNull() ?: 1).coerceIn(1, 50)
+            val engine = engines.getOrElse(engineLabels.indexOf(sheet.bulkEngine.text.toString())) { BrowserEngine.CHROME }
+            val os = sheet.bulkOs.text?.toString()?.takeIf { it in osLabels } ?: "Android"
+            val proxyId = proxyIds.getOrNull(proxyIndex)
+            dialog.dismiss()
+            ProfileRepository.createBatch(requireContext(), base, count, engine, os, proxyId) { created ->
+                Async.toast(requireContext(), getString(R.string.bulk_created, created.size))
+                refresh()
+            }
+        }
+        dialog.show()
     }
 
     // ------------------------------------------------------------------ sorting
@@ -136,20 +192,26 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         val popup = PopupMenu(requireContext(), anchor)
         popup.menu.add(0, ACTION_EDIT, 0, getString(R.string.action_edit))
         popup.menu.add(0, ACTION_SWITCH_PROXY, 1, getString(R.string.profiles_quick_proxy))
-        popup.menu.add(0, ACTION_NEW_FINGERPRINT, 2, getString(R.string.profiles_new_fingerprint))
-        popup.menu.add(0, ACTION_DUPLICATE, 3, getString(R.string.action_duplicate))
-        popup.menu.add(0, ACTION_SELECT, 4, getString(R.string.profiles_batch_select))
-        popup.menu.add(0, ACTION_CLEAR, 5, getString(R.string.profiles_clear_data))
-        popup.menu.add(0, ACTION_DELETE, 6, getString(R.string.action_delete))
+        popup.menu.add(0, ACTION_TEST_FINGERPRINT, 2, getString(R.string.profiles_test_fp))
+        popup.menu.add(0, ACTION_NEW_FINGERPRINT, 3, getString(R.string.profiles_new_fingerprint))
+        popup.menu.add(0, ACTION_DUPLICATE, 4, getString(R.string.action_duplicate))
+        popup.menu.add(0, ACTION_SELECT, 5, getString(R.string.profiles_batch_select))
+        popup.menu.add(0, ACTION_CLEAR, 6, getString(R.string.browser_clear_data))
+        popup.menu.add(0, ACTION_DELETE, 7, getString(R.string.action_delete))
+        popup.menu.add(0, ACTION_AUDIT_ALL, 8, getString(R.string.profiles_audit_all))
         popup.setOnMenuItemClickListener { item ->
             when (item.itemId) {
                 ACTION_EDIT -> (activity as? MainActivity)?.openProfileEditor(profile.id)
                 ACTION_SWITCH_PROXY -> showQuickProxyPicker(listOf(profile))
+                ACTION_TEST_FINGERPRINT -> FingerprintLabActivity.launch(requireContext(), profile.id)
                 ACTION_NEW_FINGERPRINT -> rerollFingerprint(profile)
                 ACTION_DUPLICATE -> duplicate(profile)
                 ACTION_SELECT -> toggleSelection(profile.id)
                 ACTION_CLEAR -> confirmClearData(profile)
                 ACTION_DELETE -> confirmDelete(profile)
+                ACTION_AUDIT_ALL -> startActivity(
+                    android.content.Intent(requireContext(), FingerprintBatchActivity::class.java)
+                )
             }
             true
         }
@@ -335,8 +397,8 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
 
     private fun confirmClearData(profile: Profile) {
         MaterialAlertDialogBuilder(requireContext())
-            .setTitle(R.string.profiles_clear_data)
-            .setMessage(getString(R.string.profiles_clear_data_body, profile.displayName()))
+            .setTitle(R.string.browser_clear_data)
+            .setMessage(getString(R.string.browser_clear_data_body, profile.displayName()))
             .setPositiveButton(R.string.action_clear) { _, _ -> clearData(profile) }
             .setNegativeButton(R.string.action_cancel, null)
             .show()
@@ -488,9 +550,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         private val selectionActive: () -> Boolean,
         private val onLaunch: (Profile) -> Unit,
         private val onLongPress: (Profile) -> Unit,
-        private val onEdit: (Profile) -> Unit,
-        private val onMenu: (Profile, View) -> Unit,
-        private val onDelete: (Profile) -> Unit
+        private val onMenu: (Profile, View) -> Unit
     ) : RecyclerView.Adapter<ProfileAdapter.Holder>() {
 
         private var items: List<Profile> = emptyList()
@@ -529,6 +589,16 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 } else {
                     view.profileStatus.visibility = View.VISIBLE
                     view.profileStatus.text = statusChipText
+                    // A status nobody can see at a glance is decoration. Banned and paused
+                    // profiles are exactly the ones a user needs to spot while scrolling.
+                    val (bg, fg) = when (profile.status.lowercase()) {
+                        "banned" -> R.drawable.bg_chip_danger to R.color.danger
+                        "paused" -> R.drawable.bg_chip_warning to R.color.warning
+                        "warm-up" -> R.drawable.bg_chip to R.color.accent
+                        else -> R.drawable.bg_chip_neutral to R.color.text_dim
+                    }
+                    view.profileStatus.setBackgroundResource(bg)
+                    view.profileStatus.setTextColor(ContextCompat.getColor(view.root.context, fg))
                 }
 
                 view.profileOsIcon.setImageResource(UiKit.osIconRes(profile.fp.os))
@@ -555,7 +625,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                     !proxy.enabled -> context.getString(R.string.direct)
                     proxy.online -> proxy.label() + " · " + proxy.authority()
                     proxy.checked -> proxy.label() + " · " + context.getString(R.string.proxies_failed)
-                    else -> proxy.label() + " · " + context.getString(R.string.proxies_never_checked)
+                    else -> proxy.label() + " · " + context.getString(R.string.not_checked)
                 }
                 view.proxyLatency.text = if (proxy.online) UiKit.formatLatency(proxy.latencyMs) else ""
                 view.proxyLatency.setTextColor(
@@ -563,9 +633,8 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 )
 
                 view.profileBadge.visibility = if (profile.freshSession) View.VISIBLE else View.GONE
-                view.profileBadge.imageTintList = ColorStateList.valueOf(
-                    ContextCompat.getColor(context, R.color.accent)
-                )
+                view.profileBadgeDot.visibility = if (profile.proxy.enabled && profile.proxy.online)
+                    View.VISIBLE else View.GONE
 
                 view.profileLaunch.setText(
                     if (selectionActive()) R.string.profiles_select_toggle else R.string.action_open
@@ -573,9 +642,7 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
                 view.profileLaunch.setOnClickListener {
                     if (selectionActive()) onLongPress(profile) else BrowserActivity.launch(context, profile.id)
                 }
-                view.profileEdit.setOnClickListener { onEdit(profile) }
                 view.profileMore.setOnClickListener { onMenu(profile, it) }
-                view.profileDelete.setOnClickListener { onDelete(profile) }
                 view.root.setOnClickListener { onLaunch(profile) }
                 view.root.setOnLongClickListener {
                     onLongPress(profile)
@@ -598,6 +665,8 @@ class ProfilesFragment : Fragment(), MainActivity.Refreshable {
         private const val ACTION_DELETE = 104
         private const val ACTION_SWITCH_PROXY = 105
         private const val ACTION_NEW_FINGERPRINT = 106
+        private const val ACTION_AUDIT_ALL = 109
+        private const val ACTION_TEST_FINGERPRINT = 108
         private const val ACTION_SELECT = 107
     }
 }

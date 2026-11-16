@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Compact profile row used on the dashboard (recent) and inside the browser's profile switcher.
+
+  Height is driven by content but bounded: name and meta are single-line and ellipsised, so a
+  long profile name can never wrap the row or push the trailing dot out of view.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/rowRoot"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:background="?attr/selectableItemBackground"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_vertical"
+    android:minHeight="64dp"
+    android:orientation="horizontal"
+    android:paddingStart="12dp"
+    android:paddingTop="10dp"
+    android:paddingEnd="10dp"
+    android:paddingBottom="10dp">
+
+    <TextView
+        android:id="@+id/rowAvatar"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="@drawable/bg_avatar"
+        android:gravity="center"
+        android:importantForAccessibility="no"
+        android:textColor="@color/on_accent"
+        android:textSize="13sp"
+        android:textStyle="bold"
+        tools:text="AL" />
+
+    <LinearLayout
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="12dp"
+        android:layout_weight="1"
+        android:orientation="vertical">
+
+        <TextView
+            android:id="@+id/rowName"
+            style="@style/Text.Jb.Body"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:textStyle="bold"
+            tools:text="Amazon Seller" />
+
+        <TextView
+            android:id="@+id/rowMeta"
+            style="@style/Text.Jb.Caption"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="1dp"
+            android:ellipsize="end"
+            android:maxLines="1"
+            tools:text="Android · Chrome · Direct" />
+    </LinearLayout>
+
+    <View
+        android:id="@+id/rowDot"
+        android:layout_width="8dp"
+        android:layout_height="8dp"
+        android:layout_marginStart="8dp"
+        android:background="@drawable/bg_dot" />
+
+    <ImageView
+        android:id="@+id/rowAction"
+        android:layout_width="24dp"
+        android:layout_height="24dp"
+        android:layout_marginStart="8dp"
+        android:contentDescription="@string/action_open"
+        android:src="@drawable/ic_launch"
+        app:tint="@color/accent" />
+</LinearLayout>

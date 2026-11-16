@@ -134,7 +134,7 @@ class HistoryActivity : AppCompatActivity() {
             .setMessage(
                 getString(
                     if (profileFilter == null) R.string.history_clear_body
-                    else R.string.profiles_clear_data_body,
+                    else R.string.browser_clear_data_body,
                     profiles.firstOrNull { it.id == profileFilter }?.displayName().orEmpty()
                 )
             )

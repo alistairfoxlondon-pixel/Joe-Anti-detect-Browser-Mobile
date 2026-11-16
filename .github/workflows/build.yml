@@ -6,6 +6,11 @@ on:
     tags: ['v*']
   pull_request:
   workflow_dispatch:
+    inputs:
+      dry_run_release:
+        description: 'Exercise the release job without publishing (no real release is created)'
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -24,12 +29,40 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          # Full history: the copy-budget report diffs the 1.4.0 baseline strings, and the
+          # apk-naming step reads the tag. A shallow clone silently disabled both.
+          fetch-depth: 0
 
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
+
+      # Fail before Gradle if a layout references a resource that does not exist, or a
+      # fragment uses a binding field its layout no longer has. These are the two failure
+      # classes that used to surface 4 minutes into a Gradle run.
+      - name: Static resource audit
+        shell: bash
+        run: node tools/verify-resources.js
+
+      # Copy budget: how much of the 1.4.0 baseline wording survived, and how much of the new
+      # text belongs to features that did not exist. Printed on every run so the "less text"
+      # requirement stays measurable instead of being asserted.
+      - name: Copy budget report
+        shell: bash
+        run: node tools/copy-report.js
+
+      # The icon set, launcher art and store images are generated from one source of truth.
+      # Regenerate and fail if the committed output has drifted (a stale icon ships as a bug).
+      - name: Verify generated assets are current
+        shell: bash
+        run: |
+          node tools/generate-assets.js --icons-only
+          node tools/generate-assets.js --check
+          git diff --exit-code --stat app/src/main/res/drawable app/src/main/res/mipmap-anydpi-v26 \
+            || { echo "::error::Generated assets are stale. Run: node tools/generate-assets.js"; exit 1; }
 
       - name: Verify fingerprint layer
         shell: bash
@@ -58,7 +91,7 @@ jobs:
         if: ${{ env.KEYSTORE_BASE64 != '' }}
         run: echo "$KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/joe-release.p12"
 
-      - name: Build debug and release APKs
+      - name: Build APKs
         id: build
         env:
           JOE_KEYSTORE_PATH: ${{ env.KEYSTORE_BASE64 != '' && format('{0}/joe-release.p12', runner.temp) || '' }}
@@ -96,20 +129,79 @@ jobs:
             echo "::notice::$msg"
           done
 
+      # Deterministic, human-readable output names. "app-debug.apk" tells a user nothing and
+      # an unsigned "app-release-unsigned.apk" is what made Windows throw the file away on
+      # download: an APK with no signature cannot be verified, so SmartScreen / Defender
+      # quarantines it. We name what we ship and we only ship verifiable files.
+      - name: Name and verify APKs
+        id: apk
+        shell: bash
+        run: |
+          set -euo pipefail
+          version=$(grep -oP "versionName\s+'\K[^']+" app/build.gradle)
+          code=$(grep -oP "versionCode\s+\K[0-9]+" app/build.gradle)
+          out=dist
+          mkdir -p "$out"
+
+          debug_apk=$(find app/build/outputs/apk/debug -name '*.apk' | head -1)
+          cp "$debug_apk" "$out/joe-browser-$version-debug.apk"
+
+          # A release APK is only redistributed when it is actually signed. An unsigned one is
+          # unusable to the user and is exactly the artefact antivirus products reject.
+          release_apk=$(find app/build/outputs/apk/release -name '*.apk' ! -name '*unsigned*' | head -1 || true)
+          if [ -n "${release_apk:-}" ]; then
+            cp "$release_apk" "$out/joe-browser-$version-release.apk"
+            echo "signed=yes" >> "$GITHUB_OUTPUT"
+          else
+            echo "signed=no" >> "$GITHUB_OUTPUT"
+            # An unsigned release APK cannot be installed on Android at all, and it is the exact
+            # artefact Windows scanners quarantine. Publishing it (or silently substituting a
+            # debug build) is what made 1.4.0 "fail to install"; say so on the run summary
+            # instead of leaving a green tick over an uninstallable download.
+            {
+              echo "### ⚠ Release APK is unsigned"
+              echo ""
+              echo "No keystore secrets are configured, so only the debug-signed APK was published."
+              echo "An unsigned APK cannot be installed and will be quarantined by Windows."
+              echo "See \`tools/make-keystore.md\` to create and register the release keystore."
+            } >> "$GITHUB_STEP_SUMMARY"
+            echo "::warning::Release unsigned — only the debug APK is installable. See tools/make-keystore.md"
+          fi
+
+          ls -la "$out"
+          # Best-effort signature dump: apksigner ships with the Android build-tools image.
+          if command -v apksigner >/dev/null 2>&1; then
+            for f in "$out"/*.apk; do
+              echo "---- $f"; apksigner verify --print-certs "$f" || true
+            done
+          else
+            find "$ANDROID_HOME/build-tools" -name apksigner -type f | sort -r | head -1 | xargs -r -I{} sh -c 'for f in '"$out"'/*.apk; do echo "---- $f"; {} verify --print-certs "$f" || true; done'
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
       - name: Upload APKs
         uses: actions/upload-artifact@v4
         with:
           name: joe-browser-apks
-          path: |
-            app/build/outputs/apk/debug/*.apk
-            app/build/outputs/apk/release/*.apk
+          path: dist/*.apk
           if-no-files-found: error
           retention-days: 30
+
+      - name: Upload build log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-log
+          path: ci-logs/build.log
+          if-no-files-found: ignore
+          retention-days: 7
 
   release:
     name: Publish GitHub release
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
+    # Tags publish for real; a manual run with dry_run_release exercises the same steps against a
+    # throwaway tag so the job is never first tried on the day of a release.
+    if: startsWith(github.ref, 'refs/tags/v') || inputs.dry_run_release
     runs-on: ubuntu-latest
     timeout-minutes: 10
     steps:
@@ -125,25 +217,70 @@ jobs:
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
+          DRY_RUN: ${{ inputs.dry_run_release && '1' || '0' }}
         shell: bash
         run: |
           set -euo pipefail
           tag="${GITHUB_REF_NAME}"
+          if [ "$DRY_RUN" = "1" ]; then
+            # Dry run: publish nothing, but prove the asset list, checksums and notes render.
+            tag="dry-run-${GITHUB_RUN_ID}"
+            echo "::notice::Dry run — no release will be created."
+          fi
           assets=$(find apks -name '*.apk' -type f | sort)
           echo "Assets:"; echo "$assets"
-          signed_note=$(if ls apks/release/*-signed* >/dev/null 2>&1 || ls apks/release/app-release.apk >/dev/null 2>&1; then echo "Release APK is signed."; else echo "Release APK is UNSIGNED (no signing secrets configured) — debug APK included for sideloading."; fi)
+
+          # SHA-256 sums so a user (and Defender's "known file" reputation) can verify the
+          # exact bytes they downloaded. An APK handed around without a checksum is the most
+          # common reason a scanner declines to trust it.
+          ( cd apks && sha256sum *.apk > SHA256SUMS.txt )
+          assets="$assets apks/SHA256SUMS.txt"
+
+          if ls apks/*-release.apk >/dev/null 2>&1; then
+            signed_note="Signed release APK attached. Verify with \`apksigner verify\` and the SHA-256 sums below."
+          else
+            signed_note="No signing key was configured for this build, so only the debug-signed APK is attached. Install it by allowing your file manager to install unknown apps; see INSTALL.md."
+          fi
+
+          if [ "$DRY_RUN" = "1" ]; then
+            echo "--- checksums that would be published ---"
+            cat apks/SHA256SUMS.txt
+            echo "--- notes that would be published ---"
+            echo "## Joe Browser ${tag}"
+            echo "${signed_note}"
+            echo "::notice::Dry run complete: $assets"
+            exit 0
+          fi
+
           gh release create "$tag" $assets \
             --title "Joe Browser ${tag}" \
-            --notes "Joe Browser ${tag} — anti-detect browser for Android.
+            --notes-file - <<NOTES
+          ## Joe Browser ${tag}
 
           ${signed_note}
 
-          What's in this build: isolated per-profile storage (AndroidX WebKit MULTI_PROFILE where supported), proxy authentication via loopback relay (HTTP/HTTPS/SOCKS5), per-profile fingerprint engine (canvas/audio/hardware noise, screen/GPU/cores/memory/locale consistency, Android UA-CH architecture fixes), paste-as-human typing, built-in HTTP tracker counter, proxy library with parallel checks and offline/rotation alerts, history, backups via JSON export.
+          ### Install
+          1. Download \`joe-browser-${tag#v}-debug.apk\` (or the release APK when present).
+          2. Open it from your downloads, allow "install unknown apps" for the file manager once.
+          3. Verify the SHA-256 in \`SHA256SUMS.txt\` if you want to be certain the file is intact.
 
-          New in v1.4.0: local account gate (device-local email+password, PBKDF2 hash, cold-start sign-in, Lock app in Tools — no server, no telemetry), one-tap identity templates for new profiles (coherent engine/OS/GPU/screen/timezone/language), opt-in proxy failover (two strikes → healthiest watched library proxy, with alert), engines tab rebuilt around official brand marks, and ~42% less static interface copy (41 dead strings removed).
+          ### What's in this build
+          - **Five engine families** with official brand marks (Chrome, Chromium, Brave, Edge, Firefox).
+          - **Per-profile isolation**: cookies, storage, cache, proxy and fingerprint.
+          - **Fingerprint engine**: coherent UA / UA-CH / screen / GPU / locale / timezone /
+            canvas / audio / WebGL per profile, verified by \`tools/verify-fingerprint.js\`.
+          - **Proxies**: HTTP, HTTPS, SOCKS5 with credentials through a loopback relay; live
+            checks, watchlists, offline/recovered/rotation alerts and opt-in failover.
+          - **Email + password sign-in** (on-device, no verification email, no server).
+          - **Backups** (JSON export/restore), history, tracker counter, human typing.
+          - **Fingerprint lab**: create a profile and test it on BrowserScan, IPHey, PixelScan,
+            IPFighter, Whoer and CreepJS in one tap.
 
-          v1.3.0: premium emerald design across every screen (launcher and store art redrawn), rebuilt browser chrome — one identity row, icon-only proxy/tracker actions, floating paste pill, no text overflow — fingerprint hardening for the detector sites (webdriver=false, rotating UA-CH GREASE brand with correct fullVersionList, tagged PluginArray/MimeTypeArray with linked references, permissions.query coherent with Notification.permission, profile locale in resolvedOptions, Accept-Language aligned with navigator.languages), cleartext traffic denied, private crash log, launcher shortcuts, overflow and crash fixes throughout.
+          ### Security notes
+          No telemetry, no analytics SDK, no third-party network calls. Cleartext HTTP is
+          disabled app-wide. Passwords are hashed with PBKDF2-HmacSHA256; proxy credentials are
+          AES-256-GCM encrypted with a device-bound Keystore key.
 
-          Previously in v1.2.0: multi-tab fingerprinted browsing, cookie import/export (JSON + Netscape), batch profile actions, quick proxy/fingerprint actions on profile cards, Trash Manager, dashboard 2x2 grid, MaterialSwitch and bottom-sheet overflow fixes.
-
-          All data stays on the device. See README for honest limitations (Android WebView cannot run Chrome extensions or its own sandboxed profile engine; Firefox identities are UA-level only)."
+          See \`INSTALL.md\` for the Windows/macOS "unrecognised app" explanation and the exact
+          steps to install safely.
+          NOTES

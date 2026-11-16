@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Batch fingerprint audit.
+
+  Toolbar, a one-line summary, an optional duplicate warning, then the list sorted worst-first.
+  Nothing else: the detail for one profile lives in the lab screen this list opens.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/bg"
+    android:orientation="vertical">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/toolbar_height"
+        android:background="@color/surface"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="6dp"
+        android:paddingEnd="16dp">
+
+        <ImageButton
+            android:id="@+id/btnBatchBack"
+            style="@style/Widget.Jb.IconButton"
+            android:contentDescription="@string/action_back"
+            android:src="@drawable/ic_back" />
+
+        <TextView
+            style="@style/Text.Jb.ScreenTitle"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="4dp"
+            android:layout_weight="1"
+            android:ellipsize="end"
+            android:maxLines="1"
+            android:text="@string/batch_title" />
+    </LinearLayout>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="@color/line_soft" />
+
+    <TextView
+        android:id="@+id/batchSummary"
+        style="@style/Text.Jb.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:paddingStart="@dimen/screen_h_pad"
+        android:paddingTop="@dimen/gap_m"
+        android:paddingEnd="@dimen/screen_h_pad"
+        android:ellipsize="end"
+        android:maxLines="2" />
+
+    <TextView
+        android:id="@+id/batchDuplicates"
+        style="@style/Text.Jb.Caption"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="@dimen/screen_h_pad"
+        android:layout_marginTop="@dimen/gap_s"
+        android:layout_marginEnd="@dimen/screen_h_pad"
+        android:background="@drawable/bg_card"
+        android:maxLines="2"
+        android:padding="12dp"
+        android:textColor="@color/danger"
+        android:visibility="gone" />
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/batchList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingStart="@dimen/screen_h_pad"
+            android:paddingTop="@dimen/gap_s"
+            android:paddingEnd="@dimen/screen_h_pad"
+            android:paddingBottom="@dimen/gap_l"
+            android:scrollbars="none" />
+
+        <TextView
+            android:id="@+id/batchEmpty"
+            style="@style/Text.Jb.BodyMedium"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:gravity="center"
+            android:paddingStart="28dp"
+            android:paddingEnd="28dp"
+            android:visibility="gone" />
+    </FrameLayout>
+</LinearLayout>

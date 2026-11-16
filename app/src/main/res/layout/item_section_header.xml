@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Section label with an optional trailing action ("See all"). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp">
+
+    <TextView
+        android:id="@+id/sectionTitle"
+        style="@style/Text.Jb.Section"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:ellipsize="end"
+        android:maxLines="1"
+        tools:text="Recent profiles" />
+
+    <TextView
+        android:id="@+id/sectionAction"
+        style="@style/Text.Jb.Label"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:clickable="true"
+        android:focusable="true"
+        android:paddingStart="10dp"
+        android:paddingTop="6dp"
+        android:paddingEnd="2dp"
+        android:paddingBottom="6dp"
+        android:textColor="@color/accent"
+        android:visibility="gone"
+        tools:text="See all"
+        tools:visibility="visible" />
+</LinearLayout>

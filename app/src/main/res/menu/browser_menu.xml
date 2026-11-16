@@ -37,6 +37,8 @@
                 <item android:id="@+id/fpPixelScan" android:title="PixelScan" />
                 <item android:id="@+id/fpIpFighter" android:title="IPFighter" />
                 <item android:id="@+id/fpWhoer" android:title="Whoer" />
+                <item android:id="@+id/fpCreepJs" android:title="CreepJS" />
+                <item android:id="@+id/fpSanny" android:title="Sannysoft" />
             </menu>
         </item>
     </group>

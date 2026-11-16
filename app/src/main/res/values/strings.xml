@@ -21,6 +21,7 @@
     <string name="action_cancel">Cancel</string>
     <string name="action_delete">Delete</string>
     <string name="action_edit">Edit</string>
+    <string name="action_more">More actions</string>
     <string name="action_close">Close</string>
     <string name="action_retry">Retry</string>
     <string name="action_back">Back</string>
@@ -33,7 +34,7 @@
     <string name="action_check_all">Check all</string>
     <string name="action_launch">Launch</string>
     <string name="action_duplicate">Duplicate</string>
-    <string name="action_see_all">See all</string>
+    <string name="action_see_all">All</string>
     <string name="shortcut_new_short">New profile</string>
     <string name="shortcut_new_long">New profile</string>
     <string name="shortcut_profiles_short">Profiles</string>
@@ -42,18 +43,14 @@
     <string name="shortcut_proxies_long">Proxy library</string>
 
     <!-- Dashboard -->
-    <string name="home_greeting">Joe Browser</string>
-    <string name="home_metric_profiles">Profiles</string>
-    <string name="home_metric_proxies">Proxies</string>
-    <string name="home_metric_running">Windows</string>
+    <string name="home_hero_idle">Ready</string>
+    <string name="home_hero_first_run">Create your first profile</string>
     <string name="home_metric_alerts">Alerts</string>
-    <string name="home_new_profile">New profile</string>
+    <string name="home_metric_proxies">Proxies</string>
+    <string name="home_empty_recent_action">Create your first profile</string>
     <string name="home_section_recent">Recent</string>
     <string name="home_section_alerts">Alerts</string>
-    <string name="home_section_checks">Verify</string>
 
-    <string name="home_empty_recent">No profiles yet</string>
-    <string name="home_empty_alerts">No alerts</string>
     <string name="home_kernel_isolated">Isolated</string>
     <string name="home_kernel_shared">Shared storage</string>
     <string name="home_kernel_docstart">Early injection</string>
@@ -62,15 +59,23 @@
     <!-- Profiles -->
     <string name="profiles_search_hint">Search…</string>
     <string name="profiles_empty_title">No profiles yet</string>
-    <string name="profiles_empty_body">Isolated storage &amp; fingerprint</string>
+    <string name="profiles_empty_body">Storage &amp; fingerprint isolated</string>
     <string name="profiles_no_match_title">No matches</string>
     <string name="profiles_no_match_body">Try another search</string>
     <string name="profiles_create_first">Create profile</string>
     <string name="profiles_new">New profile</string>
+    <string name="profiles_bulk_new">Bulk create</string>
+    <string name="bulk_title">Create profiles</string>
+    <string name="bulk_name">Name</string>
+    <string name="bulk_count">How many</string>
+    <string name="bulk_engine">Engine</string>
+    <string name="bulk_proxy">Proxy</string>
+    <string name="bulk_create">Create</string>
+    <string name="bulk_created">%1$d profiles created</string>
+    <string name="bulk_hint">Each profile gets its own fingerprint</string>
+    <string name="bulk_default_name">Profile</string>
     <string name="profiles_sort">Sort</string>
     <string name="profiles_filter_all">All</string>
-    <string name="profiles_clear_data">Clear data</string>
-    <string name="profiles_clear_data_body">Erase data for “%1$s”?</string>
     <string name="profiles_delete_title">Delete “%1$s”?</string>
     <string name="profiles_delete_body_trash">To trash; history removed</string>
     <string name="profiles_delete_body_forever">Delete profile + data?</string>
@@ -78,8 +83,10 @@
     <string name="profiles_count_filtered">%1$d of %2$d</string>
     <string name="profiles_quick_proxy">Switch proxy</string>
     <string name="profiles_new_fingerprint">New fingerprint</string>
+    <string name="profiles_audit_all">Audit all fingerprints</string>
+    <string name="profiles_test_fp">Test fingerprint</string>
     <string name="profiles_fingerprint_regenerated">New fingerprint</string>
-    <string name="profiles_batch_select">Select for batch action</string>
+    <string name="profiles_batch_select">Select</string>
     <string name="profiles_select_toggle">Select</string>
     <string name="profiles_selected_count">%1$d selected</string>
     <string name="profiles_batch_actions">Batch (%1$d)</string>
@@ -95,9 +102,15 @@
     <string name="editor_notes">Notes</string>
     <string name="editor_group">Group</string>
     <string name="editor_tags">Tags</string>
+    <string name="editor_status">Status</string>
+    <string-array name="editor_status_options">
+        <item>Active</item>
+        <item>Warm-up</item>
+        <item>Paused</item>
+        <item>Banned</item>
+    </string-array>
     <string name="editor_engine">Browser</string>
     <string name="editor_os">Operating system</string>
-    <string name="editor_start_url">Start page</string>
     <string name="editor_section_fingerprint">Fingerprint</string>
     <string name="editor_regenerate">Regenerate</string>
     <string name="editor_coherence">Coherence %1$d%%</string>
@@ -106,12 +119,10 @@
     <string name="editor_screen_width">Width</string>
     <string name="editor_screen_height">Height</string>
     <string name="editor_pixel_ratio">Pixel ratio</string>
-    <string name="editor_section_hardware">Hardware</string>
     <string name="editor_cores">CPU cores</string>
     <string name="editor_memory">RAM (GB)</string>
     <string name="editor_touch">Touches</string>
     <string name="editor_gpu_renderer">GPU renderer</string>
-    <string name="editor_section_locale">Locale</string>
     <string name="editor_timezone">Timezone</string>
     <string name="editor_language">Language</string>
     <string name="editor_automatch">Match locale to proxy</string>
@@ -124,7 +135,6 @@
     <string name="editor_proxy_pass">Password</string>
     <string name="editor_proxy_check">Check</string>
     <string name="editor_proxy_library">From library</string>
-    <string name="editor_proxy_idle">Not checked</string>
     <string name="editor_section_protection">Protection</string>
     <string name="editor_canvas">Canvas noise</string>
     <string name="editor_audio">Audio noise</string>
@@ -138,19 +148,15 @@
     <string name="editor_geo">Geolocation</string>
     <string name="editor_fresh">Clear on close</string>
     <string name="editor_fresh_hint">Erased on close</string>
-    <string name="editor_unlock">Allow selection and copy</string>
     <string name="editor_watch">Watch this proxy</string>
     <string name="editor_watch_interval">Watch interval</string>
     <string name="editor_human_paste">Human typing</string>
     <string name="editor_human_speed">Typing speed</string>
-    <string name="editor_section_typing">Typing</string>
-    <string name="editor_section_watch">Monitoring</string>
     <string name="editor_section_storage">Storage</string>
     <string name="editor_storage_used">Storage</string>
     <string name="editor_save">Save profile</string>
     <string name="editor_save_and_open">Save &amp; open</string>
     <string name="editor_name_required">Name is required</string>
-    <string name="editor_saved">Saved</string>
     <string name="editor_created">Created</string>
     <string name="editor_interval_value">every %1$s</string>
     <string name="editor_custom_ua">Custom user agent</string>
@@ -167,15 +173,12 @@
 
     <!-- Proxies -->
     <string name="proxies_device_title">This device</string>
-    <string name="proxies_device_idle">Not checked</string>
     <string name="proxies_monitor_label">Monitor</string>
     <string name="proxies_add">Add proxy</string>
     <string name="proxies_empty_title">No proxies saved</string>
     <string name="proxies_empty_body">Paste a list</string>
     <string name="proxies_library">Library</string>
-    <string name="proxies_never_checked">Not checked</string>
     <string name="proxies_failed">Unreachable</string>
-    <string name="proxies_untested">Not checked</string>
     <string name="proxies_delete_title">Delete proxy?</string>
     <string name="proxies_delete_body">Remove “%1$s”?</string>
     <string name="proxies_rename">Rename</string>
@@ -197,36 +200,37 @@
     <string name="proxies_alert_rotated">Rotated</string>
 
     <!-- Engines -->
-    <string name="engines_title">Browser engines</string>
-
-    <string name="engines_used_by">%1$d in use</string>
-    <string name="engines_unused">Not used</string>
-
-    
+    <string name="engines_subtitle_count">%1$d profiles · five engines</string>
+    <string name="engines_subtitle">Engine families</string>
+    <string name="engines_new_short">New</string>
 
     
 
-    <string name="engines_firefox_note">UA only; WebView renders</string>
+    
+
+
+    <plurals name="engines_profile_count">
+        <item quantity="one">%1$d profile</item>
+        <item quantity="other">%1$d profiles</item>
+    </plurals>
 
     <!-- Tools -->
-    <string name="tools_section_proxy_monitor">Proxy monitor</string>
-    <string name="tools_monitor_enabled">Run in background</string>
+    <string name="tools_section_proxy_monitor">Monitor</string>
+    <string name="tools_monitor_enabled">Background</string>
     <string name="tools_monitor_interval">Check interval</string>
-    <string name="tools_monitor_status">Status</string>
-    <string name="tools_section_typing">Human typing</string>
+    <string name="tools_section_typing">Typing</string>
     <string name="tools_human_enabled">Human typing</string>
     <string name="tools_human_speed">Speed</string>
-    <string name="tools_section_browser">Browser defaults</string>
+    <string name="tools_section_browser">Defaults</string>
     <string name="tools_history">Keep history</string>
     <string name="tools_trash">Keep trash</string>
     <string name="tools_tracker">Count requests</string>
     <string name="tools_unlock">Allow selection and copy</string>
-    <string name="tools_section_appearance">Appearance</string>
     <string name="tools_start_url">Start page</string>
     <string name="tools_section_data">Data</string>
     <string name="tools_export_full">Full backup</string>
-    <string name="tools_export_safe">Backup without passwords</string>
-    <string name="tools_export_note">Plain-text passwords in this file</string>
+    <string name="tools_export_safe">Backup (no passwords)</string>
+    <string name="tools_export_note">Passwords in plain text</string>
     <string name="tools_empty_trash">Empty trash</string>
     <string name="tools_trash_manage_title">Trash</string>
     <string name="tools_trash_empty_toast">Trash is empty</string>
@@ -236,16 +240,26 @@
     <string name="action_restore">Restore</string>
     <string name="action_delete_forever">Delete forever</string>
     <string name="tools_trash_count">%1$d item(s)</string>
-    <string name="tools_import">Restore backup</string>
+    <string name="tools_import">Restore</string>
     <string name="tools_import_confirm">Restore %1$d profiles, %2$d proxies?</string>
     <string name="tools_import_done">Restored %1$d profiles, %2$d proxies</string>
     <string name="tools_import_skipped">%1$d skipped</string>
     <string name="tools_import_invalid">Not a Joe Browser backup</string>
     <string name="tools_import_empty">Backup is empty</string>
     <string name="tools_import_credentials">Includes proxy passwords</string>
-    <string name="tools_reset">Reset all data</string>
+    <string name="tools_reset">Reset</string>
     <string name="tools_reset_title">Reset all data?</string>
     <string name="tools_reset_body">Delete all profiles, proxies and history?</string>
+    <string name="tools_account">Account</string>
+    <string name="tools_sign_out">Sign out</string>
+    <string name="tools_sign_out_title">Sign out?</string>
+    <string name="tools_sign_out_body">Your password is needed to return.</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Light</string>
+    <string name="theme_dark">Dark</string>
+    <string name="tools_theme">Theme</string>
+    <string name="tools_export_safe_hint">No passwords</string>
+    <string name="tools_footer">Local only · no telemetry</string>
     <string name="tools_section_about">About</string>
     <string name="tools_version">Version %1$s (%2$s)</string>
     <string name="tools_licenses">Open source licenses</string>
@@ -279,18 +293,16 @@
     <string name="browser_tracker_summary">%1$d req · %2$d trackers</string>
     <string name="browser_tracker_badge">%1$d req · %2$d trk</string>
     <string name="browser_proxy_ok">Proxy %1$s · %2$d ms</string>
-    <string name="browser_proxy_failed">Proxy failed</string>
-    <string name="browser_proxy_failed_detail">Unreachable — pages may fail</string>
+    <string name="browser_proxy_failed_detail">Offline — pages may fail</string>
     <string name="notify_enabled">Proxy alerts on</string>
     <string name="notify_denied">Monitor still runs</string>
-    <string name="browser_proxy_unsupported">Proxy unsupported</string>
     <string name="browser_proxy_unsupported_toast">WebView cannot route</string>
-    <string name="browser_download_description">Downloaded by Joe Browser</string>
+    <string name="browser_download_description">Joe Browser download</string>
     <string name="browser_download_direct_note">%1$s: downloads go direct</string>
+    <string name="browser_download_permission">Allow storage to download</string>
     <string name="browser_download_started">Download started</string>
-    <string name="browser_download_failed">Could not start the download</string>
+    <string name="browser_download_failed">Download did not start</string>
     <string name="browser_kernel_fallback">Injection at page start</string>
-    <string name="browser_kernel_shared">Shared storage</string>
     <string name="browser_kernel_shared_toast">Shared — update WebView</string>
     <string name="browser_external_failed">No app can open that</string>
 
@@ -347,31 +359,64 @@
     <string name="error_generic">Something went wrong</string>
     <string name="error_profile_not_found">Profile not found</string>
     <string name="browser_profile_missing">Profile not found</string>
+    <string name="error_save_profile">Could not save the profile</string>
+    <string name="error_save_proxy">Could not save the proxy</string>
     <string name="error_no_handler">No app can open this</string>
     <string name="direct">Direct</string>
+    <string name="not_checked">Not checked</string>
+
+    <!-- Fingerprint lab -->
+    <string name="batch_title">Fingerprint audit</string>
+    <string name="batch_no_issues">No contradictions</string>
+    <plurals name="batch_summary">
+        <item quantity="one">%1$d of %2$d profile clean · %3$d issues</item>
+        <item quantity="other">%1$d of %2$d profiles clean · %3$d issues</item>
+    </plurals>
+    <plurals name="batch_duplicates">
+        <item quantity="one">%1$d duplicate fingerprint — sites can link those profiles</item>
+        <item quantity="other">%1$d duplicate fingerprints — sites can link those profiles</item>
+    </plurals>
+    <string name="lab_title">Fingerprint lab</string>
+    <string name="lab_switch">Switch</string>
+    <string name="lab_no_profile">No profile yet</string>
+    <string name="lab_no_profile_body">Create a profile first.</string>
+    <string name="lab_local_title">On-device check</string>
+    <string name="lab_score_value">%1$d%%</string>
+    <string name="lab_sites_title">Test on a real site</string>
+    <string name="lab_open_scan">Open BrowserScan</string>
+    <string name="lab_fact_ua">User agent build</string>
+    <string name="lab_fact_screen">Screen</string>
+    <string name="lab_fact_gpu">GPU</string>
+    <string name="lab_fact_tz">Timezone</string>
+    <string name="lab_fact_lang">Language</string>
+    <string name="lab_fact_cores">CPU / RAM</string>
 
     <!-- Account (local only) -->
     <string name="account_title_create">Create account</string>
     <string name="account_title_signin">Welcome back</string>
-    <string name="account_subtitle">Local only — stays on device</string>
+    <string name="account_subtitle">Stored on this device only</string>
     <string name="account_email">Email</string>
     <string name="account_password">Password</string>
     <string name="account_confirm">Confirm password</string>
     <string name="account_create">Create account</string>
     <string name="account_signin">Sign in</string>
-    <string name="account_to_signin">Have an account? Sign in</string>
-    <string name="account_to_create">New here? Create one</string>
     <string name="account_forgot">Forgot password?</string>
+    <string name="account_change_password">Change password</string>
+    <string name="account_current_password">Current password</string>
+    <string name="account_new_password">New password</string>
+    <string name="account_password_changed">Password changed</string>
     <string name="account_reset_title">Reset local account?</string>
     <string name="account_reset_body">Account only; data stays</string>
     <string name="account_reset">Reset</string>
     <string name="account_error_email">Enter a valid email</string>
-    <string name="account_error_password_short">At least 8 characters</string>
+    <string name="account_error_password_short">At least 6 characters</string>
     <string name="account_error_mismatch">Passwords do not match</string>
     <string name="account_error_credentials">Email or password is wrong</string>
+    <string name="account_error_password_empty">Enter your password</string>
+    <string name="account_error_none">No account yet</string>
     <string name="account_signed_in">Signed in</string>
     <string name="tools_lock_app">Lock app</string>
     <string name="editor_template_applied">Template applied</string>
-    <string name="tools_auto_rotate">Auto-switch on proxy failure</string>
+    <string name="tools_auto_rotate">Auto-switch on failure</string>
     <string name="auto_rotate_notice">Switched to backup proxy</string>
 </resources>

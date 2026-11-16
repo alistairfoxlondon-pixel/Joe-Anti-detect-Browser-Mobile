@@ -10,6 +10,14 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+    <!--
+      Downloads only. DownloadManager writing to the public Downloads folder needs this on
+      Android 8-9 (API 26-28); from API 29 the app can write there without storage permission
+      at all. Requested at the moment of a download, never at launch, and never for anything
+      else — downloads are the only reason Joe Browser asks for a permission.
+    -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
 
     <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
 
@@ -17,6 +25,7 @@
         android:name=".JoeBrowserApp"
         android:allowBackup="false"
         android:fullBackupContent="false"
+        android:requestLegacyExternalStorage="true"
         android:dataExtractionRules="@xml/data_extraction_rules"
         android:hardwareAccelerated="true"
         android:icon="@mipmap/ic_launcher"
@@ -63,6 +72,17 @@
             android:name=".ui.HistoryActivity"
             android:exported="false"
             android:label="@string/history_title" />
+
+        <activity
+            android:name=".ui.FingerprintBatchActivity"
+            android:exported="false"
+            android:label="@string/batch_title"
+            android:parentActivityName=".ui.MainActivity" />
+
+        <activity
+            android:name=".ui.FingerprintLabActivity"
+            android:exported="false"
+            android:label="@string/lab_title" />
 
         <activity
             android:name=".ui.LicensesActivity"

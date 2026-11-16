@@ -8,6 +8,7 @@ import android.content.Intent
 import android.graphics.Bitmap
 import android.net.Uri
 import android.net.http.SslError
+import android.Manifest
 import android.os.Build
 import android.os.Bundle
 import android.os.Environment
@@ -100,6 +101,16 @@ class BrowserActivity : AppCompatActivity() {
 
     private var tracker: TrackerMonitor? = null
     private var fileCallback: ValueCallback<Array<Uri>>? = null
+
+    /** A download waiting on the API 26-28 storage permission; null when nothing is pending. */
+    private data class PendingDownload(
+        val url: String,
+        val userAgent: String?,
+        val disposition: String?,
+        val mimeType: String?
+    )
+
+    private var pendingDownload: PendingDownload? = null
     private var customView: View? = null
     private var customViewCallback: WebChromeClient.CustomViewCallback? = null
     private var pendingUrl: String = ""
@@ -152,7 +163,7 @@ class BrowserActivity : AppCompatActivity() {
             // Missing WebView provider or unusable identity: flag the dot, never crash.
             binding.browserKernelDot.visibility = View.VISIBLE
             binding.browserKernelDot.setBackgroundResource(R.drawable.bg_dot_warn)
-            binding.browserKernelDot.contentDescription = getString(R.string.browser_kernel_shared)
+            binding.browserKernelDot.contentDescription = getString(R.string.home_kernel_shared)
         }
 
         // Chrome is wired before the WebView exists so the error state is still navigable
@@ -222,7 +233,7 @@ class BrowserActivity : AppCompatActivity() {
 
     private fun updateTabBadge() {
         if (!::binding.isInitialized) return
-        binding.btnTabs.text = tabs.size.coerceAtLeast(1).toString()
+        binding.tabsCount.text = tabs.size.coerceAtLeast(1).toString()
     }
 
     private fun openNewTab(initialUrl: String? = null) {
@@ -322,11 +333,12 @@ class BrowserActivity : AppCompatActivity() {
             if (isolated) R.drawable.bg_dot_good else R.drawable.bg_dot_warn
         )
         binding.browserKernelDot.contentDescription =
-            getString(if (isolated) R.string.browser_kernel_ok else R.string.browser_kernel_shared)
-        if (!isolated) {
-            Async.toast(this, getString(R.string.browser_kernel_shared_toast))
-        } else if (status.warning != null && status.injection == BrowserKernel.InjectionMode.EARLY_FALLBACK) {
-            Async.toast(this, getString(R.string.browser_kernel_fallback))
+            getString(if (isolated) R.string.browser_kernel_ok else R.string.home_kernel_shared)
+        // One toast, chosen by the worst capability this WebView is missing.
+        when (status.warning) {
+            BrowserKernel.Warning.SHARED_STORAGE -> Async.toast(this, getString(R.string.browser_kernel_shared_toast))
+            BrowserKernel.Warning.LATE_INJECTION -> Async.toast(this, getString(R.string.browser_kernel_fallback))
+            null -> Unit
         }
     }
 
@@ -729,6 +741,8 @@ class BrowserActivity : AppCompatActivity() {
             R.id.fpPixelScan -> { load("https://pixelscan.net/"); true }
             R.id.fpIpFighter -> { load("https://ipfighter.com/"); true }
             R.id.fpWhoer -> { load("https://whoer.net/"); true }
+            R.id.fpCreepJs -> { load("https://abrahamjuliot.github.io/creepjs/"); true }
+            R.id.fpSanny -> { load("https://bot.sannysoft.com/"); true }
             else -> false
         }
     }
@@ -1061,6 +1075,17 @@ class BrowserActivity : AppCompatActivity() {
         val scheme = runCatching { Uri.parse(url).scheme?.lowercase() }.getOrNull()
         if (scheme != "http" && scheme != "https") {
             Async.toast(this, getString(R.string.browser_download_failed))
+            return
+        }
+        // API 26-28 cannot write to the public Downloads folder without this permission, and a
+        // DownloadManager request that fails on a missing permission looks exactly like "the
+        // download silently did nothing". Ask once, then continue with the file that was tapped.
+        if (needsLegacyStoragePermission() && !hasLegacyStoragePermission()) {
+            pendingDownload = PendingDownload(url, userAgent, disposition, mimeType)
+            requestPermissions(
+                arrayOf(Manifest.permission.WRITE_EXTERNAL_STORAGE),
+                REQUEST_STORAGE
+            )
             return
         }
         val loaded = profile
@@ -1457,6 +1482,36 @@ class BrowserActivity : AppCompatActivity() {
     // ------------------------------------------------------------- lifecycle
 
     @Deprecated("Deprecated in Java")
+    /** True only on API 26-28, where the public Downloads folder still needs a permission. */
+    private fun needsLegacyStoragePermission(): Boolean =
+        Build.VERSION.SDK_INT in Build.VERSION_CODES.O..Build.VERSION_CODES.P
+
+    private fun hasLegacyStoragePermission(): Boolean =
+        ContextCompat.checkSelfPermission(
+            this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+        ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<out String>,
+        grantResults: IntArray
+    ) {
+        if (requestCode != REQUEST_STORAGE) {
+            super.onRequestPermissionsResult(requestCode, permissions, grantResults)
+            return
+        }
+        val pending = pendingDownload
+        pendingDownload = null
+        val granted = grantResults.firstOrNull() == android.content.pm.PackageManager.PERMISSION_GRANTED
+        if (pending == null) return
+        if (granted) {
+            download(pending.url, pending.userAgent, pending.disposition, pending.mimeType)
+        } else {
+            // Denied: say what that means instead of pretending the download started.
+            Async.toast(this, getString(R.string.browser_download_permission))
+        }
+    }
+
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode != REQUEST_FILE) {
             @Suppress("DEPRECATION")
@@ -1584,6 +1639,7 @@ class BrowserActivity : AppCompatActivity() {
         private const val EXTRA_URL = "url"
         private const val STATE_URL = "browser_url"
         private const val REQUEST_FILE = 4311
+        private const val REQUEST_STORAGE = 4312
 
         /** Open a profile's window, optionally on a specific URL. */
         fun launch(context: Context, profileId: String, url: String? = null) {

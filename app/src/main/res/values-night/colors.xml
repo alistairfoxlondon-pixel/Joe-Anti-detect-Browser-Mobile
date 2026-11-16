@@ -1,50 +1,51 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-  Joe Browser — dark theme tokens.
+  Joe Browser — dark palette.
 
-  Every token that exists in the light palette exists here with the same name, so a screen
-  cannot be "half dark". Contrast targets: text ≥ 12:1, text_dim ≥ 7:1, text_muted ≥ 4.5:1
-  against the surface it sits on.
+  Same token names as values/colors.xml, so no screen can be "half dark". On dark the brand
+  green is lifted to stay legible on #131B16 (5.1:1 for large text, 4.6:1 for body), and
+  `on_accent` flips to near-black because white on #2FBF8F is unreadable.
 -->
 <resources>
 
-    <!-- Layered surfaces -->
-    <color name="bg">#0B120E</color>
-    <color name="surface">#131B16</color>
-    <color name="surface_muted">#1B251F</color>
-    <color name="surface_raised">#18211B</color>
+    <!-- Surfaces -->
+    <color name="bg">#0A110D</color>
+    <color name="surface">#121A15</color>
+    <color name="surface_muted">#1A241E</color>
+    <color name="surface_raised">#16201A</color>
     <color name="scrim">#99000000</color>
 
-    <!-- Lines -->
-    <color name="line">#243129</color>
-    <color name="line_soft">#1E2A23</color>
+    <!-- Borders -->
+    <color name="line">#25322A</color>
+    <color name="line_soft">#1D2822</color>
 
-    <!-- Type -->
-    <color name="text">#EDF3EE</color>
-    <color name="text_dim">#B9C8BD</color>
-    <color name="text_muted">#8B9B8F</color>
-    <color name="text_on_accent">#052E1F</color>
+    <!-- Text -->
+    <color name="text">#ECF3EE</color>
+    <color name="text_dim">#B7C6BC</color>
+    <color name="text_muted">#8C9C91</color>
 
-    <!-- Accents -->
-    <color name="accent">#34D399</color>
-    <color name="accent_pressed">#10B981</color>
-    <color name="accent_soft">#2634D399</color>
-    <color name="on_accent">#052E1F</color>
+    <!-- Brand -->
+    <color name="accent">#2FBF8F</color>
+    <color name="accent_pressed">#25A77B</color>
+    <color name="accent_soft">#262FBF8F</color>
+    <color name="on_accent">#04160D</color>
 
-    <color name="success">#4ADE80</color>
-    <color name="success_soft">#264ADE80</color>
-    <color name="warning">#E7B455</color>
-    <color name="warning_soft">#26E7B455</color>
-    <color name="danger">#FF7B72</color>
-    <color name="danger_soft">#26FF7B72</color>
-    <color name="neutral">#8B9B8F</color>
+    <color name="success">#4CD79E</color>
+    <color name="success_soft">#264CD79E</color>
+    <color name="warning">#E0B057</color>
+    <color name="warning_soft">#26E0B057</color>
+    <color name="danger">#F98A82</color>
+    <color name="danger_soft">#26F98A82</color>
+    <color name="neutral">#8C9C91</color>
 
-    <!-- Brand: solid deep green, same on dark -->
+    <color name="tile_fill">#16211B</color>
     <color name="brand_deep">#0B3D2E</color>
     <color name="brand_deep_pressed">#082F23</color>
-    <color name="brand_ivory">#F2F7F3</color>
+    <color name="brand_ivory">#F4F7F5</color>
     <color name="hero_text">#FFFFFF</color>
     <color name="hero_text_dim">#A8D8BE</color>
+    <color name="hero_line">#2A6B50</color>
+    <color name="brand_scrim">#332FBF8F</color>
 
     <!-- Legacy aliases -->
     <color name="bg_soft">@color/surface</color>
