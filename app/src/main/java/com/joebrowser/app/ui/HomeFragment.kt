@@ -196,7 +196,17 @@ class HomeFragment : Fragment(), MainActivity.Refreshable {
                 target1?.displayName() ?: context.getString(R.string.home_hero_idle)
             }
         }
+        // The hero names the profile that a verify tap would use and offers the primary action
+        // itself, so the most common task (open my profile) is one tap from launch rather than
+        // a trip through the profile list.
         target.heroHeadline.text = text
+        val hasProfile = profiles.isNotEmpty()
+        target.heroOpen.visibility = if (hasProfile) View.VISIBLE else View.GONE
+        target.heroOpen.setOnClickListener {
+            val selected = selectVerifyTarget() ?: return@setOnClickListener
+            Prefs.setLastProfileId(requireContext(), selected.id)
+            BrowserActivity.launch(requireContext(), selected.id)
+        }
     }
 
     private fun bindProxyMetric(target: FragmentHomeBinding, proxies: List<SavedProxy>) {
