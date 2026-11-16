@@ -226,7 +226,6 @@
     <string name="tools_trash">Keep trash</string>
     <string name="tools_tracker">Count requests</string>
     <string name="tools_unlock">Allow selection and copy</string>
-    <string name="tools_section_appearance">Theme</string>
     <string name="tools_start_url">Start page</string>
     <string name="tools_section_data">Data</string>
     <string name="tools_export_full">Full backup</string>
